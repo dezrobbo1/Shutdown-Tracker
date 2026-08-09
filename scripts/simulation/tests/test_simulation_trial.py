@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 
@@ -8,6 +9,7 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "simulation_trial.py"
 spec = importlib.util.spec_from_file_location("simulation_trial", MODULE_PATH)
 simulation_trial = importlib.util.module_from_spec(spec)
 assert spec.loader is not None
+sys.modules[spec.name] = simulation_trial
 spec.loader.exec_module(simulation_trial)
 
 MspdiDocument = simulation_trial.MspdiDocument
