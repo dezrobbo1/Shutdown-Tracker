@@ -1,11 +1,14 @@
 # Source Archives
 
-This folder preserves immutable source bundles after intake and classification.
+Raw source archives are external to this repository.
 
-Current archive:
+This directory may contain text-only manifest or provenance notes, but must not contain real Microsoft Project schedules, customer/site data, raw evidence, uploaded research bundles, or other operational source archives.
 
-- `Shutdown_Tracker_Current_Project_Sources_2026-08-13.zip`
+The earlier `Shutdown_Tracker_Current_Project_Sources_2026-08-13.zip` bundle is intentionally absent from the current tree because it included three real Microsoft Project XML schedules.
 
-The archive contains 22 project source files plus its internal manifest. Files are separated inside the ZIP into `research/` and `reference/`, with the three real Microsoft Project XML schedules under `reference/microsoft-project-xml/`.
+If a future archive is needed for research provenance:
 
-Do not edit files inside an archived bundle in place. If source material changes, create a newly dated archive and update the source catalogues.
+1. store the raw archive in an approved external location;
+2. record a non-sensitive identifier/hash and disposition here if useful;
+3. keep only sanitized/synthetic fixtures under `fixtures`;
+4. never copy a real schedule into application tests.
