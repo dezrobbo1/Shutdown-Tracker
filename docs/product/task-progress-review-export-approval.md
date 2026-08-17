@@ -1,392 +1,305 @@
-# Task Progress Review and Export Approval
+# Task Progress Review and Project Input Approval
 
-Task Progress Review and Export Approval is the next core Shutdown Tracker product capability.
-
-It connects field execution truth to the existing Microsoft Project import/export foundation without turning Shutdown Tracker into a scheduler or an automatic Project write-back tool.
+Task Progress Review connects field execution truth and authorised planner Console input to a planner-controlled Microsoft Project candidate schedule.
 
 ## Product decision
 
-Shutdown Tracker should capture structured task progress, route it through supervisor validation and planner review, and only then allow selected leaf-task progress/actual fields to become export-preview candidates.
+Shutdown Tracker captures structured execution facts, routes field-originated facts through operational review, allows authorised planners to enter or correct permitted inputs in the Master Console, and then creates an approved input set for a complete updated Project candidate.
+
+The candidate is opened/imported in Microsoft Project, Microsoft Project recalculates it, and the planner reviews the resulting schedule before deciding whether to reject it, retain it, use it as the next schedule/master, or merge/import it into another existing schedule.
+
+Planner input approval does **not** mean the resulting Project-calculated schedule has already been accepted or adopted.
 
 Core workflow:
 
 ```text
-field progress update
--> supervisor review
--> planner review
--> export eligibility
--> export preview
--> MSPDI/XML artifact generated
--> planner manually opens/checks in Microsoft Project
--> planner controls whether master .mpp is saved
--> Shutdown Tracker records verification metadata and audit
+field execution update and/or authorised planner Console input
+-> supervisor review where policy requires
+-> planner input review
+-> authoritative input candidates
+-> sealed approved-input manifest / preview
+-> complete updated Project candidate generated
+-> Microsoft Project opens/imports and recalculates candidate
+-> candidate delta review
+-> planner chooses reject / retain / use as next schedule / merge-import
+-> adoption or merge outcome recorded separately
 ```
 
-## Product boundary
+## Input origins
 
-Microsoft Project remains the schedule authority and final master-file control point.
+An input may originate from:
 
-Shutdown Tracker owns:
+- field user execution capture;
+- supervisor correction of a field update;
+- planner entry or correction in the Master Console; or
+- another structured source explicitly authorised by project policy.
 
-- execution truth;
-- task progress capture;
-- supervisor review;
-- planner review;
-- export eligibility checks;
-- export preview preparation;
-- MSPDI/XML artifact metadata;
-- manual Microsoft Project verification metadata;
-- blockers, actions, evidence, handover, and audit.
+Planner-originated input does not become unaudited or implicitly trusted. It must still carry:
 
-Shutdown Tracker must not:
+- actor and timestamp;
+- accepted source snapshot/file identity;
+- imported task identity;
+- current source value;
+- proposed value;
+- source reason/context;
+- handoff policy/support state;
+- approval decision.
 
-- calculate CPM;
-- calculate float;
-- calculate critical path;
-- resource-level;
-- optimise the schedule;
-- automatically move dates;
-- edit dependencies, constraints, calendars, baselines, WBS, resources, or planned dates;
-- perform hidden write-back into Microsoft Project;
-- imply that progress approval updates the master `.mpp`;
-- imply that MSPDI/XML artifact generation updates the master `.mpp`;
-- imply that Microsoft Project verification means the master `.mpp` was saved.
+A project policy may allow a planner-originated input to skip supervisor review when operational validation is not required, but it must not skip planner input authority, provenance, stale-data checks, or candidate preview.
 
-## Why this is the next major capability
+## User responsibilities
 
-The current repo already has partial import/export review infrastructure, export preview, export approval/generation metadata, Project opened/verified metadata, and worker-backed MSPDI/XML artifact handoff.
-
-The missing product bridge is:
-
-```text
-field task update -> supervisor review -> planner review -> approved export candidate
-```
-
-Without this bridge, export preview must be fed by explicit test candidates rather than reviewed live execution records.
-
-## Users and responsibilities
-
-| User | Responsibility in this workflow | Must not be burdened with |
+| User | Responsibility | Must not be burdened with |
 | --- | --- | --- |
-| Field User | Submit structured progress, blockers, comments, and evidence references for assigned work | Export eligibility, Project fields, WBS-wide review |
-| Contractor | Submit scoped progress and evidence under contractor visibility rules | Other contractors' work or export decisions |
-| Supervisor | Validate operational accuracy, evidence completeness, blockers, and completion claims | Final Microsoft Project export approval |
-| Coordinator | Triage review queues, blockers, actions, and handover impact | Project file mechanics |
-| Shutdown Control | Maintain live operational awareness and ensure review queues are moving | Routine field entry or Project save decisions |
-| Planner | Decide which reviewed leaf-task progress fields are safe to send toward Microsoft Project | Raw field entry or frontline evidence capture |
-| Inspector | Review quality/evidence outcomes where assigned | Schedule handoff decisions |
-| Viewer / Management | Read progress status, exceptions, handover, and report summaries | Editable task/review/export controls |
+| Field User | Record what happened at the workfront | Project field mechanics or schedule-impact review |
+| Contractor | Submit scoped execution facts/evidence | Other contractors' work or planner decisions |
+| Supervisor | Validate operational credibility | Final candidate-schedule adoption |
+| Coordinator | Triage review queues, blockers, actions, handover | Project file mechanics |
+| Shutdown Control | Maintain live operational awareness | Routine planner file operations |
+| Planner | Enter/correct permitted inputs, approve exact Project inputs, review recalculated candidate, choose final disposition | Raw frontline evidence capture unless needed |
+| Inspector | Review assigned quality/evidence outcomes | Schedule handoff decisions unless separately authorised |
+| Viewer / Management | Read execution and candidate-impact summaries | Editable review/handoff controls |
 
 ## State dimensions
 
-Do not collapse every task condition into one status. A task can be blocked, queued locally, awaiting planner review, and not export-eligible at the same time.
+Do not collapse task condition into one status.
 
-| Dimension | Purpose | Example states |
-| --- | --- | --- |
-| Execution state | What is happening at the workfront | Not started, Ready, In progress, Paused, Blocked, Completed |
-| Progress review state | Whether the submitted progress has been checked operationally | Draft, Submitted, Needs supervisor review, Supervisor accepted, Correction requested, Rejected, Superseded |
-| Planner review state | Whether a planner has reviewed export relevance and Project safety | Draft, Needs planner review, Planner approved, Planner rejected |
-| Export state | Whether approved values are safe for export preview/handoff | Not eligible, Eligible, Export blocked, Approved for export, In export preview, Artifact generated, Opened in Microsoft Project, Verified, Rejected / superseded |
-| Sync state | Whether a client-side event has reached the server | Local draft, Queued on device, Sending, Server received, Failed, Conflict |
-
-## Execution state rules
-
-| State | Meaning | Typical actor | Required fields | Export implication |
-| --- | --- | --- | --- | --- |
-| Not started | Imported task is not yet active | System / planner | none | No export by itself |
-| Ready | Available for work today or assigned | Supervisor / system | assignment or readiness context | No export by itself |
-| In progress | Work has genuinely started | Field user / supervisor | start time or progress note | May support actual start candidate after review |
-| Paused | Temporarily stopped, not necessarily blocked | Field user / supervisor | pause reason | Internal operational state only |
-| Blocked | Cannot continue until issue is resolved | Field user / supervisor | blocker type, severity, short description | Blocks export review until reviewed |
-| Completed | Field says work is done | Field user | completion confirmation, evidence if required | May support percent complete / actual finish candidate after review |
-
-## Progress submission fields
-
-| Field | Field-entered? | Supervisor review? | Planner review? | Export-eligible? | Notes |
-| --- | --- | --- | --- | --- | --- |
-| Percent complete | Yes | Yes | Yes | Yes, leaf tasks only | MVP export candidate |
-| Actual start | Yes | Yes | Yes | Yes, leaf tasks only | MVP export candidate |
-| Actual finish | Yes | Yes | Yes | Yes, leaf tasks only | MVP export candidate |
-| Physical percent complete | Optional | Yes | Yes | Deferred / internal first | Use only where site practice is consistent |
-| Remaining duration | Rarely | Yes | Yes | Deferred | Higher Project recalculation side-effect risk |
-| Actual duration | Rarely | Yes | Yes | Deferred | Prefer derived/controlled handling later |
-| Actual work / remaining work | No for MVP | Yes if later enabled | Yes | Deferred | Assignment/work model complexity |
-| Assignment actuals | No for MVP | Yes if later enabled | Yes | Deferred | Requires separate assignment-review model |
-| Comment | Yes | Yes | Sometimes | No | Context only; not progress truth |
-| Evidence reference | Yes | Yes | Yes for completion-critical work | No direct Project export | Supports review confidence |
-| Blocker link | Yes | Yes | Yes if export affected | No direct Project export | May block candidate |
-
-## MVP export whitelist
-
-Only these fields may become MVP export candidates, and only for imported leaf tasks:
-
-- percent complete;
-- actual start;
-- actual finish.
-
-These are not MVP export candidates:
-
-- physical percent complete, unless a later product decision enables it for a specific project/site;
-- remaining duration;
-- actual duration;
-- actual work;
-- remaining work;
-- assignment actuals;
-- summary-task actuals;
-- planned dates;
-- dependencies;
-- constraints;
-- calendars;
-- baselines;
-- WBS/outline structure;
-- resource rates, availability, allocation, or levelling data.
-
-## Leaf-task and summary-task rules
-
-- Only leaf-task progress/actual fields may become export candidates.
-- Summary tasks may appear as context, reporting groups, or Critical Work Package sources.
-- Summary-task progress must not be exported directly.
-- Let Microsoft Project roll up summary values.
-- A summary-task progress submission should be corrected into child-task progress or kept as internal/reporting context.
-
-UI copy:
-
-```text
-Summary task. Not eligible for direct progress export.
-Leaf task. Eligible fields may be reviewed for export.
-```
-
-## Supervisor review workflow
-
-Supervisor review confirms whether a field update is operationally credible. It does not approve Microsoft Project export.
-
-Supervisor actions:
-
-| Action | Meaning | Next state |
-| --- | --- | --- |
-| Accept | Update is operationally valid | Supervisor accepted |
-| Correct | Supervisor changes or clarifies value/reason | Correction requested or superseded update |
-| Reject | Update is not accepted | Rejected |
-| Request evidence | Completion or claim lacks required proof | Evidence gap / export blocked |
-| Link blocker | Work is constrained by structured issue | Blocked / export blocked |
-| Include in handover | Incoming shift must know | Handover item linked |
-
-Required copy:
-
-```text
-Supervisor review confirms operational validity. It does not approve Microsoft Project export.
-```
-
-## Planner review workflow
-
-Planner review decides whether a reviewed progress value is safe to send toward Microsoft Project through export preview.
-
-Planner review queue must show:
-
-- imported project snapshot;
-- imported task identity;
-- task name/code;
-- leaf/summary indicator;
-- current imported Project value;
-- proposed Shutdown Tracker value;
-- source update;
-- submitted by/at;
-- supervisor review state;
-- evidence state;
-- blocker/action state;
-- re-import/lineage conflict state;
-- export eligibility result;
-- exclusion reason if blocked;
-- planner approve/reject/request-clarification decision.
-
-Required copy:
-
-```text
-Planner approval marks this progress as eligible for export preview. The master .mpp is not updated.
-```
-
-## Export preview workflow
-
-Export preview is a planner-facing comparison and approval surface. It must show old value, new value, source, task identity, field, eligibility, and exclusion reason.
-
-Required sequence copy:
-
-```text
-Draft export preview — master .mpp not updated.
-Export batch approved — master .mpp not updated.
-MSPDI/XML artifact generated — master .mpp not updated.
-Planner must manually open/check the artifact in Microsoft Project.
-Verified in Microsoft Project — master .mpp update remains planner-controlled.
-```
-
-## Microsoft Project verification workflow
-
-Project verification records that a planner manually opened or checked the generated MSPDI/XML artifact in Microsoft Project. It does not automate Project and does not save the master `.mpp`.
-
-Verification metadata should include:
-
-- export batch ID;
-- generated artifact ID/URI/hash;
-- generated at/by;
-- opened in Microsoft Project state;
-- opened by/at;
-- verified by/at;
-- verification outcome;
-- rejection/supersession state;
-- notes;
-- audit correlation ID.
-
-Required copy:
-
-```text
-Shutdown Tracker records verification metadata only. Saving or updating the master .mpp is a manual planner-controlled step outside Shutdown Tracker automation.
-```
-
-## Re-import and stale candidate handling
-
-Every Microsoft Project re-import creates a new immutable snapshot. Progress candidates submitted against an older snapshot must be revalidated before export.
-
-| Scenario | Behaviour |
+| Dimension | Examples |
 | --- | --- |
-| Same imported task confidently matched | Carry candidate forward with matched lineage |
-| Task renamed but matched | Carry candidate forward with warning |
-| Task moved WBS/summary | Carry candidate forward with lineage warning |
-| Task deleted | Mark candidate orphaned and not exportable |
-| Task replaced | Require planner lineage review |
-| Summary/leaf status changed | Recheck export eligibility |
-| Snapshot changed after mobile offline capture | Mark conflict and require review before export |
+| Execution state | Not started, Ready, In progress, Paused, Blocked, Completed |
+| Progress review state | Draft, Submitted, Supervisor accepted, Correction requested, Rejected, Superseded |
+| Planner input state | Needs review, Approved as input, Rejected, Clarification requested, Superseded |
+| Candidate schedule state | Not prepared, Calculation pending, Candidate produced, Delta ready, Accepted, Rejected, Superseded |
+| Candidate disposition | Retained, Adopted as next schedule, Merged/imported into existing, Superseded |
+| Sync state | Local draft, Queued, Sending, Server received, Failed, Conflict |
 
-UI copy:
+## Execution actions
+
+| Field action | Tracker meaning | Automatic Project mapping? |
+| --- | --- | --- |
+| Start | Work genuinely started at a recorded time | No; may create an Actual Start candidate after review |
+| Pause | Temporary stop with reason | No |
+| Resume | Work restarted | No |
+| Block | Work cannot continue; create/link a Problem | No |
+| Progress update | Report measured progress using configured method | No automatic mapping until reviewed |
+| Complete | Field completion claim with evidence/policy checks | No; may create one or more review candidates |
+
+Start/Pause/Resume/Block/Complete are execution events, not Project field aliases.
+
+## Planner Console entry
+
+The Master Console may allow an authorised planner to enter or correct Project-bound execution facts that are enabled by the active project/handoff policy.
+
+Examples may include:
+
+- reviewed percent complete;
+- physical percent complete where the project uses it;
+- actual start;
+- actual finish;
+- another explicitly authorised execution/tracking field added by later policy.
+
+The Console must not silently become a second Project schedule editor. Planned dates, predecessors, constraints, calendars, resource levelling, baselines, and other schedule-logic fields remain Microsoft Project editing responsibilities unless a later explicit product/ADR decision expands direct input authority.
+
+## Progress methods
+
+A project/import profile may define the progress method that best matches the work.
+
+| Method | Business meaning | Project field | Default product position |
+| --- | --- | --- | --- |
+| Duration progress | Portion of task duration completed | `% Complete` | Reviewable; handoff support must be proven |
+| Physical progress | Portion of measurable physical scope completed | `Physical % Complete` | Project/site-specific; useful for quantity-based work |
+| Work progress | Portion of assignment Work completed | `% Work Complete` | Deferred unless resource Work is maintained intentionally |
+| State only | No percentage is meaningful | none | Always valid Tracker option |
+
+The product must not choose a field merely because it has fewer recalculation side effects. The field must represent the business fact being reported.
+
+## Authoritative input candidates
+
+An input candidate is one immutable reviewed fact bound to:
+
+- project and accepted snapshot;
+- imported task identity;
+- field;
+- captured old value;
+- proposed value;
+- source record/version;
+- source actor/time;
+- fingerprint;
+- exact approval event.
+
+Creating a candidate does not approve it. Approvals, rejection, correction requests, and supersession must identify the exact candidate.
+
+## Field support is multi-dimensional
+
+For every possible Project input, track separately whether it is:
+
+1. recognised by the importer/candidate vocabulary;
+2. reviewable as a field or planner-entered fact;
+3. authorised as a direct Project input by product policy;
+4. supported by the selected handoff mechanism;
+5. enabled for the current project/profile.
+
+A failed test of a patch-shaped MSPDI mechanism does not permanently prohibit the field. It proves only that the mechanism is not yet sufficient for that field.
+
+## Supervisor review
+
+Supervisor review confirms operational credibility. It does not approve Project input or candidate adoption.
+
+Possible decisions:
+
+- accept;
+- request correction;
+- reject;
+- request evidence;
+- link blocker/problem;
+- include in handover.
+
+Required copy:
 
 ```text
-Re-import conflict. Planner lineage review required.
+Supervisor review confirms operational validity. It does not approve a Microsoft Project schedule change.
 ```
 
-## Blockers, actions, evidence, and handover integration
+## Planner input review
 
-Progress review is not just a percent-complete screen. It must link to structured operational records.
+The planner decides whether a reviewed fact may be included in the approved-input manifest.
 
-| User input | Should become | Why |
-| --- | --- | --- |
-| Scaffold not available | Blocker/problem | Work cannot continue |
-| Permit not issued | Blocker/problem and possible handover item | Permit-to-work is safety/operational readiness issue |
-| Isolation not complete | Blocker/problem | Work cannot proceed safely |
-| Material missing | Blocker/problem | Physical constraint |
-| Crane/lift delayed | Blocker/problem plus action | Recovery ownership needed |
-| Quality hold | Blocker/problem plus evidence request | Completion may not be releasable |
-| John to follow up by 14:00 | Action | Needs owner and due time |
-| Completion photo missing | Evidence gap | Blocks completion confidence |
-| Night shift must watch permit expiry | Handover item | Incoming shift needs explicit record |
+The queue should show:
 
-## Audit events
+- source snapshot/file identity;
+- imported task UID/ID/name and leaf/summary state;
+- current Project value;
+- proposed value;
+- input origin: field / supervisor correction / planner Console / other approved source;
+- source actor/time;
+- supervisor decision where required;
+- evidence/blocker state;
+- re-import/lineage conflict state;
+- current handoff-mechanism support;
+- planner approve/reject/clarify decision.
 
-Minimum audit events for this workflow:
+Required copy:
 
-- `task_progress_submitted`;
-- `task_progress_supervisor_accepted`;
-- `task_progress_correction_requested`;
-- `task_progress_rejected`;
-- `task_progress_superseded`;
-- `planner_review_candidate_created`;
-- `planner_progress_approved_for_export`;
-- `planner_progress_rejected`;
-- `progress_export_candidate_blocked`;
-- `progress_export_candidate_superseded`;
-- `export_preview_created`;
-- `export_batch_approved`;
-- `export_batch_rejected`;
-- `export_file_generated`;
-- `export_file_opened_in_microsoft_project`;
-- `export_file_verified`.
+```text
+Planner approval authorises this exact input for an updated Project candidate. The current master schedule is unchanged.
+```
 
-## Offline rules for progress updates
+## Approved-input manifest
+
+The manifest contains only the exact planner-approved inputs plus their authority/provenance. It does not contain guessed Project-calculated consequences.
+
+The manifest should record:
+
+- accepted source snapshot and source file hash;
+- candidate IDs and approval IDs;
+- task identities;
+- approved field/value pairs;
+- input origin and actor/time;
+- manifest hash;
+- project/profile policy version;
+- generated by/at.
+
+## Complete updated candidate generation
+
+The target handoff output is a **complete updated Project candidate schedule**, normally MSPDI/XML, built from the accepted source plus the approved-input manifest.
+
+It must not be a sparse patch presented as though it were a complete schedule.
+
+The candidate is always separate from the accepted source/master.
+
+After it is opened/imported in Microsoft Project, Microsoft Project may recalculate dependent schedule state. That may include planned dates, durations, summary roll-ups, assignment work, timephased data, slack, or criticality.
+
+Those values must be labelled **Microsoft Project-calculated consequence**. Shutdown Tracker must not present them as if the planner directly approved them as input.
+
+## Candidate delta review
+
+The planner should see:
+
+- approved inputs;
+- Project-calculated schedule consequences;
+- planner edits made in Microsoft Project, if any;
+- unchanged source facts;
+- unexpected/unexplained changes;
+- project finish movement;
+- changed planned dates/durations;
+- summary changes;
+- assignment/work effects;
+- critical/slack changes reported by Project;
+- candidate and source hashes.
+
+## Candidate disposition
+
+After review the planner may:
+
+- **Reject** — candidate remains evidence only.
+- **Retain for further review** — candidate remains separate from the master.
+- **Use as next schedule/master** — planner adopts the reviewed candidate as the next controlled schedule.
+- **Merge/import into existing schedule** — planner uses Microsoft Project to merge/import the candidate into a disposable/backed-up existing schedule and reviews the merged result.
+
+Candidate acceptance does not itself perform adoption or merge.
+
+## Merge/import control
+
+Merge/import is a Microsoft Project operation controlled by the planner.
+
+Shutdown Tracker should record:
+
+- candidate hash;
+- destination schedule identity/hash before merge;
+- Microsoft Project version/build;
+- merge/import mode;
+- warnings/conflicts;
+- result schedule identity/hash;
+- planner decision.
+
+Shutdown Tracker must not silently overwrite the only master copy.
+
+## Summary tasks
+
+Do not submit direct summary-task progress/actual inputs by default. Let Microsoft Project calculate roll-ups in the candidate schedule.
+
+Project-calculated summary changes are expected candidate consequences and should be visible in the delta.
+
+## Re-import and stale candidates
+
+Every Project re-import creates a new immutable snapshot. Existing input candidates remain historical and must not be silently rebound to the new snapshot.
+
+Continued handoff requires a fresh candidate against the newly accepted snapshot and revalidation of task lineage, baseline, field support, and approval.
+
+## Problems, Actions, Evidence, and Handover
+
+Progress review is not just a percentage screen. Link structured operational records:
+
+| User input | Should become |
+| --- | --- |
+| Scaffold unavailable | Problem/blocker |
+| Permit or isolation not ready | Problem/blocker and possible handover |
+| Material missing | Problem/blocker |
+| Crane delayed | Problem plus Action |
+| Quality hold | Problem plus Evidence requirement |
+| Follow up by a time | Action |
+| Completion photo missing | Evidence gap |
+| Incoming shift must know | Handover |
+
+## Offline rules
 
 - Queued is not submitted.
-- A locally queued progress update is not visible to supervisors or planners until the server receives it.
 - Store local capture time and server received time.
-- Use idempotency keys for replay safety.
+- Use idempotency keys.
 - Show per-item sync state.
-- Failed progress updates must remain visible and retryable.
-
-Required copy:
-
-```text
-Saved locally.
-Queued on this device. Not yet sent.
-Could not send. Still saved on this device.
-Server received.
-This progress update is not submitted until the server receives it.
-Last synced at [time].
-```
-
-Use `Thread may be out of date` only for communications/discussion surfaces, not for task progress updates.
-
-## Frontend visual review implications
-
-The current Task Progress Review frontend shell is static/synthetic and not final product IA.
-
-The next visual cleanup should:
-
-- keep console top-level navigation to Today, Tasks, Problems, Evidence, Exports;
-- treat Supervisor Review and Planner Review as saved views or sections under Today/Tasks/Exports;
-- treat Verification as part of Exports;
-- replace reviewer-facing `Synthetic Task A1` style labels with sanitized realistic shutdown examples;
-- reduce card/chip density;
-- keep write-like controls disabled until APIs exist;
-- keep Project-boundary warnings visible.
+- Failed updates remain visible and retryable.
 
 ## Non-goals
 
-This feature must not build:
+This workflow does not build:
 
-- production task execution APIs before the backend brief is approved;
-- production mobile offline queue;
-- generic comments-as-progress workflow;
-- direct Microsoft Project write-back;
-- scheduler logic;
-- generic chat;
-- AI progress decisions;
-- assignment actuals or work export in MVP;
-- broad route/nav expansion.
+- a Shutdown Tracker scheduling engine;
+- hidden Project write-back;
+- unattended master overwrite or merge;
+- native `.mpp` writing by the server;
+- automatic progress derivation from comments;
+- automatic `% Work Complete` from Start/Pause timers;
+- summary-task actual input;
+- generic chat.
 
-## User testing questions
-
-Ask planners:
-
-- If you approve this progress row, what do you believe happened to Microsoft Project?
-- Which fields are you comfortable exporting: percent complete, actual start, actual finish, or something else?
-- What would make you reject a candidate?
-- What should happen after a re-import conflict?
-
-Ask supervisors:
-
-- What would make you reject or correct a field completion?
-- When should evidence be mandatory?
-- When should a progress update become a blocker or handover item?
-
-Ask field users:
-
-- What does `Queued on this device. Not yet sent.` mean?
-- What is the fastest acceptable way to submit progress?
-- When would you tap Block instead of adding a comment?
-
-Ask shutdown control:
-
-- Which review queues need attention now?
-- What should appear on Today and what should stay in drill-down views?
-
-## Acceptance criteria
-
-This product brief is satisfied only if future implementation preserves these truths:
-
-- field progress does not go straight to Microsoft Project;
-- supervisor review is not planner export approval;
-- planner approval only makes values eligible for export preview;
-- export preview does not update the master `.mpp`;
-- MSPDI/XML generation does not update the master `.mpp`;
-- Project verification is manual and planner-controlled;
-- only approved leaf-task percent complete, actual start, and actual finish are MVP export candidates;
-- summary-task actuals are not directly exported;
-- queued mobile progress is not submitted until the server receives it;
-- blockers, actions, evidence, and handover remain structured records;
-- no screen implies scheduling logic or hidden Project write-back.
+A read-only planner candidate-impact view and a separately reviewed Project-native companion are allowed by the product boundary.
