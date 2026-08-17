@@ -1,101 +1,113 @@
-# Manual Microsoft Project Round-Trip Evidence
+# Manual Microsoft Project Candidate-Schedule Evidence
 
-Manual Microsoft Project round-trip evidence records a human review of a generated MSPDI/XML export artifact. It exists to prove controlled export artifacts can be opened and inspected in Microsoft Project without adding automation, screenshots, generated files, real schedules, or Project write-back to the repository.
+Manual Microsoft Project evidence exists to prove that reviewed Shutdown Tracker execution inputs can produce a separate, reviewable Project candidate without overwriting the accepted source/master.
 
-## Current Status
+## Important distinction
 
-No manual Microsoft Project round-trip has been executed or claimed by this document. This file defines the evidence format and acceptance rules for a future manual review using synthetic or fully sanitized data only.
+The test is not “did no schedule field change?”
 
-The first preferred candidate is the synthetic export artifact described by:
+Microsoft Project is expected to recalculate dependent schedule state.
 
-- `fixtures/import-export/synthetic-basic-wbs/expected-export-artifact-summary.json`
+The test asks:
 
-The generated MSPDI/XML artifact for that candidate must be created locally as temporary output and must not be committed.
+1. Were the exact approved inputs applied?
+2. Did Microsoft Project produce a separate candidate schedule?
+3. Did the accepted source remain unchanged?
+4. Can the source-versus-candidate differences be classified and reviewed?
+5. Can the planner reject the candidate without affecting the master?
 
-## Evidence Boundaries
+## Evidence objects
 
-Allowed evidence:
+Record separately:
 
-- Text-only notes.
-- Synthetic or fully sanitized fixture identifiers.
-- Export batch ID, project ID, artifact URI/hash, and expected-output reference when they are synthetic or non-sensitive.
-- Microsoft Project application version used for the manual open check.
-- Pass/fail result with concise notes.
-- Confirmation that no write-back or schedule recalculation was performed by Shutdown Tracker.
+- accepted source file/snapshot identity and SHA-256;
+- approved-input manifest identity and SHA-256;
+- candidate schedule identity and SHA-256;
+- Microsoft Project application/version/build;
+- semantic delta identity/hash where generated;
+- planner decision;
+- later master-adoption metadata, if adoption occurs.
 
-Prohibited evidence:
+Generated Project/XML files and screenshots must remain outside Git. Repository evidence should be text-only and synthetic/sanitized.
 
-- Real customer, site, contractor, asset, work order, cost, location, vendor, person, or commercial data.
-- Real MPP/XML/MSPDI/XER files.
-- Generated export artifacts.
-- Screenshots or screen recordings of real schedules.
-- Native MPP output from Shutdown Tracker.
-- Claims of automated Microsoft Project verification.
+## Delta classification
 
-## Manual Check Procedure
+Every material source-versus-candidate difference should be classified as:
 
-1. Generate an MSPDI/XML export artifact from synthetic or fully sanitized data only.
-2. Keep the generated artifact outside Git or under an ignored local folder such as `fixtures/import-export/_local/`.
-3. Open the generated MSPDI/XML artifact manually in Microsoft Project.
-4. Confirm the file opens without requiring Shutdown Tracker to automate Microsoft Project.
-5. Confirm only approved leaf-task progress/actual fields are represented.
-6. Confirm summary-task actuals are not exported.
-7. Confirm task identity is traceable through the expected Microsoft Project task UID/ID values.
-8. Confirm no CPM, critical path, float, resource levelling, recovery scheduling, automatic date movement, or Project write-back was run by Shutdown Tracker.
-9. Record a text-only evidence note using the template below.
-10. Delete or keep generated artifacts only in ignored local storage after the manual review.
+- `approved_input` — exact planner-approved Shutdown Tracker fact;
+- `project_calculated_consequence` — dependent value created/recalculated by Microsoft Project;
+- `unexpected_difference` — unexplained change requiring investigation.
 
-## Evidence Note Template
+Do not treat a Project-calculated planned-date/duration/summary/work/slack change as an automatic failure merely because Shutdown Tracker was not allowed to directly author that field.
+
+## Acceptance procedure
+
+1. Use a fully synthetic or explicitly approved sanitized accepted source.
+2. Calculate and record the source hash.
+3. Build a sealed approved-input manifest from exact reviewed candidate/approval identities.
+4. Calculate and record the manifest hash.
+5. Apply the manifest through the handoff mechanism under test to a disposable copy only.
+6. Ensure the accepted source/master path is not overwritten.
+7. Open/process the candidate through Microsoft Project as required by the mechanism.
+8. Calculate and record the candidate hash.
+9. Compare source and candidate semantically.
+10. Confirm each approved input is present with the intended value/semantics.
+11. Classify Project-calculated consequences separately from approved inputs.
+12. Flag every unexplained difference.
+13. Review project finish movement, task planned-date/duration changes, summary changes, assignment/work effects, and Project-reported slack/criticality where present.
+14. Confirm no Shutdown Tracker CPM/float/levelling/recovery calculation was used.
+15. Confirm the candidate can be rejected without changing the source/master.
+16. Record planner decision.
+17. Record master adoption only as a later, separate planner-controlled action.
+
+## Failure conditions
+
+The manual gate fails when:
+
+- an approved input is dropped, altered, or applied to the wrong task;
+- the accepted source/master is overwritten;
+- candidate/source identity or hashes cannot be established;
+- the handoff silently injects unapproved input values rather than letting Project calculate consequences;
+- unexpected differences cannot be explained or reviewed safely;
+- the process requires hidden unattended adoption of the master.
+
+It does **not** fail solely because Microsoft Project recalculates dependent schedule fields in the disposable candidate.
+
+## Evidence note template
 
 ```text
 evidence_id:
 review_date:
 reviewer_role:
-fixture_or_source:
 synthetic_or_sanitized:
 contains_real_project_data: false
-expected_output_reference:
-export_batch_id:
-project_id:
-generated_artifact_uri:
-generated_artifact_hash:
-generated_artifact_committed: false
+source_snapshot_id:
+source_file_uri:
+source_file_hash:
+approved_input_manifest_id:
+approved_input_manifest_hash:
+authoritative_candidate_ids:
+captured_approval_event_ids:
+handoff_mechanism:
 microsoft_project_application:
 microsoft_project_version:
-opened_in_microsoft_project: yes/no
-open_result: pass/fail
-fields_checked:
-  - percent_complete
-  - physical_percent_complete
-  - actual_start
-  - actual_finish
-leaf_task_only_check: pass/fail
-summary_task_exclusion_check: pass/fail
-task_identity_check: pass/fail
-write_back_performed: no
-schedule_calculation_performed_by_shutdown_tracker: no
-issues_found:
-decision: accepted/rejected/needs_follow_up
+candidate_file_uri:
+candidate_file_hash:
+candidate_generated_as_separate_copy: yes/no
+source_file_unchanged: yes/no
+approved_inputs_checked:
+project_calculated_consequences_observed:
+unexpected_differences:
+project_finish_delta:
+planner_candidate_decision: accepted/rejected/needs_follow_up
+master_adoption_performed: yes/no
+master_adoption_reference:
+generated_artifacts_committed: false
 notes:
 ```
 
-## First Planned Evidence Record
+## Current status
 
-The first text-only evidence record should use:
+The manual diagnostics performed during export-handoff investigation showed that minimal field-isolated MSPDI patches do not reliably reproduce the same tracking transaction as entering the fact through Microsoft Project. Those diagnostics are useful mechanism evidence, not a permanent prohibition on the execution facts themselves.
 
-- `evidence_id`: `synthetic-export-leaf-actuals-round-trip-001`
-- `fixture_or_source`: `synthetic-basic-wbs`
-- `expected_output_reference`: `fixtures/import-export/synthetic-basic-wbs/expected-export-artifact-summary.json`
-- `contains_real_project_data`: `false`
-- `generated_artifact_committed`: `false`
-
-Do not mark the record as passed until a human has opened the generated MSPDI/XML artifact in Microsoft Project and completed the checks above.
-
-## Relationship to API State
-
-The API already has metadata endpoints for:
-
-- `opened_in_microsoft_project`
-- `verified`
-
-Those statuses record lifecycle metadata only. They do not automate Microsoft Project, parse the opened artifact, mutate imported task rows, calculate schedules, or write back to Microsoft Project.
+No handoff mechanism should be marked production-ready until a synthetic candidate passes the procedure above.
