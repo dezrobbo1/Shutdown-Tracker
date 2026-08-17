@@ -18,15 +18,15 @@ ADR status values: Draft, Accepted, Superseded, Rejected.
 
 ## Controlling Project-handoff decisions
 
-ADR-001 defines the Project interchange and candidate-artifact direction.
+ADR-001 defines the Project interchange and complete updated candidate-schedule objective.
 
 ADR-007 defines the three-part authority model:
 
-1. Shutdown Tracker approves execution inputs.
-2. Microsoft Project calculates the disposable candidate.
-3. The planner decides whether to adopt the candidate.
+1. Shutdown Tracker captures and approves field and authorised planner inputs.
+2. Microsoft Project calculates the complete updated candidate.
+3. The planner decides whether to reject, retain, use as the next schedule/master, or merge/import the candidate into another existing Project schedule.
 
-ADR-008 defines the MVP boundary and explicitly allows read-only candidate-impact review while continuing to prohibit a Shutdown Tracker scheduling engine or silent master-file update.
+ADR-008 defines the MVP boundary and explicitly allows complete updated candidates, read-only candidate-impact review, and planner-controlled merge/import while continuing to prohibit a Shutdown Tracker scheduling engine or silent master-file update.
 
 The detailed product contract is [Project Candidate Schedule Handoff](../product/project-candidate-schedule-handoff.md).
 
@@ -42,17 +42,18 @@ Product sources:
 
 - [Project Candidate Schedule Handoff](../product/project-candidate-schedule-handoff.md)
 - [Project Operational Mapping](../product/project-operational-mapping.md)
-- [Task Progress Review and Export Approval](../product/task-progress-review-export-approval.md)
-- [Approval and Export State Model](../product/approval-export-state-model.md)
+- [Task Progress Review and Project Input Approval](../product/task-progress-review-export-approval.md)
+- [Approval, Candidate Schedule, and Adoption State Model](../product/approval-export-state-model.md)
 - [Communications Layer](../product/communications-layer.md)
 - [Offline Audit and Sync Rules](../product/offline-audit-sync-rules.md)
 
 ## Boundary reminders
 
 - Microsoft Project remains schedule calculation authority.
-- Shutdown Tracker may prepare approved execution inputs but does not independently calculate their schedule consequences.
+- Shutdown Tracker may generate a complete updated candidate from approved inputs but does not independently calculate the schedule consequences.
 - Project-calculated changes inside a disposable candidate are expected and must be reviewed, not automatically treated as prohibited writes.
-- The accepted source/master remains unchanged until explicit planner adoption.
+- Candidate generation, acceptance, adoption as next schedule, and merge/import into another schedule are separate auditable facts.
+- The accepted source/master remains unchanged until explicit planner action.
 - Imported Project source values remain immutable.
 - Project-derived classification is not application authorisation.
 - Generic chat, editable scheduler views, and silent Project write-back require explicit future decisions.
