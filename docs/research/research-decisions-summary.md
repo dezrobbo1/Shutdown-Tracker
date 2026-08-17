@@ -9,36 +9,52 @@ Shutdown Tracker is a live execution-control system. Microsoft Project remains t
 The clarified handoff model is:
 
 ```text
-execution truth captured in Shutdown Tracker
--> supervisor validation
--> planner approves exact Project inputs
--> disposable candidate schedule
+field execution information
++ authorised planner Console input
+-> supervisor/planner review as policy requires
+-> approved input manifest
+-> complete updated MSPDI/XML candidate generated from accepted source
+-> candidate opened/imported in Microsoft Project
 -> Microsoft Project recalculates
 -> planner reviews source-versus-candidate impact
--> planner accepts/rejects candidate
--> optional manual adoption as next master
+-> planner chooses reject / retain / use as next schedule / merge-import
 ```
 
-The research baseline explicitly supports approved actual/progress inputs while warning that Microsoft Project recalculates interdependent values. Therefore “do not build a scheduler” means Shutdown Tracker must not calculate those consequences itself; it does not mean Project must be prevented from recalculating a candidate.
+The supporting research explicitly allows approved actual/progress inputs while warning that Microsoft Project recalculates interdependent values. Therefore “do not build a scheduler” means Shutdown Tracker must not calculate those consequences itself; it does not mean Project must be prevented from recalculating a useful updated candidate.
+
+The intended product output is not merely a sparse patch. It is a complete updated Project candidate that a planner can review and deliberately use.
 
 ## Core product decisions
 
 | Area | Decision |
 | --- | --- |
-| Product identity | Live shutdown execution-control platform |
-| Microsoft Project role | Schedule calculation and master-file authority |
-| Shutdown Tracker role | Execution inputs, review, evidence, handover, operational mapping, candidate preparation, audit |
-| Planner role | Approve inputs; review and adopt/reject candidate schedules |
+| Product identity | Live shutdown execution-control and Project candidate-preparation platform |
+| Microsoft Project role | Schedule calculation and Project-file review environment |
+| Shutdown Tracker role | Execution inputs, planner inputs, review, evidence, handover, operational mapping, candidate preparation, audit |
+| Planner role | Enter/correct permitted inputs, approve exact inputs, review candidate, decide final disposition |
 | Scheduling logic | Do not calculate CPM, float, critical path, levelling, recovery or dependency consequences in Tracker |
-| Candidate recalculation | Allowed in Microsoft Project on a disposable copy |
-| Master update | Never silent; separate planner adoption decision |
+| Candidate output | Complete updated Project schedule candidate from accepted source plus approved inputs |
+| Candidate recalculation | Allowed and expected in Microsoft Project on a disposable candidate |
+| Candidate outcomes | Reject, retain, use as next schedule/master, or merge/import into another existing schedule |
+| Master update | Never silent; adoption/merge is a separate planner-controlled decision |
 | Interchange | MSPDI/XML primary open format; Project-native companion remains a possible reviewed future mechanism |
-| Native `.mpp` writer | Do not build server-side |
+| Native `.mpp` writer | Do not build server-side; planner may save Project files using Microsoft Project |
 | Import model | Immutable Project snapshots |
-| Audit | Append-only high-value events and immutable candidate/artifact provenance |
+| Audit | Append-only high-value events and immutable candidate/artifact/adoption/merge provenance |
 | Offline | IndexedDB queue, visible sync state, idempotency; Background Sync only as enhancement |
 | Communications | Entity-linked Discussion later; structured records first |
-| UX | Operational and narrow; no dashboard/Gantt scheduling editor |
+| UX | Operational and narrow; candidate-impact review allowed, no Tracker scheduling editor |
+
+## Input origins
+
+Project-bound inputs may originate from:
+
+- field execution/progress capture;
+- supervisor correction;
+- authorised planner entry/correction in the Master Console;
+- another explicitly authorised structured source under project policy.
+
+Planner Console input must retain actor/time, source snapshot, task identity, old/new value, policy, and approval provenance. It does not become an unaudited shortcut.
 
 ## Progress-field decisions
 
@@ -50,7 +66,7 @@ Do not confuse Microsoft Project field semantics:
 
 Start/Pause/Resume/Block/Complete are Tracker execution events. They do not automatically map to a percentage field.
 
-The initial candidate vocabulary may recognise common actual/progress facts, but each field also needs separate product-input policy, handoff-mechanism compatibility, and project/profile enablement.
+The candidate vocabulary may recognise common actual/progress facts, but each field also needs separate product-input policy, handoff-mechanism compatibility, and project/profile enablement.
 
 A failed patch-shaped MSPDI diagnostic is evidence against that handoff mechanism, not permanent evidence that the business fact can never be used.
 
@@ -67,6 +83,26 @@ Microsoft Project may recalculate:
 - slack and criticality.
 
 Those changes are expected candidate consequences when Project produces them. Shutdown Tracker must not silently pre-compute or inject them as unapproved inputs.
+
+Candidate review should distinguish:
+
+- approved Tracker input;
+- Microsoft Project-calculated consequence;
+- planner edit performed in Microsoft Project;
+- unexpected/unexplained difference.
+
+## Candidate disposition
+
+After review the planner may:
+
+1. reject the candidate;
+2. retain it for further review;
+3. use it as the next controlled schedule/master;
+4. use Microsoft Project to merge/import it into another existing schedule.
+
+Adoption as the next schedule and merge/import into another schedule are separate auditable outcomes. A candidate opening successfully does not prove either occurred.
+
+Merge/import must be tested separately from standalone candidate use because Project matching, UID behaviour, overwrite/duplication and conflict handling can differ. Initial merge tests must use disposable/backed-up destination schedules.
 
 ## Operational Mapping
 
@@ -100,7 +136,7 @@ Field App top-level zones:
 - Evidence
 - Sync
 
-A read-only source-versus-candidate schedule impact view is allowed for planner review. Editable schedule planning remains in Microsoft Project.
+A read-only source-versus-candidate schedule impact view is allowed for planner review. Editable schedule planning remains in Microsoft Project unless a later explicit product decision expands direct schedule-editing authority.
 
 ## Communications
 
@@ -108,7 +144,7 @@ Build structured execution records first. Entity-linked Discussion may support t
 
 ## Next architecture questions
 
-The most important unresolved implementation question is **how to apply the exact approved input manifest through Microsoft Project reliably**.
+The most important unresolved implementation question is **how to apply the exact approved input manifest through Microsoft Project reliably while producing a complete updated candidate schedule**.
 
 Candidate approaches:
 
@@ -116,4 +152,4 @@ Candidate approaches:
 2. planner-controlled Microsoft Project companion operating on a disposable copy;
 3. manual planner input package as a fallback.
 
-The authority, audit, and candidate-review model should remain the same regardless of mechanism.
+The authority, audit, candidate-review, adoption, and merge-provenance model should remain the same regardless of mechanism.
