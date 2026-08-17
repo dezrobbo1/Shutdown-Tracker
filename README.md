@@ -4,32 +4,40 @@ Shutdown Tracker is a shutdown, turnaround, outage, and major-overhaul execution
 
 ## Product boundary
 
-Shutdown Tracker owns execution truth and reviewed execution inputs. Microsoft Project owns schedule recalculation. The planner owns adoption of the resulting candidate schedule.
+Shutdown Tracker owns execution truth and reviewed Project inputs. Microsoft Project owns schedule recalculation. The planner owns what happens to the resulting updated candidate schedule.
 
-The controlled progress path is:
+The core product handoff is:
 
 ```text
-field execution update
--> supervisor review
--> planner input review
+field execution information
++ authorised planner Console input
+-> supervisor/planner review as policy requires
 -> approved input manifest / preview
--> disposable candidate schedule prepared
--> Microsoft Project applies inputs and recalculates candidate
+-> complete updated MSPDI/XML candidate generated from accepted source
+-> candidate opened/imported in Microsoft Project
+-> Microsoft Project recalculates candidate
 -> source-versus-candidate delta reviewed
--> planner accepts or rejects candidate
--> planner may manually adopt a new master schedule
+-> planner chooses:
+     reject
+     retain for further review
+     use as next schedule/master
+     merge/import into another existing Project schedule
 -> Shutdown Tracker records provenance, decision, and audit
 ```
 
-Shutdown Tracker must not independently calculate CPM, critical path, float, resource levelling, recovery scheduling, dependency consequences, planned dates, or other schedule results. It must not silently update or overwrite the accepted master `.mpp` and does not provide a server-side native `.mpp` writer.
+The point of the handoff is to produce a useful **updated Project schedule candidate**, not merely a sparse field patch.
 
-Microsoft Project is expected to recalculate a disposable candidate after approved execution inputs are applied. Changes to planned dates, durations, summary roll-ups, work, slack, criticality, and related fields may therefore appear in the candidate. Those values are **Project-calculated consequences**, not hidden Shutdown Tracker-authored inputs, and must be visible to the planner in the candidate review.
+Shutdown Tracker must not independently calculate CPM, critical path, float, resource levelling, recovery scheduling, dependency consequences, planned dates, or other schedule results. It must not silently update, overwrite, or merge into the accepted master `.mpp`, and it does not provide a server-side native `.mpp` writer.
+
+Microsoft Project is expected to recalculate a disposable candidate after approved inputs are applied. Changes to planned dates, durations, summary roll-ups, work, assignment values, slack, criticality, and related fields may therefore appear in the candidate. Those values are **Project-calculated consequences**, not hidden Shutdown Tracker-authored inputs, and must be visible to the planner in candidate review.
+
+A planner may ultimately use the candidate as the next controlled schedule or use Microsoft Project to merge/import it into an existing schedule. Those are explicit planner-controlled outcomes and are recorded separately from candidate generation.
 
 See [Project Candidate Schedule Handoff](docs/product/project-candidate-schedule-handoff.md) for the durable handoff contract.
 
 ## Applications
 
-- **Master Console** — desktop-oriented operations workspace for imported Project work, execution status, problems, actions, evidence, handover, review, Critical Watch, operational mapping, and planner-controlled candidate review.
+- **Master Console** — desktop-oriented operations workspace for imported Project work, execution status, planner-entered permitted inputs, problems, actions, evidence, handover, review, Critical Watch, operational mapping, and planner-controlled candidate review.
 - **Field App** — mobile-oriented application for assigned work, execution actions, progress updates, problems, evidence, handover, and visible sync state.
 
 ## Current maturity
@@ -56,7 +64,8 @@ Do not infer runtime completeness from this overview. App/service READMEs, sourc
 - Database: PostgreSQL.
 - Microsoft Project processing: MPXJ plus Microsoft Project itself where Project-native recalculation is required.
 - Interchange: MSPDI/XML remains the primary open format; native `.mpp` writing by the server is out of scope.
-- Candidate schedule: always separate from the accepted source/master until planner adoption.
+- Candidate schedule: always separate from the accepted source/master until the planner explicitly adopts or merges it.
+- Merge/import: planner-controlled Microsoft Project operation, proven first against disposable/backed-up schedules.
 - File/evidence architecture: provider-neutral storage abstractions and immutable artifact provenance.
 - Offline field direction: IndexedDB queue, service worker, explicit sync state, idempotency keys.
 - Communications direction: entity-linked Discussion around structured records, not generic chat as the source of truth.
