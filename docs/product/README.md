@@ -13,7 +13,7 @@
 - Problems and Actions
 - Evidence and Handover
 - Critical Watchlists, Critical Work Packages, Reporting Policies, and Critical Updates
-- Candidate/input approval, candidate-schedule review, and audit
+- Candidate/input approval, candidate-schedule review, adoption/merge disposition, and audit
 - Entity-linked Discussion / Communications Layer
 - Users, roles, permissions, responsibility scopes, and delegation
 - Offline sync queue
@@ -35,8 +35,8 @@ Read these sources before implementing a workflow:
 - [Project Operational Mapping](project-operational-mapping.md)
 - [Roles and Capabilities](roles-and-capabilities.md)
 - [Permission Matrix](permission-matrix.md)
-- [Approval and Export State Model](approval-export-state-model.md)
-- [Task Progress Review and Export Approval](task-progress-review-export-approval.md)
+- [Approval, Candidate Schedule, and Adoption State Model](approval-export-state-model.md)
+- [Task Progress Review and Project Input Approval](task-progress-review-export-approval.md)
 - [Communications Layer](communications-layer.md)
 - [Correction and Supersession Rules](correction-and-supersession-rules.md)
 - [Offline Audit and Sync Rules](offline-audit-sync-rules.md)
@@ -46,27 +46,45 @@ Read these sources before implementing a workflow:
 
 ## Core Project handoff model
 
-The product deliberately separates three decisions:
+The product deliberately separates three authorities:
 
-1. **Execution-input approval** — what field fact is accepted and allowed to influence a candidate schedule.
-2. **Microsoft Project calculation** — what schedule consequences Microsoft Project produces after those inputs are applied to a disposable copy.
-3. **Planner adoption** — whether the resulting candidate is accepted, rejected, superseded, or manually adopted as the next master.
+1. **Execution/input authority** — Shutdown Tracker captures and approves exact field and authorised planner inputs.
+2. **Microsoft Project calculation authority** — Microsoft Project recalculates the complete updated candidate schedule.
+3. **Planner candidate/adoption authority** — the planner decides how the recalculated candidate is used.
 
 The workflow is:
 
 ```text
-field execution update
--> supervisor review
--> planner approves exact execution inputs
+field execution information
++ authorised planner Console input
+-> supervisor/planner review as policy requires
 -> approved-input manifest
--> disposable candidate schedule
+-> complete updated MSPDI/XML candidate generated from accepted source
+-> candidate opened/imported in Microsoft Project
 -> Microsoft Project recalculation
 -> source-versus-candidate delta
 -> planner candidate review
--> optional manual master adoption
+-> choose one:
+     reject
+     retain for further review
+     use as next schedule/master
+     merge/import into another existing Project schedule
 ```
 
 The accepted source/master remains immutable throughout candidate preparation and review.
+
+The product handoff is therefore not merely a patch export. Its useful outcome is a **complete updated Project schedule candidate** that can be reviewed and then deliberately adopted or merged by the planner.
+
+## Input origins
+
+Project-bound inputs may originate from:
+
+- field execution/progress capture;
+- supervisor-reviewed field corrections;
+- authorised planner entry or correction in the Master Console;
+- another explicitly authorised structured source under project policy.
+
+Planner Console input does not bypass provenance or authority checks. Each direct input remains bound to actor, time, source snapshot, task, old value, new value, handoff policy, and approval state.
 
 ## Task execution and progress
 
@@ -87,10 +105,24 @@ A planner review should distinguish:
 
 - approved Shutdown Tracker input;
 - Microsoft Project-calculated consequence;
+- planner edit made in Microsoft Project;
 - unchanged source fact;
 - unexpected/unexplained difference.
 
 A read-only schedule-impact view is allowed. It may show planned-date movement, project finish movement, summary roll-ups, resource/assignment effects, and Project-reported critical/slack changes. It must not become an editable scheduling surface or a second calculation engine.
+
+## Candidate disposition
+
+After review the planner may:
+
+- reject the candidate;
+- retain it for further review;
+- adopt it as the next controlled schedule/master; or
+- use Microsoft Project to merge/import it into another existing Project schedule.
+
+Adoption and merge/import are separate auditable actions. Candidate generation or acceptance does not imply either occurred.
+
+A merge/import workflow must be proven separately from standalone candidate use and should initially operate against a disposable/backed-up destination schedule, with destination-before and result-after hashes recorded.
 
 ## Project Operational Mapping
 
@@ -144,9 +176,10 @@ Shutdown Tracker does not:
 
 - calculate CPM, critical path, float, schedule optimisation, recovery, or resource levelling;
 - silently change the accepted master schedule;
+- silently merge/import into an existing master schedule;
 - directly invent Project-calculated schedule consequences;
 - write native `.mpp` server-side;
 - infer permissions from Project categories;
 - use generic chat as the source of operational truth.
 
-Microsoft Project may recalculate a disposable candidate schedule. Those consequences are expected review data, not a violation of the product boundary.
+Microsoft Project may recalculate a complete updated candidate schedule. Those consequences are expected review data, not a violation of the product boundary.
