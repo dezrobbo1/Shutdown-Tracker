@@ -17,42 +17,52 @@ Do not assume access to earlier chats, uploaded PDFs, ZIP files, or external pro
 
 Microsoft Project remains the schedule calculation and master-file authority. Shutdown Tracker is the execution-input, review, evidence, handover, operational-mapping, candidate-preparation, verification-metadata, and audit system.
 
+The handoff is intended to produce a **complete updated Project candidate schedule**, not merely a sparse field patch.
+
 Use this three-part authority model:
 
-- **Execution-input authority — Shutdown Tracker.** Capture and approve field execution facts such as progress, actual starts/finishes, blockers, evidence, and handover.
-- **Calculation authority — Microsoft Project.** A disposable candidate schedule may be recalculated by Microsoft Project after approved inputs are applied. Project-calculated dates, durations, roll-ups, work, slack, criticality, and related consequences are not treated as Shutdown Tracker-authored inputs.
-- **Adoption authority — Planner.** A planner reviews the candidate and its source-versus-candidate delta and decides whether to reject it, keep it for review, or manually adopt it as the next master schedule.
+- **Execution/input authority — Shutdown Tracker.** Capture and approve field execution facts and authorised planner-entered inputs such as progress or actuals under the active handoff policy.
+- **Calculation authority — Microsoft Project.** A complete updated candidate schedule may be recalculated by Microsoft Project after approved inputs are applied. Project-calculated dates, durations, roll-ups, work, assignment values, timephased data, slack, criticality, and related consequences are not treated as Shutdown Tracker-authored inputs.
+- **Candidate/adoption authority — Planner.** A planner reviews the candidate and its source-versus-candidate delta and decides whether to reject it, retain it for review, use it as the next schedule/master, or use Microsoft Project to merge/import it into another existing schedule.
 
 Shutdown Tracker must not:
 
 - calculate CPM, critical path, float, resource levelling, recovery scheduling, schedule optimisation, or dependency consequences itself;
 - invent planned dates, durations, work, assignment values, slack, criticality, or other Project-calculated consequences;
 - silently update, overwrite, or save the accepted master `.mpp`;
+- silently merge/import a candidate into the only master copy;
 - write native `.mpp` files server-side;
-- imply that candidate approval, artifact generation, Project open, or verification has already updated the master schedule.
+- imply that input approval, candidate generation, Project open, candidate acceptance, or verification has already updated the master schedule.
 
 Shutdown Tracker may:
 
 - prepare exact, reviewed execution inputs against an immutable accepted Project snapshot;
-- generate an approved-input manifest or candidate artifact;
+- accept permitted planner-entered inputs in the Master Console with full provenance and policy checks;
+- generate a sealed approved-input manifest;
+- generate a complete updated MSPDI/XML candidate from the accepted source plus approved inputs;
 - invoke or support a planner-controlled Microsoft Project process against a disposable copy, subject to an accepted implementation ADR and safety controls;
 - allow Microsoft Project to recalculate the disposable candidate;
 - present a read-only source-versus-candidate impact comparison, including Project-calculated schedule consequences;
-- record candidate hashes, deltas, Project version, planner decision, and later master-adoption metadata.
+- allow the planner to reject, retain, adopt, or merge/import the candidate through Microsoft Project;
+- record candidate hashes, deltas, Project version, planner decision, destination-before/result-after merge provenance, and later master-adoption metadata.
 
-The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating a separate review candidate.
+The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating or a planner deliberately using a reviewed candidate schedule.
 
 Other non-negotiable rules:
 
-- Field progress must pass through supervisor review, planner review, export/input eligibility, and preview before candidate generation.
-- Approved input authority is limited to explicitly reviewed facts under the active handoff policy. Summary-task actual inputs, dependencies, constraints, calendars, baselines, WBS structure, and unreviewed planned-date changes remain prohibited direct inputs.
-- A Project-calculated consequence may differ from the source candidate after Microsoft Project recalculates; it must be labelled as a Project-calculated consequence rather than as an approved Shutdown Tracker input.
+- Field progress must pass through supervisor review where required, planner input review, input eligibility, and preview before candidate generation.
+- Planner-originated Console inputs may skip supervisor review only when project policy explicitly allows it; they must not skip provenance, stale-data checks, policy checks, or planner input authority.
+- Approved input authority is limited to explicitly reviewed facts under the active handoff policy. Summary-task actual inputs, dependencies, constraints, calendars, baselines, WBS structure, and unreviewed planned-date changes remain prohibited direct inputs unless a later explicit product decision expands authority.
+- A Project-calculated consequence may differ from the source after Microsoft Project recalculates; label it as a Project-calculated consequence rather than an approved Shutdown Tracker input.
+- Planner edits made directly in Microsoft Project during candidate review must be distinguished from both approved Tracker inputs and Project-calculated consequences.
+- Candidate acceptance is not the same as `adopted_as_new_master` or `merged_into_existing`; record those outcomes separately.
+- Merge/import testing must be separate from standalone candidate testing and must use a disposable/backed-up destination schedule before production use.
 - Critical Work Packages and Critical Watchlists are configurable reporting constructs, not calculated critical-path features.
 - Project Operational Mapping may interpret imported fields, hierarchy, and resource-assignment metadata operationally, but imported source values remain immutable.
 - Project-derived category membership is not application authorization. Visibility/relevance, responsibility, update permission, review permission, and export authority remain separate.
 - Mapping revalidation must never silently remap an uncertain Project source after re-import.
 - Communications must start with structured domain records. Entity-linked Discussion may support those records later; generic chat, channels, and private messaging are not an operational source of truth by default.
-- Preserve append-only audit history and explicit approval, correction, rejection, and supersession semantics.
+- Preserve append-only audit history and explicit approval, correction, rejection, supersession, candidate-disposition, adoption, and merge provenance.
 
 Relevant authority documents include:
 
@@ -69,6 +79,7 @@ Relevant authority documents include:
 ## Current implementation guardrails
 
 - Do not infer that a documented target workflow already exists in runtime code.
+- Do not describe the existing minimal/patch-shaped MSPDI writer as the final complete candidate-schedule implementation unless the code and manual evidence actually prove that.
 - Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist.
 - Keep the console top-level navigation fixed to Today, Tasks, Problems, Evidence, and Exports.
 - Keep the mobile top-level navigation fixed to My Work, Today, Problems, Evidence, and Sync.
@@ -131,13 +142,15 @@ For every change:
 git diff --check
 ```
 
-For Project handoff changes, distinguish three different claims:
+For Project handoff changes, distinguish these claims:
 
 1. the approved input manifest is correct;
-2. Microsoft Project produced a candidate schedule and calculated consequences;
-3. a planner accepted or adopted that candidate.
+2. a complete updated candidate schedule was generated from the intended accepted source;
+3. Microsoft Project opened/imported and recalculated the candidate correctly;
+4. the planner reviewed and accepted/rejected the candidate;
+5. the planner adopted it as the next schedule or merged/imported it into an existing schedule, if either occurred.
 
-Do not use evidence for one claim as proof of another. Manual Microsoft Project testing remains required for handoff milestones.
+Do not use evidence for one claim as proof of another. Standalone candidate testing and merge/import testing are separate evidence gates. Manual Microsoft Project testing remains required for handoff milestones.
 
 ## Definition of done
 
