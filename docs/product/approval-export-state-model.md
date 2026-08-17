@@ -1,6 +1,6 @@
 # Approval, Candidate Schedule, and Adoption State Model
 
-Shutdown Tracker separates execution state, review state, Project-input authority, candidate-schedule calculation, and master adoption.
+Shutdown Tracker separates execution state, review state, Project-input authority, candidate-schedule calculation, candidate disposition, and later schedule adoption/merge.
 
 ## Why the separation matters
 
@@ -8,11 +8,11 @@ A field user can report a task complete while:
 
 - the update is still awaiting supervisor review;
 - no planner has approved Project input;
-- no candidate schedule exists;
+- no updated candidate schedule exists;
 - Microsoft Project has not recalculated anything;
 - the current master remains unchanged.
 
-Likewise, a candidate schedule may be successfully produced but rejected by the planner.
+Likewise, a complete candidate schedule may be successfully produced and still be rejected, retained for review, adopted as the next schedule, or merged/imported into another schedule.
 
 ## State dimensions
 
@@ -32,7 +32,9 @@ Supervisor acceptance means operationally credible only.
 
 `needs_planner_review -> input_approved | input_rejected | clarification_requested | superseded`
 
-Input approval authorises one exact execution candidate for the approved-input manifest.
+Input approval authorises one exact input candidate for the approved-input manifest.
+
+An authorised planner may also originate or correct a permitted input in the Master Console. That origin does not remove attribution, stale-data checks, policy checks, or planner input authority.
 
 ### Approved-input manifest state
 
@@ -40,21 +42,31 @@ Suggested target states:
 
 `draft -> sealed -> approved_for_candidate_calculation -> superseded`
 
-The sealed manifest is immutable and includes source/hash/candidate/approval provenance.
+The sealed manifest is immutable and includes source/hash/candidate/approval/input-origin provenance.
 
 ### Candidate schedule state
 
 Suggested target states:
 
-`not_prepared -> calculation_pending -> candidate_produced -> delta_ready -> accepted | rejected | failed | superseded`
+`not_prepared -> calculation_pending -> candidate_produced -> delta_ready -> review_pending -> accepted | rejected | failed | superseded`
 
 These target states describe the product lifecycle. They do not imply that every current branch already implements them.
 
-### Master adoption state
+### Candidate disposition state
 
-`not_adopted -> adopted_manually -> superseded_by_later_master`
+After candidate review:
 
-Adoption is a separate audit fact. Candidate acceptance does not imply adoption.
+`none -> retained_for_review | adopted_as_new_master | merged_into_existing | rejected | superseded`
+
+Candidate acceptance and candidate disposition are separate concepts. `accepted` means the candidate is considered valid for planner use; it does not itself mean the master has changed.
+
+### Merge/import state
+
+Where merge/import is supported:
+
+`not_requested -> merge_pending -> merge_result_ready -> merge_accepted | merge_rejected | failed`
+
+The merge/import operation is performed in Microsoft Project against a disposable/backed-up destination schedule. The destination-before and result-after identities/hashes are recorded.
 
 ### Sync state
 
@@ -66,38 +78,41 @@ Queued is not submitted.
 
 Current export-integrity implementations may use states such as draft preview, approved, generated, opened in Microsoft Project, verified, rejected, failed, and superseded.
 
-Those states remain useful for authority and artifact provenance. Future candidate-schedule work should either extend them carefully or introduce a separate candidate-schedule run entity rather than overloading “verified” to mean “planner accepted the recalculated schedule.”
+Those states remain useful for input authority and artifact provenance. Future candidate-schedule work should either extend them carefully or introduce a separate candidate-schedule run entity rather than overloading `verified` to mean that a planner accepted, adopted, or merged the recalculated schedule.
 
 ## Authority rules
 
-- Field users and contractors do not approve Project input or candidate adoption.
+- Field users and contractors do not approve Project input or candidate disposition.
 - Supervisors validate execution truth.
-- Planners approve Project inputs and candidate adoption by default.
+- Planners may originate permitted Console inputs, approve exact Project inputs, review complete recalculated candidates, and choose candidate disposition by default.
 - An approved input is bound to one exact project/snapshot/task/field/value/source/version/candidate/approval identity.
 - A candidate schedule is bound to one immutable source schedule and one immutable approved-input manifest.
 - A planner candidate decision is bound to one candidate hash and semantic delta.
-- A later master adoption is a separate event.
+- Adoption as next schedule is a separate audit fact.
+- Merge/import into another existing schedule is a separate planner-controlled Project operation with its own destination-before and result-after provenance.
 
 ## Candidate review requirements
 
 A candidate review should show:
 
 - source schedule identity/hash;
-- candidate schedule identity/hash;
+- complete updated candidate schedule identity/hash;
 - approved-input manifest/hash;
 - Project version/build used for calculation;
-- approved inputs;
+- approved inputs and input origin;
 - Project-calculated consequences;
+- planner edits made in Microsoft Project, if any;
 - unexplained changes;
 - project finish movement;
 - planner decision and notes.
 
 ## Provenance classification
 
-Every source-versus-candidate difference should be classified as:
+Every material source-versus-candidate difference should be classified as:
 
 - `approved_input`;
 - `project_calculated_consequence`;
+- `planner_project_edit`;
 - `unexpected_difference`.
 
 Unchanged values need not be stored as delta rows but remain traceable to the source hash.
@@ -107,7 +122,7 @@ Unchanged values need not be stored as delta rows but remain traceable to the so
 Without an explicit policy change, Shutdown Tracker must not directly author:
 
 - summary-task actuals;
-- planned dates/durations;
+- arbitrary planned dates/durations;
 - dependencies;
 - constraints;
 - calendars;
@@ -118,13 +133,44 @@ Without an explicit policy change, Shutdown Tracker must not directly author:
 
 Those values may change inside a Microsoft Project-calculated candidate and be shown to the planner.
 
+## Adoption as next schedule
+
+If the planner chooses to use the candidate as the next controlled schedule, record:
+
+- accepted source identity/hash;
+- candidate identity/hash;
+- adopted schedule identity/hash where available;
+- adopted by/at;
+- Project version/build;
+- any manual Project edits made after the original candidate calculation;
+- lineage to the prior master.
+
+Shutdown Tracker must not claim adoption merely because the candidate opened successfully.
+
+## Merge/import into existing schedule
+
+If the planner chooses to merge/import the candidate into another Project schedule, record:
+
+- candidate identity/hash;
+- destination schedule identity/hash before merge;
+- Microsoft Project version/build;
+- merge/import mode;
+- warnings/conflicts and planner choices;
+- merged result identity/hash;
+- planner decision;
+- merged by/at.
+
+The first supported merge/import process must operate against a disposable/backed-up destination copy. Shutdown Tracker must not silently overwrite the only master copy.
+
 ## Immutability and corrections
 
 - Source schedule files/snapshots are immutable.
-- Execution candidates and approval events are append-only.
+- Input candidates and approval events are append-only.
 - Approved-input manifests are sealed and immutable.
-- Candidate schedules and deltas are immutable artifacts once produced.
+- Generated candidate schedules and deltas are immutable artifacts once produced.
+- Project-saved/reviewed candidate variants receive new identities/hashes rather than replacing prior evidence.
 - Rejected and superseded candidates remain visible in history.
+- Adoption and merge/import records are append-only decisions.
 - Corrections create new candidates/manifests/runs rather than editing prior evidence.
 
 ## Required user-facing wording
@@ -132,23 +178,29 @@ Those values may change inside a Microsoft Project-calculated candidate and be s
 Before candidate calculation:
 
 ```text
-Approved for candidate calculation. Current master schedule unchanged.
+Approved for updated candidate calculation. Current master schedule unchanged.
 ```
 
 After candidate produced:
 
 ```text
-Candidate schedule produced by Microsoft Project. Review calculated impacts before adoption.
+Updated candidate schedule produced. Open in Microsoft Project and review calculated impacts before deciding how to use it.
 ```
 
 After candidate acceptance:
 
 ```text
-Candidate accepted for planner use. Master adoption is still a separate action.
+Candidate accepted for planner use. The master schedule has not changed yet.
 ```
 
-After manual adoption is recorded:
+After adoption as next schedule:
 
 ```text
-Planner recorded this candidate as adopted into the next master schedule.
+Planner recorded this candidate as the next controlled schedule.
+```
+
+After merge/import:
+
+```text
+Planner recorded a Microsoft Project merge/import result. Review the recorded destination and result hashes for provenance.
 ```
