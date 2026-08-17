@@ -1,26 +1,51 @@
 # Task Progress Review and Project Input Approval
 
-Task Progress Review connects field execution truth to a planner-controlled Microsoft Project candidate schedule.
+Task Progress Review connects field execution truth and authorised planner Console input to a planner-controlled Microsoft Project candidate schedule.
 
 ## Product decision
 
-Shutdown Tracker captures structured execution facts, routes them through operational review, allows a planner to approve exact Project inputs, and then hands those inputs to a controlled candidate-schedule process.
+Shutdown Tracker captures structured execution facts, routes field-originated facts through operational review, allows authorised planners to enter or correct permitted inputs in the Master Console, and then creates an approved input set for a complete updated Project candidate.
 
-Planner input approval does **not** mean the resulting Project-calculated schedule has already been accepted.
+The candidate is opened/imported in Microsoft Project, Microsoft Project recalculates it, and the planner reviews the resulting schedule before deciding whether to reject it, retain it, use it as the next schedule/master, or merge/import it into another existing schedule.
+
+Planner input approval does **not** mean the resulting Project-calculated schedule has already been accepted or adopted.
 
 Core workflow:
 
 ```text
-field execution update
--> supervisor review
+field execution update and/or authorised planner Console input
+-> supervisor review where policy requires
 -> planner input review
--> authoritative execution candidate
--> approved-input manifest / preview
--> Microsoft Project candidate calculation
+-> authoritative input candidates
+-> sealed approved-input manifest / preview
+-> complete updated Project candidate generated
+-> Microsoft Project opens/imports and recalculates candidate
 -> candidate delta review
--> planner accepts / rejects / supersedes
--> optional manual master adoption
+-> planner chooses reject / retain / use as next schedule / merge-import
+-> adoption or merge outcome recorded separately
 ```
+
+## Input origins
+
+An input may originate from:
+
+- field user execution capture;
+- supervisor correction of a field update;
+- planner entry or correction in the Master Console; or
+- another structured source explicitly authorised by project policy.
+
+Planner-originated input does not become unaudited or implicitly trusted. It must still carry:
+
+- actor and timestamp;
+- accepted source snapshot/file identity;
+- imported task identity;
+- current source value;
+- proposed value;
+- source reason/context;
+- handoff policy/support state;
+- approval decision.
+
+A project policy may allow a planner-originated input to skip supervisor review when operational validation is not required, but it must not skip planner input authority, provenance, stale-data checks, or candidate preview.
 
 ## User responsibilities
 
@@ -30,10 +55,10 @@ field execution update
 | Contractor | Submit scoped execution facts/evidence | Other contractors' work or planner decisions |
 | Supervisor | Validate operational credibility | Final candidate-schedule adoption |
 | Coordinator | Triage review queues, blockers, actions, handover | Project file mechanics |
-| Shutdown Control | Maintain live operational awareness | Routine field entry |
-| Planner | Approve exact Project inputs and review the recalculated candidate | Raw frontline evidence capture |
+| Shutdown Control | Maintain live operational awareness | Routine planner file operations |
+| Planner | Enter/correct permitted inputs, approve exact Project inputs, review recalculated candidate, choose final disposition | Raw frontline evidence capture unless needed |
 | Inspector | Review assigned quality/evidence outcomes | Schedule handoff decisions unless separately authorised |
-| Viewer / Management | Read execution and candidate-impact summaries | Editable review/export controls |
+| Viewer / Management | Read execution and candidate-impact summaries | Editable review/handoff controls |
 
 ## State dimensions
 
@@ -45,7 +70,7 @@ Do not collapse task condition into one status.
 | Progress review state | Draft, Submitted, Supervisor accepted, Correction requested, Rejected, Superseded |
 | Planner input state | Needs review, Approved as input, Rejected, Clarification requested, Superseded |
 | Candidate schedule state | Not prepared, Calculation pending, Candidate produced, Delta ready, Accepted, Rejected, Superseded |
-| Adoption state | Not adopted, Adopted manually, Replaced by later master |
+| Candidate disposition | Retained, Adopted as next schedule, Merged/imported into existing, Superseded |
 | Sync state | Local draft, Queued, Sending, Server received, Failed, Conflict |
 
 ## Execution actions
@@ -61,6 +86,20 @@ Do not collapse task condition into one status.
 
 Start/Pause/Resume/Block/Complete are execution events, not Project field aliases.
 
+## Planner Console entry
+
+The Master Console may allow an authorised planner to enter or correct Project-bound execution facts that are enabled by the active project/handoff policy.
+
+Examples may include:
+
+- reviewed percent complete;
+- physical percent complete where the project uses it;
+- actual start;
+- actual finish;
+- another explicitly authorised execution/tracking field added by later policy.
+
+The Console must not silently become a second Project schedule editor. Planned dates, predecessors, constraints, calendars, resource levelling, baselines, and other schedule-logic fields remain Microsoft Project editing responsibilities unless a later explicit product/ADR decision expands direct input authority.
+
 ## Progress methods
 
 A project/import profile may define the progress method that best matches the work.
@@ -74,9 +113,9 @@ A project/import profile may define the progress method that best matches the wo
 
 The product must not choose a field merely because it has fewer recalculation side effects. The field must represent the business fact being reported.
 
-## Authoritative execution candidates
+## Authoritative input candidates
 
-An execution candidate is one immutable reviewed fact bound to:
+An input candidate is one immutable reviewed fact bound to:
 
 - project and accepted snapshot;
 - imported task identity;
@@ -95,7 +134,7 @@ Creating a candidate does not approve it. Approvals, rejection, correction reque
 For every possible Project input, track separately whether it is:
 
 1. recognised by the importer/candidate vocabulary;
-2. reviewable as an execution fact;
+2. reviewable as a field or planner-entered fact;
 3. authorised as a direct Project input by product policy;
 4. supported by the selected handoff mechanism;
 5. enabled for the current project/profile.
@@ -131,8 +170,9 @@ The queue should show:
 - imported task UID/ID/name and leaf/summary state;
 - current Project value;
 - proposed value;
-- source update and actor/time;
-- supervisor decision;
+- input origin: field / supervisor correction / planner Console / other approved source;
+- source actor/time;
+- supervisor decision where required;
 - evidence/blocker state;
 - re-import/lineage conflict state;
 - current handoff-mechanism support;
@@ -141,7 +181,7 @@ The queue should show:
 Required copy:
 
 ```text
-Planner approval authorises this exact input for a candidate schedule calculation. The current master schedule is unchanged.
+Planner approval authorises this exact input for an updated Project candidate. The current master schedule is unchanged.
 ```
 
 ## Approved-input manifest
@@ -154,15 +194,20 @@ The manifest should record:
 - candidate IDs and approval IDs;
 - task identities;
 - approved field/value pairs;
+- input origin and actor/time;
 - manifest hash;
 - project/profile policy version;
 - generated by/at.
 
-## Candidate schedule calculation
+## Complete updated candidate generation
 
-The candidate is always based on a disposable copy of the accepted source.
+The target handoff output is a **complete updated Project candidate schedule**, normally MSPDI/XML, built from the accepted source plus the approved-input manifest.
 
-Microsoft Project may recalculate dependent schedule state after approved inputs are applied. That may include planned dates, durations, summary roll-ups, assignment work, timephased data, slack, or criticality.
+It must not be a sparse patch presented as though it were a complete schedule.
+
+The candidate is always separate from the accepted source/master.
+
+After it is opened/imported in Microsoft Project, Microsoft Project may recalculate dependent schedule state. That may include planned dates, durations, summary roll-ups, assignment work, timephased data, slack, or criticality.
 
 Those values must be labelled **Microsoft Project-calculated consequence**. Shutdown Tracker must not present them as if the planner directly approved them as input.
 
@@ -172,6 +217,7 @@ The planner should see:
 
 - approved inputs;
 - Project-calculated schedule consequences;
+- planner edits made in Microsoft Project, if any;
 - unchanged source facts;
 - unexpected/unexplained changes;
 - project finish movement;
@@ -181,13 +227,32 @@ The planner should see:
 - critical/slack changes reported by Project;
 - candidate and source hashes.
 
-The planner can accept, reject, or supersede the candidate. Candidate acceptance still does not mean the master has been adopted.
+## Candidate disposition
 
-## Master adoption
+After review the planner may:
 
-Master adoption is a separate planner-controlled event.
+- **Reject** — candidate remains evidence only.
+- **Retain for further review** — candidate remains separate from the master.
+- **Use as next schedule/master** — planner adopts the reviewed candidate as the next controlled schedule.
+- **Merge/import into existing schedule** — planner uses Microsoft Project to merge/import the candidate into a disposable/backed-up existing schedule and reviews the merged result.
 
-Shutdown Tracker may record adoption metadata, but must not silently overwrite or save the accepted master file.
+Candidate acceptance does not itself perform adoption or merge.
+
+## Merge/import control
+
+Merge/import is a Microsoft Project operation controlled by the planner.
+
+Shutdown Tracker should record:
+
+- candidate hash;
+- destination schedule identity/hash before merge;
+- Microsoft Project version/build;
+- merge/import mode;
+- warnings/conflicts;
+- result schedule identity/hash;
+- planner decision.
+
+Shutdown Tracker must not silently overwrite the only master copy.
 
 ## Summary tasks
 
@@ -197,7 +262,7 @@ Project-calculated summary changes are expected candidate consequences and shoul
 
 ## Re-import and stale candidates
 
-Every Project re-import creates a new immutable snapshot. Existing execution candidates remain historical and must not be silently rebound to the new snapshot.
+Every Project re-import creates a new immutable snapshot. Existing input candidates remain historical and must not be silently rebound to the new snapshot.
 
 Continued handoff requires a fresh candidate against the newly accepted snapshot and revalidation of task lineage, baseline, field support, and approval.
 
@@ -230,6 +295,7 @@ This workflow does not build:
 
 - a Shutdown Tracker scheduling engine;
 - hidden Project write-back;
+- unattended master overwrite or merge;
 - native `.mpp` writing by the server;
 - automatic progress derivation from comments;
 - automatic `% Work Complete` from Start/Pause timers;
