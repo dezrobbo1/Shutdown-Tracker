@@ -31,7 +31,44 @@ When `VITE_SHUTDOWN_TRACKER_PROJECT_ID` is absent, the console stays in syntheti
 
 The task-progress review surfaces are visual/product-review only and use synthetic data. They do not add production task execution APIs, supervisor review APIs, planner review APIs, production offline sync, evidence upload, handover workflow, generated artifacts, or Microsoft Project write-back.
 
-The console imports `@shutdown-tracker/api-client` and can be configured with `VITE_SHUTDOWN_TRACKER_API_BASE_URL`. It does not upload source files, store uploaded files, parse Project files, create import batches, create live execution records, generate MSPDI/XML, approve exports, calculate schedules, or write back to Microsoft Project.
+The console imports `@shutdown-tracker/api-client` and can be configured with `VITE_SHUTDOWN_TRACKER_API_BASE_URL`.
+
+## Local round-trip acceptance mode
+
+A separate local acceptance harness can drive the current backend export-integrity workflow from the browser instead of manually assembling PowerShell/API calls.
+
+Enable it with:
+
+```text
+VITE_SHUTDOWN_TRACKER_ROUND_TRIP_MODE=true
+VITE_SHUTDOWN_TRACKER_API_BASE_URL=http://localhost:8080
+VITE_SHUTDOWN_TRACKER_PROJECT_ID=<review-project-id>
+```
+
+The project ID and test actor ID can also be entered in the page and are stored locally in the browser for convenience.
+
+The harness can:
+
+1. list existing import snapshots;
+2. read a snapshot and its imported tasks;
+3. accept a parsed snapshot;
+4. select an imported leaf task;
+5. create an authoritative `percent_complete`, `actual_start`, or `actual_finish` candidate;
+6. record the candidate-bound planner approval event;
+7. create a sealed export preview;
+8. approve the batch;
+9. generate the worker-backed MSPDI/XML artifact;
+10. show/copy the generated file URI and SHA-256;
+11. record that the planner opened the candidate in Microsoft Project; and
+12. record the manual Project verification result.
+
+The harness deliberately states that Microsoft Project recalculation is expected. Project-calculated date, duration, summary, work, assignment, timephased, slack, criticality, or project-finish changes are not automatically treated as export-integrity failures.
+
+Current limitation: this browser flow starts from an imported snapshot that already exists in the API. The current upload/parse-summary endpoint does not yet expose a complete browser-driven upload → parsed entities → persisted snapshot workflow. That missing import-orchestration step is the next gap if the round-trip test should start from a fresh XML file with no prior setup.
+
+The generated artifact is currently exposed as a local `file:` URI, not a browser download endpoint. The page therefore provides a copy action so the local artifact can be opened in Microsoft Project. A streaming/download endpoint would remove that remaining filesystem step.
+
+This mode is a development/acceptance harness. It is not the production planner workflow and it does not automate Microsoft Project, calculate the schedule in Shutdown Tracker, or overwrite the accepted master schedule.
 
 ## Visual shell limitations
 
