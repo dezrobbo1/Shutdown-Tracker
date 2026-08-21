@@ -49,6 +49,7 @@ class ExportIntegrityPostgresIntegrationTests {
     private static final UUID OPENER_ID = UUID.fromString("30000000-0000-0000-0000-000000000010");
     private static final UUID VERIFIER_ID = UUID.fromString("30000000-0000-0000-0000-000000000011");
     private static final String ARTIFACT_HASH = "a".repeat(64);
+    private static final String SOURCE_CONTENT_HASH = "c".repeat(64);
 
     private static final Path MIGRATIONS = Path.of(System.getProperty("user.dir"))
             .resolve("..")
@@ -83,23 +84,12 @@ class ExportIntegrityPostgresIntegrationTests {
         );
     }
 
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private ExportCandidateService candidateService;
-
-    @Autowired
-    private ExportPreviewService previewService;
-
-    @Autowired
-    private ExportArtifactHandoffService handoffService;
-
-    @Autowired
-    private ExportPreviewRepository repository;
-
-    @Autowired
-    private PlatformTransactionManager transactionManager;
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private ExportCandidateService candidateService;
+    @Autowired private ExportPreviewService previewService;
+    @Autowired private ExportArtifactHandoffService handoffService;
+    @Autowired private ExportPreviewRepository repository;
+    @Autowired private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void resetDatabase() {
@@ -272,16 +262,12 @@ class ExportIntegrityPostgresIntegrationTests {
                 .containsEntry("generation", Map.of("exportFileHash", "caller-forged"));
         assertThat(sectionMap(opened.batch(), "generation")).isEqualTo(generationSection);
 
-        assertDataFailure(
-                """
-                        UPDATE export_batches
-                        SET opened_in_microsoft_project_at = opened_in_microsoft_project_at + interval '1 second',
-                            opened_in_microsoft_project_by_user_id = ?
-                        WHERE id = ?
-                        """,
-                UUID.randomUUID(),
-                fixture.batchId()
-        );
+        assertDataFailure("""
+                UPDATE export_batches
+                SET opened_in_microsoft_project_at = opened_in_microsoft_project_at + interval '1 second',
+                    opened_in_microsoft_project_by_user_id = ?
+                WHERE id = ?
+                """, UUID.randomUUID(), fixture.batchId());
 
         ExportPreviewDetail verified = previewService.verifyBatch(
                 PROJECT_ID,
@@ -432,9 +418,11 @@ class ExportIntegrityPostgresIntegrationTests {
     private void seedAcceptedSnapshotAndLeafTask() {
         jdbcTemplate.update("INSERT INTO projects (id, name, timezone) VALUES (?, 'Integration project', 'Australia/Perth')", PROJECT_ID);
         jdbcTemplate.update("""
-                INSERT INTO source_files (id, project_id, original_filename, file_kind, storage_uri)
-                VALUES (?, ?, 'synthetic-integration.xml', 'mspdi_xml', 'validation://integration/source')
-                """, SOURCE_FILE_ID, PROJECT_ID);
+                INSERT INTO source_files (
+                    id, project_id, original_filename, file_kind, storage_uri, content_hash
+                )
+                VALUES (?, ?, 'synthetic-integration.xml', 'mspdi_xml', 'validation://integration/source', ?)
+                """, SOURCE_FILE_ID, PROJECT_ID, SOURCE_CONTENT_HASH);
         jdbcTemplate.update("""
                 INSERT INTO import_batches (id, project_id, source_file_id, status, parser_name, parser_version)
                 VALUES (?, ?, ?, 'accepted', 'integration-test', '1')
@@ -481,11 +469,9 @@ class ExportIntegrityPostgresIntegrationTests {
     }
 
     private static final class DockerPostgres {
-
         private static final String USERNAME = "shutdown_tracker";
         private static final String PASSWORD = "shutdown_tracker_test";
         private static final String DATABASE = "shutdown_tracker";
-
         private final String containerName;
         private final int port;
         private final AtomicBoolean stopped = new AtomicBoolean();
@@ -519,17 +505,9 @@ class ExportIntegrityPostgresIntegrationTests {
             return postgres;
         }
 
-        private String jdbcUrl() {
-            return "jdbc:postgresql://127.0.0.1:" + port + "/" + DATABASE;
-        }
-
-        private String username() {
-            return USERNAME;
-        }
-
-        private String password() {
-            return PASSWORD;
-        }
+        private String jdbcUrl() { return "jdbc:postgresql://127.0.0.1:" + port + "/" + DATABASE; }
+        private String username() { return USERNAME; }
+        private String password() { return PASSWORD; }
 
         private void waitUntilReady() {
             for (int attempt = 0; attempt < 120; attempt++) {
@@ -554,9 +532,7 @@ class ExportIntegrityPostgresIntegrationTests {
             }
         }
 
-        private static void stopContainer(String containerName) {
-            run("docker", "rm", "--force", containerName);
-        }
+        private static void stopContainer(String containerName) { run("docker", "rm", "--force", containerName); }
 
         private static String runRequired(String... command) {
             ProcessResult result = run(command);
@@ -570,9 +546,7 @@ class ExportIntegrityPostgresIntegrationTests {
 
         private static ProcessResult run(String... command) {
             try {
-                Process process = new ProcessBuilder(command)
-                        .redirectErrorStream(true)
-                        .start();
+                Process process = new ProcessBuilder(command).redirectErrorStream(true).start();
                 String output = new String(process.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
                 return new ProcessResult(process.waitFor(), output);
             } catch (IOException exception) {
@@ -584,9 +558,6 @@ class ExportIntegrityPostgresIntegrationTests {
         }
     }
 
-    private record ProcessResult(int exitCode, String output) {
-    }
-
-    private record ApprovedFixture(UUID candidateId, UUID latestApprovalId, UUID batchId) {
-    }
+    private record ProcessResult(int exitCode, String output) {}
+    private record ApprovedFixture(UUID candidateId, UUID latestApprovalId, UUID batchId) {}
 }
