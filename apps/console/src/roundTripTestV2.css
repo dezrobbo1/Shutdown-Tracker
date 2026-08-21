@@ -1,4 +1,4 @@
-.rt-download {
+.rt-shell .rt-download {
   display: inline-flex;
   width: fit-content;
   min-height: 38px;
@@ -13,16 +13,16 @@
   text-decoration: none;
 }
 
-.rt-download:hover {
+.rt-shell .rt-download:hover {
   background: #dfecef;
   border-color: #284b5d;
 }
 
-.rt-form-grid input[type="file"] {
+.rt-shell .rt-form-grid input[type="file"] {
   padding: 7px;
 }
 
-.rt-form-grid input[type="file"]::file-selector-button {
+.rt-shell .rt-form-grid input[type="file"]::file-selector-button {
   margin-right: 10px;
   padding: 6px 10px;
   border: 1px solid #78838b;
