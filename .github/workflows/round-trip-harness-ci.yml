@@ -1,6 +1,7 @@
 name: Round-trip harness CI
 
 on:
+  pull_request:
   push:
     branches:
       - frontend/round-trip-test-harness
