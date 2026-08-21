@@ -1,0 +1,29 @@
+package com.shutdowntracker.projectworker.handoff;
+
+import com.shutdowntracker.projectimport.contract.ProjectParseSnapshotResponse;
+import com.shutdowntracker.projectimport.contract.ProjectParseSummaryRequest;
+import org.springframework.http.MediaType;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/worker/project-import")
+public class WorkerProjectSnapshotController {
+
+    private final WorkerProjectSnapshotHandoffService handoffService;
+
+    public WorkerProjectSnapshotController(WorkerProjectSnapshotHandoffService handoffService) {
+        this.handoffService = handoffService;
+    }
+
+    @PostMapping(
+            value = "/parse-snapshot",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    public ProjectParseSnapshotResponse parseSnapshot(@RequestBody ProjectParseSummaryRequest request) {
+        return handoffService.parse(request);
+    }
+}
