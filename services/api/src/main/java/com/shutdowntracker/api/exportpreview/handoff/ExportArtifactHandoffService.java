@@ -11,6 +11,7 @@ import com.shutdowntracker.projectexport.contract.ProjectExportArtifactFieldValu
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactGenerationRequest;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactGenerationResponse;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactRequest;
+import com.shutdowntracker.projectexport.contract.ProjectExportArtifactSource;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactTask;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -28,22 +29,26 @@ import org.springframework.web.server.ResponseStatusException;
 @ConditionalOnProperty(prefix = "shutdown-tracker.persistence", name = "enabled", havingValue = "true")
 public class ExportArtifactHandoffService {
 
-    private static final String GENERATED_MESSAGE = "Worker-generated MSPDI/XML artifact metadata recorded. "
+    private static final String GENERATED_MESSAGE = "Worker-generated MSPDI/XML candidate metadata recorded. "
             + "No Microsoft Project write-back was run.";
     private static final String WORKER_PROJECT_NAME_PREFIX = "Shutdown Tracker Export Batch ";
+    private static final String MSPDI_SOURCE_KIND = "mspdi_xml";
 
     private final ExportPreviewService exportPreviewService;
     private final ProjectExportArtifactJobClient exportArtifactJobClient;
     private final ExportArtifactStorage exportArtifactStorage;
+    private final AcceptedSourceFileRepository acceptedSourceFileRepository;
 
     public ExportArtifactHandoffService(
             ExportPreviewService exportPreviewService,
             ProjectExportArtifactJobClient exportArtifactJobClient,
-            ExportArtifactStorage exportArtifactStorage
+            ExportArtifactStorage exportArtifactStorage,
+            AcceptedSourceFileRepository acceptedSourceFileRepository
     ) {
         this.exportPreviewService = exportPreviewService;
         this.exportArtifactJobClient = exportArtifactJobClient;
         this.exportArtifactStorage = exportArtifactStorage;
+        this.acceptedSourceFileRepository = acceptedSourceFileRepository;
     }
 
     @Transactional
@@ -124,10 +129,48 @@ public class ExportArtifactHandoffService {
                 storageLocation.outputPath().toString(),
                 new ProjectExportArtifactRequest(
                         WORKER_PROJECT_NAME_PREFIX + preview.batch().id(),
+                        resolveAcceptedSource(preview),
                         taskBuilders.values().stream()
                                 .map(ExportTaskBuilder::build)
                                 .toList()
                 )
+        );
+    }
+
+    /**
+     * Resolves the exact uploaded schedule behind the accepted snapshot. Candidate generation
+     * fails closed rather than rebuilding from imported rows that cannot represent a complete
+     * Microsoft Project schedule.
+     */
+    private ProjectExportArtifactSource resolveAcceptedSource(ExportPreviewDetail preview) {
+        AcceptedSourceFile sourceFile = acceptedSourceFileRepository
+                .findByProjectSnapshotId(preview.batch().projectSnapshotId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.CONFLICT,
+                        "Accepted snapshot has no source file, so no candidate schedule can be derived from it."
+                ));
+
+        if (!MSPDI_SOURCE_KIND.equalsIgnoreCase(sourceFile.fileKind())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Candidate schedule generation requires an MSPDI/XML source schedule; this snapshot was "
+                            + "imported from '" + sourceFile.fileKind() + "'. Re-import the project from XML "
+                            + "saved by Microsoft Project."
+            );
+        }
+
+        if (sourceFile.contentHash() == null || sourceFile.contentHash().isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Accepted source schedule has no recorded content hash, so the candidate could not be "
+                            + "proven to derive from the reviewed schedule."
+            );
+        }
+
+        return new ProjectExportArtifactSource(
+                sourceFile.sourceFileId(),
+                sourceFile.storageUri(),
+                sourceFile.contentHash()
         );
     }
 
@@ -167,7 +210,8 @@ public class ExportArtifactHandoffService {
         provenance.put("artifactStorageUri", storageLocation.storageUri());
         provenance.put("artifactFilename", storageLocation.artifactFilename());
         provenance.put("artifactFormat", workerResponse.artifactSummary().artifactFormat());
-        provenance.put("artifactTaskCount", workerResponse.artifactSummary().taskCount());
+        provenance.put("artifactUpdatedTaskCount", workerResponse.artifactSummary().taskCount());
+        provenance.put("artifactSourceTaskCount", workerResponse.artifactSummary().sourceTaskCount());
         provenance.put("artifactExportedFieldCount", workerResponse.artifactSummary().exportedFieldCount());
         provenance.put("artifactSizeBytes", workerResponse.artifactSummary().sizeBytes());
         provenance.put("workerMessage", workerResponse.message());
