@@ -61,6 +61,8 @@ The round-trip test deliberately expects Microsoft Project to recalculate. Proje
 
 This acceptance importer currently persists task facts required for the test path. It does not yet claim final full Project import persistence for resources, assignments, calendars, custom-field definitions, or timephased data. The current export worker also remains the existing direct-input/diagnostic writer until the complete-source candidate implementation is finished.
 
+The normal console is isolated from the acceptance harness: round-trip code and its global test-only stylesheet are dynamically loaded only when the mode flag is enabled.
+
 The mode is development/acceptance tooling. It does not calculate the schedule in Shutdown Tracker, automate Microsoft Project, silently update the master `.mpp`, or adopt a candidate without planner control.
 
 ## Visual shell limitations
