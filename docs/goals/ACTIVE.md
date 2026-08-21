@@ -64,8 +64,8 @@ This PR may add:
 
 ## Deliberate limits
 
-- The parsed snapshot persistence slice may persist task facts only; it is not yet the final full Project import model for resources, assignments, calendars, custom fields, or timephased data.
-- The generated artifact path still uses the current worker implementation; this PR does not claim that the existing patch-shaped writer is the final complete-source candidate generator.
+- The parsed snapshot persistence slice persists the task facts required by the acceptance path. It is not yet the final full Project import model for resources, assignments, calendars, custom fields, or timephased data.
+- The generated artifact path still uses the current worker implementation. This PR does not claim that the existing patch-shaped writer is the final complete-source candidate generator.
 - Microsoft Project itself is still opened manually. COM/Interop automation remains a separate implementation decision.
 - No master `.mpp` is silently overwritten or adopted.
 - No Shutdown Tracker CPM, float, critical-path, levelling, or recovery engine is introduced.
@@ -78,6 +78,7 @@ This PR may add:
 - Candidate creation, exact approval, preview, batch approval, and generation work through the existing hardened backend authority path.
 - A generated local artifact can be downloaded through a hash-verified API endpoint rather than manually locating a `file:` URI.
 - The UI explicitly expects Microsoft Project recalculation and does not classify legitimate Project-calculated consequences as unauthorized direct inputs.
+- Round-trip-only CSS and code do not alter the normal console when the mode flag is absent.
 - Frontend tests/build, Maven tests, and migration validation pass on the branch.
 - PR #61 remains draft until the manual Microsoft Project round-trip is performed.
 
