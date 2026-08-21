@@ -1,205 +1,206 @@
-# Approval and Export State Model
+# Approval, Candidate Schedule, and Adoption State Model
 
-Shutdown Tracker is the live execution and reporting authority. Microsoft Project remains the schedule authority. Export to Microsoft Project is controlled, reviewed, approved, and batch-oriented.
+Shutdown Tracker separates execution state, review state, Project-input authority, candidate-schedule calculation, candidate disposition, and later schedule adoption/merge.
 
-This document separates execution, progress review, planner review, export, and sync states. Do not collapse them into one overloaded task status.
+## Why the separation matters
 
-A task can be blocked, server received, awaiting planner review, and export blocked at the same time.
+A field user can report a task complete while:
 
-## State Dimensions
+- the update is still awaiting supervisor review;
+- no planner has approved Project input;
+- no updated candidate schedule exists;
+- Microsoft Project has not recalculated anything;
+- the current master remains unchanged.
 
-| Dimension | Purpose | Example |
-| --- | --- | --- |
-| Execution state | What is happening at the workfront | `blocked` |
-| Progress review state | Whether a submitted progress update has been operationally reviewed | `supervisor_accepted` |
-| Planner review state | Whether planner has approved export eligibility | `needs_planner_review` |
-| Export state | Where an approved candidate or batch is in the Project handoff lifecycle | `in_export_preview` |
-| Sync state | Whether a client event has reached the server | `queued_on_device` |
+Likewise, a complete candidate schedule may be successfully produced and still be rejected, retained for review, adopted as the next schedule, or merged/imported into another schedule.
 
-## Execution States
+## State dimensions
 
-| State | Meaning | Allowed next states |
-| --- | --- | --- |
-| `not_started` | Imported task has not started. | `ready`, `in_progress`, `blocked`, `superseded` |
-| `ready` | Task is available to start or assigned for current work window. | `in_progress`, `blocked`, `superseded` |
-| `in_progress` | Work has actively started. | `paused`, `blocked`, `completed`, `superseded` |
-| `paused` | Work stopped temporarily without being formally blocked. | `in_progress`, `blocked`, `completed`, `superseded` |
-| `blocked` | Work cannot proceed until a blocker/problem is resolved. | `in_progress`, `paused`, `completed`, `superseded` |
-| `completed` | Field reports the task as done. | `awaiting_supervisor_review`, `in_progress`, `superseded` |
-| `superseded` | A newer execution record now carries the active meaning. | none |
+### Execution state
 
-Execution state is operational. It is not automatically exportable to Microsoft Project.
+`not_started -> ready -> in_progress -> paused/blocked -> completed`
 
-## Progress Review States
+Corrections use explicit events/supersession rather than destructive history edits.
 
-| State | Meaning | Allowed next states |
-| --- | --- | --- |
-| `draft` | Local or server-side draft that has not been submitted for review. | `submitted`, `superseded` |
-| `submitted` | User has submitted a progress update. | `needs_supervisor_review`, `correction_requested`, `rejected`, `superseded` |
-| `needs_supervisor_review` | Update needs operational validation. | `supervisor_accepted`, `correction_requested`, `rejected`, `superseded` |
-| `supervisor_accepted` | Supervisor confirms the update is operationally credible. | `needs_planner_review`, `superseded` |
-| `correction_requested` | Reviewer has requested clarification or correction. | `submitted`, `rejected`, `superseded` |
-| `rejected` | Update is not accepted. | `superseded` |
-| `superseded` | A newer correction or replacement record now carries the active meaning. | none |
+### Progress review state
 
-Supervisor acceptance is not Microsoft Project export approval.
+`draft -> submitted -> supervisor_accepted | correction_requested | rejected | superseded`
 
-Required copy:
+Supervisor acceptance means operationally credible only.
 
-```text
-Supervisor review confirms operational validity. It does not approve Microsoft Project export.
-```
+### Planner input state
 
-## Planner Review States
+`needs_planner_review -> input_approved | input_rejected | clarification_requested | superseded`
 
-| State | Meaning | Allowed next states |
-| --- | --- | --- |
-| `draft` | No planner review is required yet or candidate is not ready. | `needs_planner_review`, `superseded` |
-| `needs_planner_review` | Supervisor-accepted progress candidate needs planner decision. | `planner_approved`, `planner_rejected`, `clarification_requested`, `superseded` |
-| `clarification_requested` | Planner needs more information before deciding. | `needs_planner_review`, `planner_rejected`, `superseded` |
-| `planner_approved` | Planner marks selected values eligible for export preview. | `approved_for_export`, `superseded` |
-| `planner_rejected` | Planner decides the candidate should not be exported. | `superseded` |
-| `superseded` | A later review/candidate replaces this decision. | none |
+Input approval authorises one exact input candidate for the approved-input manifest.
 
-Required copy:
+An authorised planner may also originate or correct a permitted input in the Master Console. That origin does not remove attribution, stale-data checks, policy checks, or planner input authority.
 
-```text
-Planner approval marks this progress as eligible for export preview. The master .mpp is not updated.
-```
+### Approved-input manifest state
 
-## Export Candidate States
+Suggested target states:
 
-| State | Meaning | Allowed next states |
-| --- | --- | --- |
-| `not_eligible` | Candidate cannot be exported due to task type, field, policy, lineage, blocker, or evidence state. | `eligible`, `superseded` |
-| `eligible` | Candidate appears to satisfy export rules but is not approved yet. | `approved_for_export`, `export_blocked`, `superseded` |
-| `export_blocked` | Candidate is blocked by evidence, blocker, lineage, summary-task rule, or policy. | `eligible`, `rejected`, `superseded` |
-| `approved_for_export` | Planner-approved candidate may be included in export preview. | `in_export_preview`, `superseded` |
-| `in_export_preview` | Candidate is included in a draft export preview. | `exported`, `superseded` |
-| `exported` | Candidate was included in a generated export artifact. | `superseded` |
-| `rejected` | Candidate is not approved for export. | `superseded` |
-| `superseded` | A later candidate replaces this one. | none |
+`draft -> sealed -> approved_for_candidate_calculation -> superseded`
 
-## Export Batch States
+The sealed manifest is immutable and includes source/hash/candidate/approval/input-origin provenance.
 
-| State | Meaning | Allowed next states |
-| --- | --- | --- |
-| `draft_preview` | Preview has been assembled but not submitted for approval. | `awaiting_approval`, `approved`, `rejected`, `failed`, `superseded` |
-| `awaiting_approval` | Preview is ready for Planner approval. | `approved`, `rejected`, `failed`, `superseded` |
-| `approved` | Export batch has been approved for file generation. | `generated`, `failed`, `superseded` |
-| `rejected` | Export batch is not approved. | none |
-| `generated` | MSPDI/XML export artifact has been generated. | `opened_in_microsoft_project`, `failed`, `superseded` |
-| `opened_in_microsoft_project` | Planner has opened the artifact in Microsoft Project for manual verification. | `verified`, `failed`, `superseded` |
-| `verified` | Planner has confirmed the artifact opened and behaved as expected in Microsoft Project. | none |
-| `failed` | Generation or manual verification failed. | none |
-| `superseded` | A later export batch replaces this batch for operational purposes. | none |
+### Candidate schedule state
 
-Required copy sequence:
+Suggested target states:
 
-```text
-Draft export preview — master .mpp not updated.
-Export batch approved — master .mpp not updated.
-MSPDI/XML artifact generated — master .mpp not updated.
-Planner must manually open/check the artifact in Microsoft Project.
-Verified in Microsoft Project — master .mpp update remains planner-controlled.
-```
+`not_prepared -> calculation_pending -> candidate_produced -> delta_ready -> review_pending -> accepted | rejected | failed | superseded`
 
-## Sync States
+These target states describe the product lifecycle. They do not imply that every current branch already implements them.
 
-| State | Meaning | Required copy |
-| --- | --- | --- |
-| `local_draft` | Saved only on device as a draft. | `Saved locally.` |
-| `queued_on_device` | Captured locally and not accepted by the server. | `Queued on this device. Not yet sent.` |
-| `sending` | Client is attempting to submit. | `Sending.` |
-| `server_received` | Server accepted the event and can make it available for review. | `Server received.` |
-| `failed` | Server rejected or operation could not complete. | `Could not send. Still saved on this device.` |
-| `conflict` | Server accepted context but cannot apply without review. | `Conflict needs review.` |
+### Candidate disposition state
 
-Queued is not submitted. A local progress update is not visible to supervisors or planners until the server receives it.
+After candidate review:
 
-## Approval Rules
+`none -> retained_for_review | adopted_as_new_master | merged_into_existing | rejected | superseded`
 
-- Field users cannot approve export batches.
-- Contractors cannot approve export batches.
-- Planners own Microsoft Project export approval by default.
-- Supervisors may approve task completion depending on project policy.
-- Supervisor completion approval is not the same as planner export approval.
-- Shutdown Control may review, reject, request correction, and recommend export decisions, but final export approval is Planner-owned by default.
-- Admins may administer permissions but should not be routine export approvers.
+Candidate acceptance and candidate disposition are separate concepts. `accepted` means the candidate is considered valid for planner use; it does not itself mean the master has changed.
 
-## Export Preview Requirements
+### Merge/import state
 
-Every export preview line must show:
+Where merge/import is supported:
 
-- imported task identity;
-- imported project snapshot identity;
-- leaf-task indicator;
-- old value;
-- new value;
-- source record;
-- actor;
-- timestamp;
-- supervisor review state;
-- planner review state;
-- export eligibility status;
-- reason or comment;
-- exclusion reason where applicable;
-- whether the value is eligible for Microsoft Project export.
+`not_requested -> merge_pending -> merge_result_ready -> merge_accepted | merge_rejected | failed`
 
-## MVP Export Whitelist
+The merge/import operation is performed in Microsoft Project against a disposable/backed-up destination schedule. The destination-before and result-after identities/hashes are recorded.
 
-Only these fields may be MVP export candidates, and only on imported leaf tasks:
+### Sync state
 
-- `percent_complete`;
-- `actual_start`;
-- `actual_finish`.
+`local_draft -> queued_on_device -> sending -> server_received | failed | conflict`
 
-Deferred export fields:
+Queued is not submitted.
 
-- `physical_percent_complete`, unless site practice proves it is required;
-- `remaining_duration`;
-- `actual_duration`;
-- `actual_work`;
-- `remaining_work`;
-- assignment actuals.
+## Existing export-integrity batches
 
-Never export from Shutdown Tracker:
+Current export-integrity implementations may use states such as draft preview, approved, generated, opened in Microsoft Project, verified, rejected, failed, and superseded.
 
-- summary task actuals;
-- planned start/finish;
-- dependencies/predecessors;
+Those states remain useful for input authority and artifact provenance. Future candidate-schedule work should either extend them carefully or introduce a separate candidate-schedule run entity rather than overloading `verified` to mean that a planner accepted, adopted, or merged the recalculated schedule.
+
+## Authority rules
+
+- Field users and contractors do not approve Project input or candidate disposition.
+- Supervisors validate execution truth.
+- Planners may originate permitted Console inputs, approve exact Project inputs, review complete recalculated candidates, and choose candidate disposition by default.
+- An approved input is bound to one exact project/snapshot/task/field/value/source/version/candidate/approval identity.
+- A candidate schedule is bound to one immutable source schedule and one immutable approved-input manifest.
+- A planner candidate decision is bound to one candidate hash and semantic delta.
+- Adoption as next schedule is a separate audit fact.
+- Merge/import into another existing schedule is a separate planner-controlled Project operation with its own destination-before and result-after provenance.
+
+## Candidate review requirements
+
+A candidate review should show:
+
+- source schedule identity/hash;
+- complete updated candidate schedule identity/hash;
+- approved-input manifest/hash;
+- Project version/build used for calculation;
+- approved inputs and input origin;
+- Project-calculated consequences;
+- planner edits made in Microsoft Project, if any;
+- unexplained changes;
+- project finish movement;
+- planner decision and notes.
+
+## Provenance classification
+
+Every material source-versus-candidate difference should be classified as:
+
+- `approved_input`;
+- `project_calculated_consequence`;
+- `planner_project_edit`;
+- `unexpected_difference`.
+
+Unchanged values need not be stored as delta rows but remain traceable to the source hash.
+
+## Direct-input restrictions
+
+Without an explicit policy change, Shutdown Tracker must not directly author:
+
+- summary-task actuals;
+- arbitrary planned dates/durations;
+- dependencies;
 - constraints;
 - calendars;
 - baselines;
 - WBS/outline structure;
-- resource rates, availability, allocation, or levelling data.
+- Project critical/slack values;
+- resource levelling or schedule optimisation outputs.
 
-## Export Boundaries
+Those values may change inside a Microsoft Project-calculated candidate and be shown to the planner.
 
-- Only planner-approved leaf-task progress/actual fields can be export candidates.
-- Summary task actuals must not be exported.
-- Watchlists, problems, actions, evidence, handover, Critical Updates, communication comments, Needs Response states, and reporting period states remain inside Shutdown Tracker.
-- Critical Work Package due/overdue state does not move Microsoft Project dates.
-- Critical Updates do not directly update Microsoft Project.
-- Export review comments do not update Microsoft Project.
-- Project verification notes do not save the master `.mpp`.
-- Exports use MSPDI/XML, not native MPP writing.
+## Adoption as next schedule
 
-## Immutability and Corrections
+If the planner chooses to use the candidate as the next controlled schedule, record:
 
-- Policy-1 export batches allow only the explicit state transitions shown above. The one-time draft line-set seal is the only permitted same-state mutation.
-- Batch identity, preview creation, sealed membership, and every established approval, generation, artifact, Microsoft Project open, and verification fact are immutable.
-- Rejected, failed, superseded, and verified policy-1 batches are terminal and immutable.
-- Lifecycle metadata uses server-owned sections with caller data nested under `clientMetadata`; later transitions cannot replace earlier provenance.
-- Corrections create new records or superseding records, not destructive edits.
-- Generated export artifacts should remain linked to the approval record that produced them.
-- A failed or superseded export batch must remain visible in export history.
-- Manual Microsoft Project verification should be recorded as an audit event.
-- Text-only manual reopen evidence should follow [Manual Microsoft Project Round-Trip Evidence](../testing/manual-microsoft-project-round-trip-evidence.md) and must not include generated artifacts, real Project files, screenshots, or claims of automated Project write-back.
+- accepted source identity/hash;
+- candidate identity/hash;
+- adopted schedule identity/hash where available;
+- adopted by/at;
+- Project version/build;
+- any manual Project edits made after the original candidate calculation;
+- lineage to the prior master.
 
-## Related product docs
+Shutdown Tracker must not claim adoption merely because the candidate opened successfully.
 
-- [Task Progress Review and Export Approval](task-progress-review-export-approval.md)
-- [Communications Layer](communications-layer.md)
-- [Offline Audit and Sync Rules](offline-audit-sync-rules.md)
-- [Correction and Supersession Rules](correction-and-supersession-rules.md)
+## Merge/import into existing schedule
+
+If the planner chooses to merge/import the candidate into another Project schedule, record:
+
+- candidate identity/hash;
+- destination schedule identity/hash before merge;
+- Microsoft Project version/build;
+- merge/import mode;
+- warnings/conflicts and planner choices;
+- merged result identity/hash;
+- planner decision;
+- merged by/at.
+
+The first supported merge/import process must operate against a disposable/backed-up destination copy. Shutdown Tracker must not silently overwrite the only master copy.
+
+## Immutability and corrections
+
+- Source schedule files/snapshots are immutable.
+- Input candidates and approval events are append-only.
+- Approved-input manifests are sealed and immutable.
+- Generated candidate schedules and deltas are immutable artifacts once produced.
+- Project-saved/reviewed candidate variants receive new identities/hashes rather than replacing prior evidence.
+- Rejected and superseded candidates remain visible in history.
+- Adoption and merge/import records are append-only decisions.
+- Corrections create new candidates/manifests/runs rather than editing prior evidence.
+
+## Required user-facing wording
+
+Before candidate calculation:
+
+```text
+Approved for updated candidate calculation. Current master schedule unchanged.
+```
+
+After candidate produced:
+
+```text
+Updated candidate schedule produced. Open in Microsoft Project and review calculated impacts before deciding how to use it.
+```
+
+After candidate acceptance:
+
+```text
+Candidate accepted for planner use. The master schedule has not changed yet.
+```
+
+After adoption as next schedule:
+
+```text
+Planner recorded this candidate as the next controlled schedule.
+```
+
+After merge/import:
+
+```text
+Planner recorded a Microsoft Project merge/import result. Review the recorded destination and result hashes for provenance.
+```
