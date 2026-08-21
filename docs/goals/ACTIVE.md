@@ -10,221 +10,197 @@ Expected branch:
 
 `backend/enforce-export-integrity`
 
-The manual Microsoft Project open/reopen round-trip is deliberately outside the automated work in this goal and remains pending.
+The manual Microsoft Project round-trip remains pending.
 
 ## Outcome
 
-Bring PR #48 to an independently verified state where every automated export-integrity gate is complete and the only remaining release gate is the documented human Microsoft Project round-trip.
+Bring PR #48 to an independently verified state where the automated **direct-input and export-lifecycle integrity** gates are complete while preserving the repository's accepted three-part Project authority model.
 
-Do not assume the PR description or previous validation report is correct. Review the complete diff against `main`, trace the end-to-end authority chain, reproduce the important database and application guarantees, and make only the smallest corrections required by confirmed findings.
+This PR hardens how exact approved inputs reach the current worker and how export/candidate lifecycle facts are recorded. It does **not** establish a product rule that the final Microsoft Project-calculated candidate may differ from the source only in the directly approved fields.
 
-Synchronize this branch with current `origin/main` using a normal merge commit while preserving main's repository cleanup, documentation consolidation, and Project Operational Mapping decisions. Preserve the completed export-integrity implementation, do not resurrect deliberately deleted placeholders or stale status documents, and do not restore a public standalone mark-generated route.
+Synchronize this branch with current `origin/main` before merge. Preserve current main's repository cleanup, Project Operational Mapping decisions, and accepted candidate-schedule authority documents. Do not resurrect stale product-boundary wording.
 
-The target authority chain is:
+## Authority model that governs this goal
+
+### 1. Execution/input authority — Shutdown Tracker
+
+Shutdown Tracker may capture, review, approve, and audit exact Project-bound execution inputs under the active policy.
+
+The current PR #48 worker contract is intentionally narrow. For policy 1, only these direct input fields may reach that worker:
+
+- `percent_complete`
+- `actual_start`
+- `actual_finish`
+
+That allowlist is a **direct-input safety boundary**. It is not a final-candidate difference allowlist.
+
+### 2. Calculation authority — Microsoft Project
+
+Microsoft Project owns schedule calculation.
+
+When a complete updated candidate is opened/imported or a future planner-controlled Project companion applies the approved-input manifest, Microsoft Project may legitimately recalculate dependent values including:
+
+- planned start/finish dates;
+- durations and remaining values;
+- summary roll-ups;
+- assignment/work values;
+- timephased values;
+- slack and criticality;
+- project finish and other dependent schedule state.
+
+Those changes are `project_calculated_consequence`, not unauthorized Shutdown Tracker inputs.
+
+A pre-Project allowlist/fingerprint check must never be reused as a rule that rejects a Project-calculated candidate merely because Project changed dependent schedule fields.
+
+### 3. Candidate/adoption authority — Planner
+
+The planner reviews the source-versus-candidate delta and decides whether to reject the candidate, retain it, use it as the next controlled schedule/master, or use Microsoft Project to merge/import it into another schedule.
+
+Candidate generation or verification must not silently overwrite the accepted source/master. Adoption and merge/import are separate recorded planner decisions.
+
+## Current implementation boundary
+
+The existing worker-backed MSPDI/XML generation in PR #48 is minimal/patch-shaped and is useful for proving exact-input authority, lifecycle integrity, and diagnostics.
+
+Do **not** describe that current writer as the complete final candidate-schedule generator unless the implementation and manual evidence prove it.
+
+The product target remains a complete updated candidate generated from the accepted source plus the approved-input manifest, followed by Microsoft Project recalculation and planner review.
+
+A future planner-controlled Microsoft Project desktop companion is not prohibited by this goal. Implementing it is outside PR #48 and requires a separate focused design/implementation review.
+
+## Target direct-input authority chain for PR #48
 
 ```text
-authoritative export candidate
-→ exact approval event
+authoritative input candidate
+→ exact candidate-bound approval event
 → preview selection by candidate identity
 → sealed preview line
 → batch approval revalidation
 → generation-time locking and revalidation
-→ narrowed worker request
-→ request-specific MSPDI/XML allowlist
-→ generated-state metadata
+→ narrowed direct-input worker request
+→ request-specific MSPDI/XML direct-input allowlist
+→ generated-artifact lifecycle metadata
 ```
 
 An approval must authorize one exact execution fact for one project, accepted snapshot, imported task, field, normalized old value, normalized proposed value, source identity/version, candidate identity, and approval identity. It must not be reusable for another task, field, value, snapshot, project, or source version.
 
 ## Required final-review corrections
 
-The final review must verify and, where confirmed, correct all of the following:
+Verify and, where confirmed, correct:
 
-- database-enforced current-policy export-batch immutability with a status-specific allowed-column delta for every permitted transition;
-- rejection of same-state business, lifecycle, provenance, metadata, artifact, failure, actor, or timestamp mutation;
-- immutable terminal policy-1 records and immutable approval, generation, Microsoft Project open, and verification facts once established;
-- collision-proof lifecycle metadata with caller-supplied values isolated beneath transition-specific `clientMetadata` and server-owned lifecycle provenance retained authoritatively;
-- authoritative Microsoft Project open actor/time retained through verification, with verification unable to rewrite generation or open provenance;
-- state-specific immutable candidate approval audit events for approval, rejection, correction requested, and supersession, while retaining exact candidate binding and deterministic event ordering;
-- deterministic real-PostgreSQL integration coverage through the actual Spring transaction proxy, JDBC repository mappings, JSONB lifecycle metadata, latest candidate-bound approval resolution, and HTTP worker-failure rollback;
-- documentation and fixture corrections for supported one-to-six fractional timestamp digits, a non-zero explicit offset in the planned manual Project test, accurate worker implementation status, and removal of any public standalone mark-generated route reference.
+- database-enforced current-policy export-batch immutability with explicit allowed-column deltas;
+- rejection of same-state business/lifecycle/provenance mutation except the documented one-time line-set seal;
+- immutable approval, generation, Microsoft Project open, and verification facts once established;
+- collision-proof lifecycle metadata with caller metadata isolated from server-owned provenance;
+- authoritative Microsoft Project open actor/time retained through verification;
+- state-specific immutable candidate approval audit events;
+- deterministic real-PostgreSQL/Spring/JDBC transaction coverage including controlled worker-failure rollback;
+- documentation and fixtures that match the implemented direct-input worker and timestamp rules;
+- removal of any public standalone `mark-generated` route reference;
+- clear wording that worker/direct-input restrictions do not prohibit Microsoft Project recalculation in a later complete candidate.
 
-V006 legacy history must remain readable, unversioned, unchanged, and frozen. Corrections to current-policy history use new or superseding records rather than rewriting established facts.
-
-## Corrected implementation claims to verify
-
-The corrected branch must provide:
-
-- immutable normalized `export_candidate_records`;
-- current export-integrity policy version 1 introduced by the corrected, unmerged V007;
-- exact candidate-to-approval and candidate-to-preview-line binding;
-- preservation of V006 historical business values with legacy policy, candidate, approval-reference, and event-order fields left null;
-- accepted-snapshot, task-identity, old-value, proposed-value, source, and approval freshness checks;
-- deterministic approval-event ordering;
-- sealed and immutable preview membership;
-- stable database lock ordering across approval and generation;
-- a worker contract limited to `percent_complete`, `actual_start`, and `actual_finish`;
-- request-specific task and field allowlisting in generated MSPDI/XML;
-- a committed PostgreSQL validation suite for clean install, populated upgrades, integrity assertions, concurrency, and migration rollback;
-- status-specific policy-1 export-batch transition deltas and terminal-state immutability enforced at the PostgreSQL boundary;
-- protected, sectioned lifecycle provenance with authoritative generation, artifact, Project-open, and verification identity;
-- state-specific candidate approval audit event types;
-- real Spring/JDBC/PostgreSQL transaction integration tests, including a controlled HTTP worker failure that proves complete rollback and a later successful revalidation;
-- a 21-table V001–V007 baseline;
-- passing Java, TypeScript, frontend build, and migration validation.
-
-Treat each item as a claim requiring evidence, not as an established fact.
+V006 legacy history must remain readable, unversioned, unchanged, and frozen.
 
 ## Success criteria
 
 ### Exact candidate authority
 
 - Every current-policy preview line is derived from an immutable authoritative candidate.
-- The preview caller cannot authoritatively override project, snapshot, imported task, Project UID/ID, field, old value, new value, source identity/version, or source fingerprint.
-- Every current-policy approval event identifies exactly one authoritative candidate through a database-enforced relationship.
-- An approval for candidate A cannot satisfy candidate B.
-- A newer approval event invalidates a preview that captured an older approval identity, even when the approval state is unchanged.
+- The caller cannot override project, snapshot, imported task identity, field, captured baseline, normalized proposed value, source identity/version, fingerprint, or approval identity.
+- Approval for candidate A cannot authorize candidate B.
+- A newer candidate-bound approval event invalidates stale captured authority.
 - Missing or ambiguous authority fails closed.
 - Unsupported future policy versions fail closed.
 
 ### Value normalization
 
 - `percent_complete` uses one canonical whole-number representation within 0–100.
-- Semantically equivalent inputs such as `75`, `75.0`, and `075` do not create different approved facts.
-- Proposed `actual_start` and `actual_finish` values use one documented whole-second canonical date-time rule consistent across candidate creation, previewing, revalidation, worker handoff, and XML verification.
-- Imported actual baselines retain their available microsecond precision under a separate canonicalizer used for exact freshness comparison.
-- Proposed-value normalization preserves the intended Microsoft Project local wall-clock component; the worker does not convert that component to UTC.
-- `physical_percent_complete` remains readable where required for historical/internal compatibility but cannot become newly export eligible.
+- Proposed `actual_start` and `actual_finish` use the documented whole-second rule, preserve intended Project local wall-clock semantics, and require an explicit offset.
+- Imported actual baselines retain available precision under the separate freshness canonicalizer.
+- `physical_percent_complete` may remain readable historically/internal but is not eligible for the current direct-input worker.
 
 ### Baseline and task freshness
 
-Before preview sealing, approval, generation, and generated-state recording where applicable, prove for every candidate that:
+Before preview sealing, approval, and generation, verify that the accepted snapshot, imported task identity, leaf status, captured baseline, proposed value, source identity/version, field policy, and exact approval identity are still current.
 
-- the project snapshot still exists and remains accepted;
-- the candidate belongs to the batch project and snapshot;
-- the imported task still exists in that project and snapshot;
-- Microsoft Project task UID, ID, name or trace identity, and leaf status match the reviewed candidate;
-- the current imported value normalizes to the captured old value;
-- the proposed normalized value matches the authoritative candidate;
-- the exact approval identity and state remain current;
-- the field remains recognized and export-authorized;
-- candidate uniqueness within the batch remains valid.
+Any failed line blocks the batch.
 
-Any failed line must block the complete batch.
+### Concurrency and lifecycle integrity
 
-### Concurrency and locking
-
-- There is no check-then-use race involving preview membership, candidate facts, approval authority, snapshot status, task baseline/identity, worker output, or generated-state persistence.
+- No check-then-use race may allow stale input authority into generation.
 - Lock acquisition follows one documented stable order.
-- Approval-event insertion cannot change authority between final validation and artifact output.
-- Snapshot or task changes cannot invalidate reviewed authority after final validation and before generated state is committed.
-- Reversed multi-source contention has a documented outcome; deadlock retry may remain a follow-up only if integrity still fails closed.
 - Worker failure rolls back database lifecycle changes and does not falsely mark a batch generated.
-- Spring-managed transaction rollback is proven through the real JDBC repository and PostgreSQL schema rather than inferred from fake repositories or direct service construction.
-- A controlled worker HTTP failure after transaction entry leaves the batch approved and commits no generated timestamp, actor, URI/hash, generation provenance, or generation audit event; a later retry can revalidate.
+- Spring-managed rollback is proven through the real JDBC repository and PostgreSQL schema.
+- Established lifecycle provenance cannot be rewritten.
 
 ### Historical compatibility
 
 - V006 business rows are not rewritten, normalized, deduplicated, deleted, or assigned invented chronology.
 - Historical physical-percent and duplicate rows remain readable.
-- Legacy V006 terminal batches remain readable.
-- Legacy V006 draft and approved batches cannot newly progress under policy 1.
-- New policy, candidate, approval-reference, and event-order columns remain null on historical rows where required.
+- Legacy current-state restrictions remain enforced without rewriting history.
 - Pre/post deterministic hashes over historical business columns match exactly.
 
-### Worker and artifact boundary
+### Direct-input worker and artifact boundary
 
-Only these fields may reach the worker or MSPDI/XML writer:
+Only these **direct input fields** may reach the current PR #48 worker:
 
 - `percent_complete`
 - `actual_start`
 - `actual_finish`
 
-The worker and writer must reject or fail closed on:
+The current worker must fail closed on unsupported/unknown fields, summary-task direct actuals, invalid/mismatched task identity, duplicate task/field inputs, invalid values, stale source facts, and request/generated-artifact mismatches.
 
-- `physical_percent_complete`;
-- unknown fields or policy values;
-- numeric enum aliases;
-- unknown or duplicate JSON properties;
-- duplicate task/field candidates;
-- summary-task candidates;
-- missing, invalid, or mismatched Project task identity;
-- invalid or fractional percentages under the current rule;
-- invalid date-time values;
-- task membership or value differences between the request and generated XML;
-- any schedule-authority element outside the explicit allowlist.
+This check proves that Shutdown Tracker did not inject unauthorized direct inputs into the pre-Project artifact. It does **not** prove or require that a later Microsoft Project-calculated candidate changes only those fields.
 
-No native `.mpp` may be written. Artifact generation, opening, and verification metadata must never imply that the master `.mpp` was updated.
+### Project-calculated candidate boundary
+
+When manual or future automated Project-native calculation is performed:
+
+- the accepted source/master remains unchanged;
+- exact approved inputs are traceable into the calculation;
+- Microsoft Project is allowed to recalculate dependent schedule state;
+- differences are classified as `approved_input`, `project_calculated_consequence`, `planner_project_edit`, or `unexpected_difference`;
+- a Project-calculated planned-date/duration/summary/work/slack change is not an automatic failure merely because Shutdown Tracker could not directly author that field;
+- unexplained differences, wrong-task application, lost approved inputs, missing provenance, or source overwrite fail safe.
 
 ### Reproducible PostgreSQL evidence
 
-The committed validation suite and CI must reproduce:
+The committed validation suite and CI must reproduce clean installation, populated V006-to-V007 preservation, candidate/approval/preview relationships, immutability, lifecycle metadata protection, deterministic concurrency, worker-failure rollback, real Spring/JDBC/PostgreSQL transaction behaviour, and intentional late-migration rollback.
 
-- clean V001–V007 installation;
-- expected table count and key database objects;
-- populated V006-to-V007 upgrade preservation;
-- candidate, approval, and preview-line relationship enforcement;
-- candidate, approval, and line immutability;
-- same-state export-batch rewrite rejection and status-specific allowed-column deltas;
-- approval, generation, Project-open, and verification actor/time immutability;
-- generated URI/hash immutability, metadata-section protection, valid-transition piggyback rejection, and terminal-state immutability;
-- candidate uniqueness and field-authority enforcement;
-- accepted-snapshot and task/baseline drift rejection;
-- approval identity and state drift rejection;
-- changed approvals on ineligible lines blocking mixed batches;
-- line insertion versus sealing;
-- concurrent duplicate insertion;
-- approval changes versus approval and generation;
-- worker failure rollback;
-- real Spring transaction proxy and JDBC row-mapping coverage against PostgreSQL;
-- latest candidate-bound approval materialization and JSONB lifecycle metadata preservation;
-- an intentional late V007 failure leaving no partial migration objects or V006 business-data changes.
+## Documentation and pull-request accuracy
 
-Fake repository tests do not replace PostgreSQL evidence for constraints, triggers, foreign keys, locking, concurrency, or rollback.
+Documentation must distinguish:
 
-### Documentation and pull request accuracy
+1. execution/progress fact captured;
+2. exact input candidate created;
+3. input approved;
+4. preview/approved-input set sealed;
+5. current worker artifact generated;
+6. complete updated candidate generated by the selected handoff mechanism;
+7. Microsoft Project recalculated candidate;
+8. source-versus-candidate delta reviewed;
+9. candidate accepted/rejected/retained;
+10. candidate adopted as next schedule or merged/imported into another schedule, if either occurs.
 
-The controlled handoff lifecycle remains:
+Evidence for one step must not be presented as proof of another.
 
-1. Candidate created — master `.mpp` not updated.
-2. Candidate approved — master `.mpp` not updated.
-3. Export preview created — master `.mpp` not updated.
-4. Export batch approved — master `.mpp` not updated.
-5. MSPDI/XML artifact generated — master `.mpp` not updated.
-6. Artifact opened in Microsoft Project — master `.mpp` not updated.
-7. Artifact verified in Microsoft Project — master `.mpp` not updated.
-8. Planner manually updates or saves the master `.mpp` — outside Shutdown Tracker automation.
+## Non-goals for PR #48
 
-- Product, API, worker, migration, testing, and operational documentation describe the implementation that actually exists.
-- Documentation distinguishes candidate creation, candidate approval, preview creation, batch approval, artifact generation, Project open, Project verification, and planner-controlled master-file save.
-- The PR body reports Java tests, PostgreSQL validation, GitHub Actions, Bash execution, PowerShell wrapper status, and the manual Project gate as separate evidence without presenting one as proof of another.
-- Direct PowerShell wrapper execution and its underlying PostgreSQL transaction-pattern validation are reported separately.
-- The manual Microsoft Project round-trip remains explicitly pending.
-- PR #48 remains draft.
+Do not implement in this PR:
 
-## Non-goals
+- a Shutdown Tracker CPM, critical-path, float, dependency, levelling, recovery, or optimisation engine;
+- the complete-candidate generator if it is not already part of this branch;
+- Microsoft Project COM/Interop automation or another desktop companion;
+- unattended master overwrite or silent merge/import;
+- server-side native `.mpp` writing;
+- broad live task-progress, evidence, Problems, Handover, communications, or frontend feature expansion;
+- authentication/authorization expansion, asynchronous queues, unrelated dependencies, or broad refactors.
 
-Do not implement or expand:
-
-- CPM, critical-path, float, dependency scheduling, recovery scheduling, resource levelling, or automatic date movement;
-- native `.mpp` output or Microsoft Project automation;
-- automatic master-file updates;
-- broad task-progress, evidence, problem, handover, or communications features beyond what is strictly required for export-candidate integrity;
-- frontend feature work or visual design;
-- authentication or authorization expansion;
-- asynchronous queues;
-- worker filesystem path confinement;
-- filesystem orphan compensation;
-- broad HTTP restructuring;
-- unrelated dependency upgrades or refactors.
-
-Worker HTTP timeout and lock-duration observability, filesystem compensation, asynchronous processing, path confinement, authentication, and deadlock retry handling may remain separately documented follow-ups unless inspection proves one is necessary to preserve current export integrity.
+These non-goals are PR-scope exclusions, not permanent product prohibitions. In particular, planner-controlled Microsoft Project recalculation and a separately reviewed Project-native companion remain valid product directions.
 
 ## Required validation
 
-Run the strongest available validation from the repository root.
-
-At minimum:
+At minimum run from the repository root:
 
 ```text
 git status -sb
@@ -238,78 +214,53 @@ bash scripts/db/validate-migrations.sh
 
 If the real Spring/PostgreSQL integration suite is not included in `mvn test`, run it explicitly. Record the final V007 SHA-256 whenever V007 changes.
 
-Also run or inspect the committed focused validation for:
+Verify GitHub Actions on the exact final branch head. Do not treat an earlier green run as evidence for later commits.
 
-- authoritative candidate creation and immutability;
-- candidate-to-approval binding;
-- preview selection by candidate ID;
-- value normalization;
-- snapshot, task identity, old-value, proposed-value, source, and approval drift;
-- policy-1 and legacy readability/freeze behavior;
-- policy-1 status-specific lifecycle immutability and protected metadata sections;
-- authoritative Project-open identity preserved through verification;
-- state-specific candidate approval audit events;
-- Spring/JDBC/PostgreSQL worker-failure rollback through the actual transaction proxy;
-- deterministic concurrency cases;
-- intentional late-migration rollback;
-- worker request deserialization;
-- shared contract field restrictions;
-- MSPDI/XML task membership, identity, value, and element allowlisting.
-
-Verify GitHub Actions for the final branch head. Do not treat a previously green run as evidence for later commits.
-
-Before completion:
-
-- inspect every changed file in the complete PR diff;
-- inspect staged content before committing;
-- confirm no secrets, real Project files, generated exports, database files, screenshots, IDE state, absolute developer paths, or temporary validation output are included;
-- confirm the backend worktree is clean after push;
-- confirm `frontend/rebuild-review-shell-ia` retains its branch, HEAD, status, and existing content fingerprints.
-
-Report exact test totals, exact migration outcomes, and any check that could not be run.
+Before completion, inspect the complete PR diff and confirm no secrets, real Project files, generated candidate/export artifacts, local database files, screenshots, IDE state, absolute developer paths, or temporary validation output are included.
 
 ## Safety constraints
 
-- Preserve existing commits. Add new commits only when a confirmed correction or required goal/document update justifies them.
+- Preserve existing commits. Add new commits only for confirmed corrections or required authority/documentation updates.
 - Do not amend, rebase, squash, rewrite history, or force-push.
 - Push only `backend/enforce-export-integrity`.
 - Keep PR #48 draft.
 - Do not merge PR #48.
 - Do not modify another worktree.
-- Do not change Windows execution policy.
-- Do not install global tooling without explicit approval.
-- Do not commit generated artifacts, temporary SQL copies, Docker volumes, local database data, real schedules, customer/site data, or secrets.
-- If the implementation already satisfies a criterion, record the evidence instead of introducing speculative churn.
+- Do not change machine execution policy or install global tooling without explicit approval.
+- Do not commit generated artifacts, real schedules, customer/site data, local DB files, or secrets.
 
 ## Manual Microsoft Project gate
 
-This goal does not authorize claiming or fabricating a manual Microsoft Project result.
+This goal does not authorize fabricating a manual Project result.
 
-After all automated criteria pass, the remaining human gate is to generate a synthetic MSPDI/XML artifact and have a planner manually verify that it:
+The manual gate must prove the handoff behaviour actually being claimed. At minimum it must record:
 
-- opens successfully in Microsoft Project;
-- preserves the intended task UID and ID identity;
-- contains only approved leaf-task values for the three authorized fields;
-- excludes summary-task actuals;
-- does not perform schedule recalculation or update the master `.mpp` through Shutdown Tracker.
+- the accepted synthetic source identity/hash;
+- the exact approved direct inputs;
+- the generated artifact/candidate identity/hash;
+- Microsoft Project application/version/build;
+- that the candidate opens/imports successfully;
+- that the approved inputs apply to the intended leaf tasks;
+- that Microsoft Project is allowed to perform its normal recalculation;
+- the observed Project-calculated schedule consequences;
+- any unexplained differences;
+- that the accepted source/master remains unchanged;
+- the planner decision.
 
-Keep generated artifacts outside Git and record only sanitized text evidence according to the repository testing guide.
+Do **not** require “no schedule recalculation” as a pass condition. Recalculation is expected once Microsoft Project processes a complete updated candidate. The failure conditions are lost/altered approved inputs, wrong-task application, unexplained unsafe differences, missing provenance, or source/master overwrite.
+
+Generated Project/XML files and screenshots remain outside Git; repository evidence is sanitized text only.
 
 ## Completion conditions
 
 The automated portion of this goal is complete only when:
 
-- the full PR diff has received an independent end-to-end authority review;
-- no unresolved material export-integrity defect remains;
-- every success criterion is either proven by code plus reproducible tests or identified as a precise blocker;
-- relevant focused and full tests pass;
-- the PostgreSQL clean-install, populated-upgrade, concurrency, and atomicity suite passes;
-- final-head GitHub Actions are green;
-- documentation and the PR body accurately match the implementation and evidence;
-- the branch is pushed without rewriting history;
+- the full PR diff has received end-to-end authority review;
+- no unresolved material direct-input/export-lifecycle integrity defect remains;
+- all required automated checks pass on the final head;
+- PostgreSQL clean-install, populated-upgrade, concurrency, and rollback evidence passes;
+- documentation and PR wording match the three-part authority model and current implementation;
 - PR #48 remains draft;
-- the backend worktree is clean;
-- the frontend worktree is demonstrably unchanged;
-- the manual Microsoft Project round-trip is the only remaining gate and is explicitly reported as pending.
-
-If a material defect remains or a required automated check cannot be completed, finish with a precise blocker report rather than claiming review readiness.
+- the branch is pushed without history rewriting;
+- unrelated worktrees remain untouched;
+- the remaining manual Project gate is reported precisely rather than being replaced by the old “no schedule changes” assumption.
