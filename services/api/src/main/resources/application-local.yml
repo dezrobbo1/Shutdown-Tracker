@@ -12,3 +12,9 @@ spring:
 shutdown-tracker:
   persistence:
     enabled: true
+  project-parse-worker:
+    enabled: ${SHUTDOWN_TRACKER_PROJECT_PARSE_WORKER_ENABLED:true}
+  project-export-worker:
+    enabled: ${SHUTDOWN_TRACKER_PROJECT_EXPORT_WORKER_ENABLED:true}
+  review-project-bootstrap:
+    enabled: ${SHUTDOWN_TRACKER_REVIEW_PROJECT_BOOTSTRAP_ENABLED:true}

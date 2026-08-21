@@ -1,0 +1,32 @@
+.rt-shell .rt-download {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 38px;
+  align-items: center;
+  padding: 8px 13px;
+  border: 1px solid #385f73;
+  border-radius: 2px;
+  background: #eaf1f4;
+  color: #173746;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.rt-shell .rt-download:hover {
+  background: #dfecef;
+  border-color: #284b5d;
+}
+
+.rt-shell .rt-form-grid input[type="file"] {
+  padding: 7px;
+}
+
+.rt-shell .rt-form-grid input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: 6px 10px;
+  border: 1px solid #78838b;
+  border-radius: 2px;
+  background: #f7f8f9;
+  font-weight: 650;
+}
