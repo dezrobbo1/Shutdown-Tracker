@@ -71,7 +71,7 @@ public class MpxjProjectImportSnapshotService implements ProjectImportSnapshotSe
                 task.getWBS(),
                 task.getOutlineNumber(),
                 task.getOutlineLevel(),
-                !task.getChildTasks().isEmpty(),
+                task.getSummary(),
                 parent == null ? null : text(parent.getUniqueID()),
                 task.getStart(),
                 task.getFinish(),
