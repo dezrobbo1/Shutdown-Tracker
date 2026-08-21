@@ -23,4 +23,21 @@ public record ProjectExportArtifactSummary(
     public ProjectExportArtifactSummary {
         notes = List.copyOf(notes == null ? List.of() : notes);
     }
+
+    /**
+     * Compatibility constructor for callers that only report the number of updated tasks.
+     * Generated complete candidates should use the canonical constructor and supply the source task
+     * count explicitly.
+     */
+    public ProjectExportArtifactSummary(
+            String outputFilename,
+            String artifactFormat,
+            int taskCount,
+            int exportedFieldCount,
+            long sizeBytes,
+            String sha256,
+            List<String> notes
+    ) {
+        this(outputFilename, artifactFormat, taskCount, taskCount, exportedFieldCount, sizeBytes, sha256, notes);
+    }
 }
