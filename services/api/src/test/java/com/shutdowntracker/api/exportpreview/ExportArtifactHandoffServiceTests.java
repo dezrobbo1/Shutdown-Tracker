@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.shutdowntracker.api.audit.CapturingAuditEventRecorder;
+import com.shutdowntracker.api.exportpreview.handoff.AcceptedSourceFile;
+import com.shutdowntracker.api.exportpreview.handoff.AcceptedSourceFileRepository;
 import com.shutdowntracker.api.exportpreview.handoff.DisconnectedProjectExportArtifactJobClient;
 import com.shutdowntracker.api.exportpreview.handoff.ExportArtifactGenerationRequest;
 import com.shutdowntracker.api.exportpreview.handoff.ExportArtifactGenerationResponse;
@@ -16,6 +18,7 @@ import com.shutdowntracker.projectexport.contract.ProjectExportArtifactFieldValu
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactGenerationRequest;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactGenerationResponse;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactRequest;
+import com.shutdowntracker.projectexport.contract.ProjectExportArtifactSource;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactSummary;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactTask;
 import java.math.BigDecimal;
@@ -31,6 +34,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 class ExportArtifactHandoffServiceTests {
+
+    private static final UUID SOURCE_FILE_ID = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
+    private static final String SOURCE_CONTENT_HASH = "synthetic-source-hash";
+    private static final int SOURCE_TASK_COUNT = 6;
 
     @Test
     void generatesWorkerArtifactForApprovedEligibleLeafLinesAndRecordsMetadata() {
@@ -59,6 +66,8 @@ class ExportArtifactHandoffServiceTests {
         assertThat(client.request.outputPath()).endsWith(repository.exportBatchId + ".mspdi.xml");
         assertThat(client.request.artifactRequest().projectName())
                 .isEqualTo("Shutdown Tracker Export Batch " + repository.exportBatchId);
+        assertThat(client.request.artifactRequest().source().sourceFileId()).isEqualTo(SOURCE_FILE_ID);
+        assertThat(client.request.artifactRequest().source().contentHash()).isEqualTo(SOURCE_CONTENT_HASH);
         assertThat(client.request.artifactRequest().tasks()).hasSize(1);
         assertThat(client.request.artifactRequest().tasks().getFirst().microsoftProjectTaskUid()).isEqualTo("101");
         assertThat(client.request.artifactRequest().tasks().getFirst().microsoftProjectTaskId()).isEqualTo("1");
@@ -150,6 +159,38 @@ class ExportArtifactHandoffServiceTests {
     }
 
     @Test
+    void rejectsMissingAcceptedSourceBeforeWorkerCall() {
+        FakeExportPreviewRepository repository = new FakeExportPreviewRepository();
+        CapturingProjectExportArtifactJobClient client = new CapturingProjectExportArtifactJobClient();
+        CapturingExportArtifactStorage storage = new CapturingExportArtifactStorage();
+        FakeAcceptedSourceFileRepository source = new FakeAcceptedSourceFileRepository();
+        source.present = false;
+        ExportArtifactHandoffService service = service(repository, client, storage, source);
+
+        assertThatThrownBy(() -> service.generateArtifact(repository.projectId, repository.exportBatchId, null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception ->
+                        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
+                .hasMessageContaining("no source file");
+        assertThat(client.request).isNull();
+    }
+
+    @Test
+    void rejectsNativeMppSourceForCandidateGeneration() {
+        FakeExportPreviewRepository repository = new FakeExportPreviewRepository();
+        CapturingProjectExportArtifactJobClient client = new CapturingProjectExportArtifactJobClient();
+        CapturingExportArtifactStorage storage = new CapturingExportArtifactStorage();
+        FakeAcceptedSourceFileRepository source = new FakeAcceptedSourceFileRepository();
+        source.fileKind = "mpp";
+        ExportArtifactHandoffService service = service(repository, client, storage, source);
+
+        assertThatThrownBy(() -> service.generateArtifact(repository.projectId, repository.exportBatchId, null))
+                .isInstanceOfSatisfying(ResponseStatusException.class, exception ->
+                        assertThat(exception.getStatusCode()).isEqualTo(HttpStatus.CONFLICT))
+                .hasMessageContaining("requires an MSPDI/XML source schedule");
+        assertThat(client.request).isNull();
+    }
+
+    @Test
     void rejectsWorkerArtifactUriOutsideReservedStorageLocation() {
         FakeExportPreviewRepository repository = new FakeExportPreviewRepository();
         CapturingProjectExportArtifactJobClient client = new CapturingProjectExportArtifactJobClient();
@@ -186,15 +227,43 @@ class ExportArtifactHandoffServiceTests {
             ProjectExportArtifactJobClient client,
             ExportArtifactStorage storage
     ) {
+        return service(repository, client, storage, new FakeAcceptedSourceFileRepository());
+    }
+
+    private ExportArtifactHandoffService service(
+            FakeExportPreviewRepository repository,
+            ProjectExportArtifactJobClient client,
+            ExportArtifactStorage storage,
+            AcceptedSourceFileRepository sourceFileRepository
+    ) {
         return new ExportArtifactHandoffService(
                 new ExportPreviewService(repository, new CapturingAuditEventRecorder()),
                 client,
-                storage
+                storage,
+                sourceFileRepository
         );
     }
 
-    private static class CapturingProjectExportArtifactJobClient implements ProjectExportArtifactJobClient {
+    private static class FakeAcceptedSourceFileRepository implements AcceptedSourceFileRepository {
+        private String fileKind = "mspdi_xml";
+        private String contentHash = SOURCE_CONTENT_HASH;
+        private boolean present = true;
 
+        @Override
+        public Optional<AcceptedSourceFile> findByProjectSnapshotId(UUID projectSnapshotId) {
+            if (!present) {
+                return Optional.empty();
+            }
+            return Optional.of(new AcceptedSourceFile(
+                    SOURCE_FILE_ID,
+                    "file:///synthetic/source/" + projectSnapshotId + ".mspdi.xml",
+                    contentHash,
+                    fileKind
+            ));
+        }
+    }
+
+    private static class CapturingProjectExportArtifactJobClient implements ProjectExportArtifactJobClient {
         private ProjectExportArtifactGenerationRequest request;
         private ProjectExportArtifactGenerationResponse response;
         private boolean mismatchedUri;
@@ -214,21 +283,19 @@ class ExportArtifactHandoffServiceTests {
                             request.exportBatchId() + ".mspdi.xml",
                             "mspdi_xml",
                             request.artifactRequest().tasks().size(),
-                            request.artifactRequest().tasks().stream()
-                                    .mapToInt(task -> task.fieldValues().size())
-                                    .sum(),
+                            SOURCE_TASK_COUNT,
+                            request.artifactRequest().tasks().stream().mapToInt(task -> task.fieldValues().size()).sum(),
                             512,
                             "synthetic-sha256",
-                            List.of("MSPDI/XML artifact only; no schedule calculations or Microsoft Project write-back were run.")
+                            List.of("Candidate schedule derived from the accepted source; no schedule calculations or Microsoft Project write-back were run by Shutdown Tracker.")
                     ),
-                    "MSPDI/XML artifact generated by project worker. No Microsoft Project write-back was run."
+                    "MSPDI/XML candidate schedule generated by project worker from the accepted source. No Microsoft Project write-back was run."
             );
             return response;
         }
     }
 
     private static class CapturingExportArtifactStorage implements ExportArtifactStorage {
-
         private ExportArtifactStorageLocation location;
 
         @Override
@@ -252,7 +319,6 @@ class ExportArtifactHandoffServiceTests {
     }
 
     private static class FakeExportPreviewRepository implements ExportPreviewRepository {
-
         private final UUID projectId = UUID.randomUUID();
         private final UUID projectSnapshotId = UUID.randomUUID();
         private final UUID exportBatchId = UUID.randomUUID();
@@ -281,16 +347,7 @@ class ExportArtifactHandoffServiceTests {
         );
 
         private ExportPreviewLineRecord eligibleLine(String externalUid, String externalId) {
-            return line(
-                    importedTaskId,
-                    externalUid,
-                    externalId,
-                    "Synthetic Task A1",
-                    "percent_complete",
-                    "25",
-                    "75",
-                    true
-            );
+            return line(importedTaskId, externalUid, externalId, "Synthetic Task A1", "percent_complete", "25", "75", true);
         }
 
         private ExportPreviewLineRecord line(
@@ -335,30 +392,12 @@ class ExportArtifactHandoffServiceTests {
             );
             candidates.put(candidateId, candidate);
             return new ExportPreviewLineRecord(
-                    UUID.randomUUID(),
-                    exportBatchId,
-                    projectId,
-                    projectSnapshotId,
-                    taskId,
-                    externalUid,
-                    externalId,
-                    taskName,
-                    "task_update",
-                    sourceEntityId,
-                    ApprovalState.APPROVED_FOR_EXPORT,
-                    approvalRecordId,
-                    fieldName,
-                    oldValue,
-                    newValue,
-                    sourceActorUserId,
-                    sourceTimestamp,
-                    reason,
-                    leafTask,
-                    eligible,
-                    ExportIntegrityPolicy.CURRENT_VERSION,
-                    candidateId,
-                    candidate.sourceEventOrPayloadHash(),
-                    candidate.sourceVersion()
+                    UUID.randomUUID(), exportBatchId, projectId, projectSnapshotId, taskId,
+                    externalUid, externalId, taskName, "task_update", sourceEntityId,
+                    ApprovalState.APPROVED_FOR_EXPORT, approvalRecordId, fieldName, oldValue, newValue,
+                    sourceActorUserId, sourceTimestamp, reason, leafTask, eligible,
+                    ExportIntegrityPolicy.CURRENT_VERSION, candidateId,
+                    candidate.sourceEventOrPayloadHash(), candidate.sourceVersion()
             );
         }
 
@@ -369,27 +408,22 @@ class ExportArtifactHandoffServiceTests {
                     ".shutdown-tracker/export-artifacts/" + exportBatchId + ".mspdi.xml",
                     new ProjectExportArtifactRequest(
                             "Synthetic Export Preview",
+                            new ProjectExportArtifactSource(
+                                    SOURCE_FILE_ID,
+                                    "file:///synthetic/source/snapshot.mspdi.xml",
+                                    SOURCE_CONTENT_HASH
+                            ),
                             List.of(new ProjectExportArtifactTask(
-                                    importedTaskId.toString(),
-                                    "101",
-                                    "1",
-                                    "Synthetic Task A1",
-                                    true,
+                                    importedTaskId.toString(), "101", "1", "Synthetic Task A1", true,
                                     List.of(new ProjectExportArtifactFieldValue(
-                                            ProjectExportArtifactField.PERCENT_COMPLETE,
-                                            "75"
-                                    ))
+                                            ProjectExportArtifactField.PERCENT_COMPLETE, "75"))
                             ))
                     )
             );
         }
 
         @Override
-        public ExportPreviewBatchRecord createDraftPreview(
-                UUID projectId,
-                UUID projectSnapshotId,
-                Map<String, Object> metadata
-        ) {
+        public ExportPreviewBatchRecord createDraftPreview(UUID projectId, UUID projectSnapshotId, Map<String, Object> metadata) {
             throw new UnsupportedOperationException("not needed");
         }
 
@@ -413,32 +447,19 @@ class ExportArtifactHandoffServiceTests {
         }
 
         @Override
-        public Optional<ExportPreviewBatchRecord> approveBatch(
-                UUID projectId,
-                UUID exportBatchId,
-                UUID approvedByUserId,
-                Map<String, Object> metadata
-        ) {
+        public Optional<ExportPreviewBatchRecord> approveBatch(UUID projectId, UUID exportBatchId, UUID approvedByUserId, Map<String, Object> metadata) {
             throw new UnsupportedOperationException("not needed");
         }
 
         @Override
-        public Optional<ExportPreviewBatchRecord> rejectBatch(
-                UUID projectId,
-                UUID exportBatchId,
-                Map<String, Object> metadata
-        ) {
+        public Optional<ExportPreviewBatchRecord> rejectBatch(UUID projectId, UUID exportBatchId, Map<String, Object> metadata) {
             throw new UnsupportedOperationException("not needed");
         }
 
         @Override
         public Optional<ExportPreviewBatchRecord> markBatchGenerated(
-                UUID projectId,
-                UUID exportBatchId,
-                String exportFileUri,
-                String exportFileHash,
-                UUID generatedByUserId,
-                Map<String, Object> metadata
+                UUID projectId, UUID exportBatchId, String exportFileUri, String exportFileHash,
+                UUID generatedByUserId, Map<String, Object> metadata
         ) {
             if (status != ExportBatchState.APPROVED) {
                 return Optional.empty();
@@ -453,30 +474,20 @@ class ExportArtifactHandoffServiceTests {
 
         @Override
         public Optional<ExportPreviewBatchRecord> markBatchOpenedInMicrosoftProject(
-                UUID projectId,
-                UUID exportBatchId,
-                UUID openedByUserId,
-                Map<String, Object> metadata
+                UUID projectId, UUID exportBatchId, UUID openedByUserId, Map<String, Object> metadata
         ) {
             throw new UnsupportedOperationException("not needed");
         }
 
         @Override
         public Optional<ExportPreviewBatchRecord> markBatchVerified(
-                UUID projectId,
-                UUID exportBatchId,
-                UUID verifiedByUserId,
-                Map<String, Object> metadata
+                UUID projectId, UUID exportBatchId, UUID verifiedByUserId, Map<String, Object> metadata
         ) {
             throw new UnsupportedOperationException("not needed");
         }
 
         @Override
-        public Optional<ExportPreviewTaskContext> findTaskContext(
-                UUID projectId,
-                UUID projectSnapshotId,
-                UUID importedTaskId
-        ) {
+        public Optional<ExportPreviewTaskContext> findTaskContext(UUID projectId, UUID projectSnapshotId, UUID importedTaskId) {
             if (!this.projectId.equals(projectId) || !this.projectSnapshotId.equals(projectSnapshotId)) {
                 return Optional.empty();
             }
@@ -484,17 +495,10 @@ class ExportArtifactHandoffServiceTests {
                     .filter(line -> line.importedTaskId().equals(importedTaskId))
                     .findFirst()
                     .map(line -> new ExportPreviewTaskContext(
-                            line.importedTaskId(),
-                            line.projectId(),
-                            line.projectSnapshotId(),
-                            line.importedTaskExternalUid(),
-                            line.importedTaskExternalId(),
-                            line.importedTaskName(),
-                            !line.leafTask(),
-                            line.importedTaskId().equals(this.importedTaskId) ? new BigDecimal("25") : null,
-                            null,
-                            null,
-                            null
+                            line.importedTaskId(), line.projectId(), line.projectSnapshotId(),
+                            line.importedTaskExternalUid(), line.importedTaskExternalId(), line.importedTaskName(),
+                            !line.leafTask(), line.importedTaskId().equals(this.importedTaskId) ? new BigDecimal("25") : null,
+                            null, null, null
                     ));
         }
 
@@ -512,10 +516,7 @@ class ExportArtifactHandoffServiceTests {
         }
 
         @Override
-        public Optional<ExportCandidateRecord> findAuthoritativeCandidate(
-                UUID projectId,
-                UUID authoritativeExportCandidateId
-        ) {
+        public Optional<ExportCandidateRecord> findAuthoritativeCandidate(UUID projectId, UUID authoritativeExportCandidateId) {
             if (!this.projectId.equals(projectId)) {
                 return Optional.empty();
             }
@@ -523,37 +524,27 @@ class ExportArtifactHandoffServiceTests {
         }
 
         @Override
-        public List<ExportPreviewApprovalRecord> findCurrentApprovalCandidates(
-                UUID projectId,
-                UUID authoritativeExportCandidateId
-        ) {
+        public List<ExportPreviewApprovalRecord> findCurrentApprovalCandidates(UUID projectId, UUID authoritativeExportCandidateId) {
             return lines.stream()
                     .filter(line -> line.authoritativeExportCandidateId().equals(authoritativeExportCandidateId))
                     .findFirst()
                     .map(line -> {
                         ApprovalState currentApprovalState = currentApprovalStates.getOrDefault(
-                                authoritativeExportCandidateId,
-                                ApprovalState.APPROVED_FOR_EXPORT
-                        );
+                                authoritativeExportCandidateId, ApprovalState.APPROVED_FOR_EXPORT);
                         return List.of(new ExportPreviewApprovalRecord(
-                            currentApprovalState == line.approvalState()
-                                    ? line.sourceApprovalRecordId()
-                                    : changedApprovalRecordId,
-                            currentApprovalState,
-                            line.authoritativeExportCandidateId(),
-                            ExportIntegrityPolicy.CURRENT_VERSION
+                                currentApprovalState == line.approvalState()
+                                        ? line.sourceApprovalRecordId()
+                                        : changedApprovalRecordId,
+                                currentApprovalState,
+                                line.authoritativeExportCandidateId(),
+                                ExportIntegrityPolicy.CURRENT_VERSION
                         ));
                     })
                     .orElseGet(List::of);
         }
 
         @Override
-        public ExportPreviewLineRecord createLine(
-                UUID projectId,
-                UUID projectSnapshotId,
-                UUID exportBatchId,
-                UUID authoritativeExportCandidateId
-        ) {
+        public ExportPreviewLineRecord createLine(UUID projectId, UUID projectSnapshotId, UUID exportBatchId, UUID authoritativeExportCandidateId) {
             throw new UnsupportedOperationException("not needed");
         }
 
@@ -565,25 +556,13 @@ class ExportArtifactHandoffServiceTests {
         private ExportPreviewBatchRecord batch() {
             int eligible = (int) lines.stream().filter(ExportPreviewLineRecord::exportEligible).count();
             return new ExportPreviewBatchRecord(
-                    exportBatchId,
-                    projectId,
-                    projectSnapshotId,
-                    status,
+                    exportBatchId, projectId, projectSnapshotId, status,
                     OffsetDateTime.parse("2026-01-01T00:00:00Z"),
                     OffsetDateTime.parse("2026-01-01T01:00:00Z"),
-                    null,
-                    generatedAt,
-                    generatedByUserId,
-                    verifiedAt,
-                    verifiedByUserId,
-                    exportFileUri,
-                    exportFileHash,
-                    null,
-                    lines.size(),
-                    eligible,
-                    lines.size() - eligible,
-                    ExportIntegrityPolicy.CURRENT_VERSION,
-                    true
+                    null, generatedAt, generatedByUserId, verifiedAt, verifiedByUserId,
+                    exportFileUri, exportFileHash, null,
+                    lines.size(), eligible, lines.size() - eligible,
+                    ExportIntegrityPolicy.CURRENT_VERSION, true
             );
         }
     }
