@@ -1,10 +1,10 @@
 # Project Worker
 
-Purpose: Spring Boot worker service shell for future Microsoft Project import/export processing through MPXJ and MSPDI/XML artifacts.
+Purpose: Spring Boot worker service for bounded Microsoft Project import summaries and controlled MSPDI/XML artifact generation through MPXJ.
 
 ## Current Scope
 
-- Placeholder Spring Boot application in package `com.shutdowntracker.projectworker`.
+- Spring Boot application in package `com.shutdowntracker.projectworker`.
 - Worker-only MPXJ import summary spike in package `com.shutdowntracker.projectworker.importer`.
 - Shared-contract parse summary handoff service and worker endpoint in package `com.shutdowntracker.projectworker.handoff`.
 - Worker-only MSPDI/XML export artifact spike in package `com.shutdowntracker.projectworker.exporter`.
@@ -14,7 +14,7 @@ Purpose: Spring Boot worker service shell for future Microsoft Project import/ex
 - The import spike reads one explicit local file path only when `shutdown-tracker.import-spike.path` is set.
 - The export spike writes one explicit local MSPDI/XML output path only when `shutdown-tracker.export-spike.output-path` is set.
 - No persistence, upload endpoint, export approval endpoint, Project write-back, background jobs, queue integration, scheduler logic, secrets, binaries, seed data, or real Project files are included.
-- No domain behavior exists yet.
+- Implemented worker behavior is deliberately limited to parse summaries and request-specific MSPDI/XML artifact generation; workflow authority and persistence remain API-owned.
 
 ## MPXJ Import Summary Spike
 
@@ -75,20 +75,19 @@ The worker HTTP endpoint defaults to port `8081`, or `PORT` when set. The import
 
 ## MSPDI/XML Export Artifact Spike
 
-`MpxjMspdiExportArtifactService` builds a minimal MPXJ `ProjectFile` from explicit leaf-task export candidates and writes an MSPDI/XML artifact with MPXJ. It currently supports only:
+`MpxjMspdiExportArtifactService` builds an MPXJ `ProjectFile` from the explicit values in the shared worker request. In the supported API handoff, the API constructs those values from revalidated authoritative candidates; the worker itself does not read or resolve candidate or approval records. It renders the project in memory, validates the generated task identity and requested values, then writes a securely parsed request-specific MSPDI/XML allowlist. The artifact retains project/task identity (`Name`, task `UID`, `ID`, and `Name`) for traceability and only the requested progress/actual elements below; MPXJ defaults such as calendars, WBS, durations, planned dates, resources, assignments, predecessors, constraints, and baselines are removed before bytes reach disk. It currently supports only:
 
 - `percent_complete`
-- `physical_percent_complete`
 - `actual_start`
 - `actual_finish`
 
-The service rejects summary-task candidates, non-numeric Microsoft Project task identity, invalid percentage values, and non-XML output paths. Generated files are local-only test artifacts and must not be committed.
+The shared contract and worker reject `physical_percent_complete`, duplicate imported-task/field candidates, inconsistent repeated imported-task identity, duplicate Microsoft Project UID/ID mappings, summary-task candidates, missing or invalid task identity, unknown or numeric field aliases, unknown JSON properties, duplicate JSON properties, invalid values, and non-XML output paths. `percent_complete` equivalents such as `75`, `75.0`, and `075` canonicalize to whole-number `75`; fractional and out-of-range values are rejected. Proposed actual dates require an ISO-8601 minute- or second-precision value with an explicit offset and canonicalize to whole seconds while preserving the reviewed local wall-clock component. Omitted seconds become `:00`. A fractional component is accepted only when it contains one through six digits and every digit is zero; that zero-valued fraction canonicalizes away. Non-zero fractions, fractions outside the one-to-six-digit input range, offset-free inputs, and invalid values are rejected. The worker uses the normalized local date-time component without converting it to UTC. The API and worker use the same shared proposed-value normalizer; imported baseline timestamps do not cross this contract boundary. Physical percent complete may remain imported/internal read data, but it is not within the worker's MVP export authority. Generated files are local-only test artifacts and must not be committed.
 
 The worker also exposes the same artifact generation through:
 
 - `POST /worker/project-export/generate-artifact`
 
-The endpoint accepts the shared export handoff contract, writes the requested local MSPDI/XML path, and returns artifact URI/hash plus summary counts. The API remains responsible for checking export-batch approval and recording generated metadata.
+The endpoint accepts the shared export handoff contract, writes the requested local MSPDI/XML path, and returns artifact URI/hash plus summary counts. Direct contract use still fails closed on field, value, task-identity, and duplicate violations. The API remains responsible for candidate creation, current candidate-bound approval resolution, final export-batch validation, and generated metadata.
 
 The spike and endpoint do not read from the database, approve export batches, mark approval records exported, update `export_batches`, generate native MPP files, call Microsoft Project, or write back to Microsoft Project. They do not calculate CPM, critical path, float, resource levelling, recovery dates, or schedule movement.
 

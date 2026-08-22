@@ -8,24 +8,27 @@ import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
-public record ExportPreviewLineCreateRequest(
+public record ExportCandidateCreateRequest(
+        UUID projectSnapshotId,
         UUID importedTaskId,
+        String fieldName,
+        String proposedValue,
         String sourceEntityType,
         UUID sourceEntityId,
-        String fieldName,
-        String newValue,
+        String sourceVersion,
         UUID sourceActorUserId,
         OffsetDateTime sourceTimestamp,
         String reason,
         Map<String, Object> metadata
 ) {
-    public ExportPreviewLineCreateRequest {
+    public ExportCandidateCreateRequest {
+        requireNonNull(projectSnapshotId, "projectSnapshotId is required.");
         requireNonNull(importedTaskId, "importedTaskId is required.");
-        requireText(sourceEntityType, "sourceEntityType is required.");
+        fieldName = requireText(fieldName, "fieldName is required.");
+        proposedValue = requireText(proposedValue, "proposedValue is required.");
+        sourceEntityType = requireText(sourceEntityType, "sourceEntityType is required.");
         requireNonNull(sourceEntityId, "sourceEntityId is required.");
-        requireText(fieldName, "fieldName is required.");
-        ExportPreviewField.fromFieldName(fieldName);
-        requireText(newValue, "newValue is required.");
+        sourceVersion = requireText(sourceVersion, "sourceVersion is required.");
         metadata = immutableObjectMap(metadata, "metadata");
     }
 }
