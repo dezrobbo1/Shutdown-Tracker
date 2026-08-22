@@ -7,15 +7,12 @@ const roundTripMode = import.meta.env.VITE_SHUTDOWN_TRACKER_ROUND_TRIP_MODE === 
 const root = createRoot(document.getElementById("root") as HTMLElement);
 
 if (roundTripMode) {
-  void Promise.all([
-    import("./RoundTripTestAppV2"),
-    import("./roundTripTestV2.css")
-  ])
-    .then(([module]) => {
-      const RoundTripTestAppV2 = module.RoundTripTestAppV2;
+  void import("./RoundTripWorkspace")
+    .then((module) => {
+      const RoundTripWorkspace = module.RoundTripWorkspace;
       root.render(
         <StrictMode>
-          <RoundTripTestAppV2 />
+          <RoundTripWorkspace />
         </StrictMode>
       );
     })
@@ -23,7 +20,7 @@ if (roundTripMode) {
       const message = error instanceof Error ? error.message : String(error);
       root.render(
         <main style={{ padding: "24px", fontFamily: "system-ui, sans-serif" }}>
-          <h1>Round-trip harness could not load</h1>
+          <h1>Round-trip workspace could not load</h1>
           <p>{message}</p>
         </main>
       );
