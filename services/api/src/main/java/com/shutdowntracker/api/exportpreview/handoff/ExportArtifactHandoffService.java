@@ -33,6 +33,7 @@ public class ExportArtifactHandoffService {
             + "No Microsoft Project write-back was run.";
     private static final String WORKER_PROJECT_NAME_PREFIX = "Shutdown Tracker Export Batch ";
     private static final String MSPDI_SOURCE_KIND = "mspdi_xml";
+    private static final String XML_SOURCE_KIND = "xml";
 
     private final ExportPreviewService exportPreviewService;
     private final ProjectExportArtifactJobClient exportArtifactJobClient;
@@ -140,7 +141,9 @@ public class ExportArtifactHandoffService {
     /**
      * Resolves the exact uploaded schedule behind the accepted snapshot. Candidate generation
      * fails closed rather than rebuilding from imported rows that cannot represent a complete
-     * Microsoft Project schedule.
+     * Microsoft Project schedule. Plain .xml filenames remain eligible here because Microsoft
+     * Project normally saves MSPDI using that extension; the worker validates the actual MSPDI
+     * namespace/root before changing any content.
      */
     private ProjectExportArtifactSource resolveAcceptedSource(ExportPreviewDetail preview) {
         AcceptedSourceFile sourceFile = acceptedSourceFileRepository
@@ -150,12 +153,12 @@ public class ExportArtifactHandoffService {
                         "Accepted snapshot has no source file, so no candidate schedule can be derived from it."
                 ));
 
-        if (!MSPDI_SOURCE_KIND.equalsIgnoreCase(sourceFile.fileKind())) {
+        if (!isXmlCandidateSource(sourceFile.fileKind())) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Candidate schedule generation requires an MSPDI/XML source schedule; this snapshot was "
-                            + "imported from '" + sourceFile.fileKind() + "'. Re-import the project from XML "
-                            + "saved by Microsoft Project."
+                    "Complete-source candidate generation requires Microsoft Project XML/MSPDI content; this snapshot "
+                            + "was imported from '" + sourceFile.fileKind() + "'. Save/export the source as XML from "
+                            + "Microsoft Project for this handoff mode."
             );
         }
 
@@ -172,6 +175,10 @@ public class ExportArtifactHandoffService {
                 sourceFile.storageUri(),
                 sourceFile.contentHash()
         );
+    }
+
+    private boolean isXmlCandidateSource(String fileKind) {
+        return MSPDI_SOURCE_KIND.equalsIgnoreCase(fileKind) || XML_SOURCE_KIND.equalsIgnoreCase(fileKind);
     }
 
     private void verifyWorkerResponse(
