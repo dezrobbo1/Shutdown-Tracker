@@ -29,6 +29,22 @@ class MspdiCandidateDifferenceTests {
     }
 
     @Test
+    void approvedFieldInsertionDoesNotCreateFalseOrderDrift() throws Exception {
+        Element source = xml("""
+                <Project xmlns="http://schemas.microsoft.com/project"><Tasks><Task><UID>2</UID><ID>2</ID></Task></Tasks></Project>
+                """);
+        Element candidate = xml("""
+                <Project xmlns="http://schemas.microsoft.com/project"><Tasks><Task><UID>2</UID><PercentComplete>75</PercentComplete><ID>2</ID></Task></Tasks></Project>
+                """);
+
+        assertThat(MspdiCandidateDifference.find(
+                source,
+                candidate,
+                Map.of("2", Map.of("PercentComplete", "75"))
+        )).isEmpty();
+    }
+
+    @Test
     void detectsUnapprovedFieldAndAttributeChanges() throws Exception {
         Element source = xml("""
                 <Project xmlns="http://schemas.microsoft.com/project"><Tasks flag="one"><Task><UID>2</UID><ID>2</ID></Task></Tasks></Project>
@@ -60,7 +76,7 @@ class MspdiCandidateDifferenceTests {
     }
 
     @Test
-    void matchesTasksByProjectUidRatherThanDocumentPosition() throws Exception {
+    void detectsTaskReorderingEvenWhenProjectUidIdentityIsUnchanged() throws Exception {
         Element source = xml("""
                 <Project xmlns="http://schemas.microsoft.com/project"><Tasks>
                   <Task><UID>2</UID><ID>2</ID><Name>A</Name></Task>
@@ -74,7 +90,8 @@ class MspdiCandidateDifferenceTests {
                 </Tasks></Project>
                 """);
 
-        assertThat(MspdiCandidateDifference.find(source, candidate, Map.of())).isEmpty();
+        assertThat(MspdiCandidateDifference.find(source, candidate, Map.of()))
+                .anyMatch(value -> value.startsWith("reordered") && value.contains("Tasks"));
     }
 
     private Element xml(String xml) throws Exception {
