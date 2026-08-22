@@ -112,6 +112,7 @@ export function RoundTripTestAppV2() {
   );
   const selectedTask = leafTasks.find((task) => task.id === taskId) ?? null;
   const activeProjectId = projectId || project?.id || "";
+  const selectedSourceIsMpp = file?.name.toLowerCase().endsWith(".mpp") ?? false;
 
   function log(label: string, detail: string, isError = false) {
     setActivity((current) => [
@@ -338,6 +339,10 @@ export function RoundTripTestAppV2() {
 
   async function generateArtifact() {
     if (!preview || preview.batch.status !== "APPROVED" || !activeProjectId) return;
+    if (selectedSourceIsMpp) {
+      setError("This complete-source round-trip mode requires Microsoft Project XML. MPP can be imported for review, but generate the test source as XML before creating the candidate.");
+      return;
+    }
     const result = await run(
       "Generate candidate XML",
       () => client.exportPreview.generateArtifact(activeProjectId, preview.batch.id, {
@@ -440,7 +445,7 @@ export function RoundTripTestAppV2() {
         </div>
         <div className="rt-form-grid two">
           <label>
-            Project source (.xml, .mspdi.xml or .mpp)
+            Project source for import/review (.xml, .mspdi.xml or .mpp)
             <input type="file" accept=".xml,.mspdi.xml,.mpp" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
           </label>
           <div className="rt-inline-action">
@@ -450,6 +455,10 @@ export function RoundTripTestAppV2() {
             </button>
           </div>
         </div>
+        <p className="rt-muted">
+          MPP can be imported for review. Complete-source round-trip candidate generation currently requires Microsoft Project XML
+          (.xml or .mspdi.xml); the worker validates that the file is actual MSPDI content before applying any approved input.
+        </p>
         <div className="rt-action-row">
           <button type="button" onClick={() => void loadExistingSnapshots()} disabled={Boolean(busy)}>Load existing snapshots</button>
           {snapshots.map((snapshot) => (
@@ -533,8 +542,18 @@ export function RoundTripTestAppV2() {
           <button type="button" onClick={() => void approveCandidate()} disabled={Boolean(busy) || !candidate || candidateApproved}>Approve exact input</button>
           <button type="button" onClick={() => void createPreview()} disabled={Boolean(busy) || !candidateApproved || Boolean(preview)}>Create preview</button>
           <button type="button" onClick={() => void approveBatch()} disabled={Boolean(busy) || !preview || preview.batch.status !== "DRAFT_PREVIEW"}>Approve batch</button>
-          <button type="button" onClick={() => void generateArtifact()} disabled={Boolean(busy) || !preview || preview.batch.status !== "APPROVED"}>Generate candidate</button>
+          <button
+            type="button"
+            onClick={() => void generateArtifact()}
+            disabled={Boolean(busy) || !preview || preview.batch.status !== "APPROVED" || selectedSourceIsMpp}
+            title={selectedSourceIsMpp ? "Save/export this Project source as XML for complete-source candidate generation." : undefined}
+          >
+            Generate candidate
+          </button>
         </div>
+        {selectedSourceIsMpp && (
+          <p className="rt-muted">This MPP snapshot can be reviewed, but candidate generation is disabled until the source is re-imported from Microsoft Project XML.</p>
+        )}
       </section>
 
       <section className="rt-panel">
