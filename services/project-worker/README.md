@@ -1,103 +1,94 @@
 # Project Worker
 
-Purpose: Spring Boot worker service shell for future Microsoft Project import/export processing through MPXJ and MSPDI/XML artifacts.
+Purpose: Spring Boot worker service for bounded Microsoft Project parsing and controlled complete-source MSPDI/XML candidate generation.
 
-## Current Scope
+## Authority boundary
 
-- Placeholder Spring Boot application in package `com.shutdowntracker.projectworker`.
-- Worker-only MPXJ import summary spike in package `com.shutdowntracker.projectworker.importer`.
-- Shared-contract parse summary handoff service and worker endpoint in package `com.shutdowntracker.projectworker.handoff`.
-- Worker-only MSPDI/XML export artifact spike in package `com.shutdowntracker.projectworker.exporter`.
-- Shared-contract export artifact generation handoff service and worker endpoint in package `com.shutdowntracker.projectworker.handoff`.
-- Future queue/background-job wrapping for API-to-worker handoffs is documented in [Worker Handoff Queue Strategy](../../docs/architecture/worker-handoff-queue-strategy.md); no worker queue consumer exists yet.
-- The `local` profile configures PostgreSQL and Flyway runtime wiring.
-- The import spike reads one explicit local file path only when `shutdown-tracker.import-spike.path` is set.
-- The export spike writes one explicit local MSPDI/XML output path only when `shutdown-tracker.export-spike.output-path` is set.
-- No persistence, upload endpoint, export approval endpoint, Project write-back, background jobs, queue integration, scheduler logic, secrets, binaries, seed data, or real Project files are included.
-- No domain behavior exists yet.
+Microsoft Project remains the schedule calculation authority. The worker does not calculate CPM, critical path, float, resource levelling, recovery schedules, dependency consequences, or project-finish movement.
 
-## MPXJ Import Summary Spike
+The worker may apply an exact set of planner-approved direct execution inputs to an accepted Microsoft Project XML/MSPDI source. The resulting pre-Project candidate is then opened in Microsoft Project so Project can perform its normal recalculation.
 
-The worker includes `net.sf.mpxj:mpxj` version `16.4.0` for local import summary exploration. The summary service reads a local file with MPXJ and reports:
+Current direct-input fields are limited to:
 
-- Source filename.
-- Detected file format when MPXJ exposes it.
-- Project name.
-- Task, summary-task, leaf-task, resource, assignment, calendar, and custom-field counts.
-- Ignored read issues as notes when MPXJ exposes them.
+- `percent_complete`;
+- `actual_start`;
+- `actual_finish`.
 
-The spike does not calculate CPM, critical path, float, resource levelling, recovery dates, or any schedule movement. It does not persist imported data or produce exports.
+This allowlist is a **direct-input boundary**. It is not a rule that the candidate must remain unchanged after Microsoft Project recalculates it.
 
-Local files are for local testing only. Do not commit real customer/project files, MPP/XML/MSPDI/XER/ZIP/PDF/DOCX files, screenshots, generated exports, or any file containing real work orders, contractors, vendors, people, locations, assets, costs, or commercial data.
+## Import processing
 
-## Project Parse Handoff Boundary
+The worker uses MPXJ `16.4.0` for Project-file reading.
 
-`WorkerProjectParseHandoffService` accepts the shared `ProjectParseSummaryRequest`, resolves an explicit local file URI/path, calls the existing MPXJ summary service, and returns a shared `ProjectParseSummaryResponse`.
+Current import endpoints include:
 
-The worker exposes the same contract through:
+- `POST /worker/project-import/parse-summary` — returns parser/project/count metadata only;
+- `POST /worker/project-import/parse-snapshot` — returns the imported task facts required by the browser round-trip acceptance path.
 
-- `POST /worker/project-import/parse-summary`
+The API owns persistence, review state, acceptance decisions and audit. The worker does not turn imported schedule facts into live execution state.
 
-The response is summary-only: parser name/version, source filename, detected format, project name, task/resource/assignment/calendar/custom-field counts, warning/error counts, and notes. It does not persist import output, create snapshots, create imported tasks, run jobs, integrate a queue, generate exports, write back to Microsoft Project, or calculate schedules.
+MPP, XML and MSPDI may be read for import/review when supported by MPXJ. Real Project files remain local test/operational data and must not be committed.
 
-Only local file storage URIs are accepted for this early handoff. Non-local object-storage URIs should wait for the future storage/queue contract.
+## Complete-source candidate generation
 
-When a future queue consumer is added, it should reuse this worker-owned parsing boundary rather than moving MPXJ into the API. Product workflow state and audit writes should remain API-owned.
+The worker endpoint is:
 
-Worker tests compare the approved `synthetic-basic-wbs` MSPDI fixture against its structured expected import summary JSON, including the stable `worker_response` fields. This remains synthetic and summary-only.
+- `POST /worker/project-export/generate-artifact`
 
-## Database Runtime Config
+`MpxjMspdiExportArtifactService` no longer rebuilds a sparse Project file from only the changed task fields. For the complete-source handoff it:
 
-The `local` profile uses PostgreSQL and Flyway. Run commands from the repository root so Flyway can resolve `filesystem:infra/migrations`.
+1. receives the exact accepted source identity, local storage URI and recorded SHA-256 from the API;
+2. reads the accepted source bytes;
+3. verifies the bytes still match the recorded source hash;
+4. requires a Microsoft Project MSPDI/XML document with namespace `http://schemas.microsoft.com/project` and root `Project`;
+5. resolves every approved task by Project UID and rechecks task ID, name and leaf status;
+6. applies only the approved `PercentComplete`, `ActualStart` and/or `ActualFinish` values;
+7. inserts new task fields in MSPDI task-element order;
+8. writes a separate candidate XML file;
+9. reparses source and candidate and verifies that the pre-Project candidate differs only at the exact approved task/field pairs; and
+10. returns candidate URI/hash and summary counts.
 
-Default local values align with `infra/docker/docker-compose.postgres.yml`:
+The accepted source file is never overwritten.
 
-- `SHUTDOWN_TRACKER_DB_URL`, default `jdbc:postgresql://localhost:5432/shutdown_tracker`
-- `SHUTDOWN_TRACKER_DB_USERNAME`, default `shutdown_tracker`
-- `SHUTDOWN_TRACKER_DB_PASSWORD`, default `shutdown_tracker_dev`
-- `SHUTDOWN_TRACKER_FLYWAY_LOCATIONS`, default `filesystem:infra/migrations`
+Ordinary `.xml` filenames and `.mspdi.xml` filenames can proceed to candidate generation. Filename classification alone is not trusted as proof of MSPDI: the worker validates the document namespace/root before applying any input.
 
-The test profile disables datasource and Flyway auto-configuration so context-load tests do not require PostgreSQL.
+A source imported from native `.mpp` can be reviewed, but this complete-source generation mechanism currently requires Microsoft Project XML/MSPDI. Native MPP candidate handling would require a separately reviewed Project-native/COM companion or another approved mechanism; the server does not write native MPP files.
 
-The migration validation scripts apply SQL directly and do not create Flyway history. Use a clean PostgreSQL volume when checking Spring Boot runtime migrations through this service.
+## Pre-Project integrity check
 
-## Local Commands
+`MspdiCandidateDifference` is a pre-Microsoft-Project safety check. It detects unapproved element, attribute, value and sibling/task-order changes while excluding the exact approved direct-input fields.
 
-Run from the repository root when Maven and Java 21 are available:
+This check proves that **Shutdown Tracker** did not author anything beyond the reviewed inputs before the candidate reaches Project.
+
+It must not be applied as a post-Project invariant. Once Microsoft Project opens the candidate it may legitimately recalculate dates, durations, summaries, assignment/work values, timephased data, slack, criticality, project finish and other dependent schedule state. Those are Project-calculated consequences for planner review.
+
+## Value normalization
+
+The API and worker share the proposed-value normalizer.
+
+- `percent_complete` canonicalizes whole-number equivalents such as `75`, `75.0` and `075` to `75`; fractional and out-of-range values are rejected.
+- Proposed `actual_start` and `actual_finish` require explicit-offset ISO-8601 values and canonicalize to whole seconds while preserving the reviewed Microsoft Project local wall-clock component.
+- Unsupported fields, duplicate task/field candidates, inconsistent task identity, summary-task candidates, unknown/numeric enum aliases, unknown/duplicate JSON properties, invalid values and non-XML output paths fail closed.
+
+## Browser acceptance path
+
+The Master Console round-trip mode can now drive source upload, task-snapshot parsing, snapshot acceptance, candidate creation/approval, sealed preview, batch approval, candidate generation and candidate download without manually assembling backend API calls.
+
+Microsoft Project is still opened manually for the external acceptance gate. The planner then records Project-open and verification metadata through the console.
+
+## Runtime and local development
+
+The worker HTTP service defaults to port `8081` or `PORT` when set.
+
+Run from the repository root:
 
 ```text
 mvn -pl services/project-worker test
 mvn -pl services/project-worker spring-boot:run -Dspring-boot.run.profiles=local
-mvn -pl services/project-worker spring-boot:run -Dspring-boot.run.arguments=--shutdown-tracker.import-spike.path=/absolute/path/to/local/safe-file.mpp
 ```
 
-The worker HTTP endpoint defaults to port `8081`, or `PORT` when set. The import spike command uses the default profile so it does not require PostgreSQL. When the path property is absent, the worker starts normally and does not run the import spike. With the path property set, the worker logs the summary during startup and continues serving until stopped.
+The local profile uses the repository PostgreSQL/Flyway configuration where required. Future queue/background-job wrapping should reuse the worker-owned parsing and candidate-generation boundaries rather than moving Project processing into the API.
 
-## MSPDI/XML Export Artifact Spike
+## Data safety
 
-`MpxjMspdiExportArtifactService` builds a minimal MPXJ `ProjectFile` from explicit leaf-task export candidates and writes an MSPDI/XML artifact with MPXJ. It currently supports only:
-
-- `percent_complete`
-- `physical_percent_complete`
-- `actual_start`
-- `actual_finish`
-
-The service rejects summary-task candidates, non-numeric Microsoft Project task identity, invalid percentage values, and non-XML output paths. Generated files are local-only test artifacts and must not be committed.
-
-The worker also exposes the same artifact generation through:
-
-- `POST /worker/project-export/generate-artifact`
-
-The endpoint accepts the shared export handoff contract, writes the requested local MSPDI/XML path, and returns artifact URI/hash plus summary counts. The API remains responsible for checking export-batch approval and recording generated metadata.
-
-The spike and endpoint do not read from the database, approve export batches, mark approval records exported, update `export_batches`, generate native MPP files, call Microsoft Project, or write back to Microsoft Project. They do not calculate CPM, critical path, float, resource levelling, recovery dates, or schedule movement.
-
-Worker tests compare a synthetic export request against `fixtures/import-export/synthetic-basic-wbs/expected-export-artifact-summary.json`, including stable summary fields and MPXJ readback values. Generated MSPDI/XML files are temporary test output only and are not committed.
-
-When a future queue consumer is added, it should reuse this worker-owned artifact generation boundary. The API remains responsible for export approval checks, storage target reservation, URI/hash recording, audit writes, and product lifecycle state.
-
-Run a synthetic local generation only when explicitly needed:
-
-```text
-mvn -pl services/project-worker spring-boot:run -Dspring-boot.run.arguments=--shutdown-tracker.export-spike.output-path=/absolute/path/to/local/synthetic-export.mspdi.xml
-```
+Do not commit real customer/site Project files, generated candidates, screenshots, local databases, secrets, evidence files, or operational data. Synthetic fixtures under the repository fixture policy are the only committed Project-like test assets.

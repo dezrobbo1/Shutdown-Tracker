@@ -34,6 +34,22 @@ class ReviewProjectBootstrapServiceTests {
                 .contains("Synthetic review project");
     }
 
+    @Test
+    void createsFreshIsolatedReviewProjectWithoutReusingImmutableHistory() {
+        ProjectRecord existing = new ProjectRecord(UUID.randomUUID(), "Synthetic Review Project", "active", "UTC");
+        FakeProjectRepository repository = new FakeProjectRepository(Optional.of(existing));
+        ReviewProjectBootstrapService service = new ReviewProjectBootstrapService(repository, defaultProperties());
+
+        ProjectRecord project = service.createFreshReviewProject();
+
+        assertThat(project.id()).isNotEqualTo(existing.id());
+        assertThat(project.name())
+                .startsWith("Synthetic Review Project · ")
+                .isNotEqualTo(existing.name());
+        assertThat(repository.createRequest.description())
+                .contains("prior immutable test history is retained");
+    }
+
     private ReviewProjectBootstrapProperties defaultProperties() {
         return new ReviewProjectBootstrapProperties(
                 false,

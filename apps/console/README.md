@@ -2,23 +2,11 @@
 
 Purpose: React and Vite application for shutdown control, planners, coordinators, supervisors, package owners, and managers.
 
-Current status: scaffolded React/Vite shell with shared API client wiring, opt-in live import/export review data fetching, and a static Task Progress Review visual shell. The initial visual cleanup pass locks the approved top-level IA and uses sanitised operational examples.
+Current status: scaffolded React/Vite shell with shared API client wiring, opt-in live import/export review data fetching, a static Task Progress Review visual shell, and a separate Microsoft Project round-trip acceptance workspace.
 
-The console renders synthetic review state by default for:
+The normal console renders synthetic review state by default for source validation, imported snapshots, export preview, planner/supervisor review, Project verification, blockers, and handover examples.
 
-- source-file validation status
-- parsed snapshot review
-- task lineage review
-- export preview candidates
-- import/export review API client operations
-- task progress review and export approval workflow
-- supervisor review queue
-- planner progress review queue
-- progress candidates in export preview
-- Microsoft Project verification metadata
-- structured blockers and handover summary examples
-
-To fetch live review data from the API, configure:
+To fetch live review data from the API in the normal console, configure:
 
 ```text
 VITE_SHUTDOWN_TRACKER_API_BASE_URL=http://localhost:8080
@@ -27,26 +15,65 @@ VITE_SHUTDOWN_TRACKER_IMPORT_SNAPSHOT_ID=<optional-snapshot-id>
 VITE_SHUTDOWN_TRACKER_EXPORT_BATCH_ID=<optional-export-batch-id>
 ```
 
-When `VITE_SHUTDOWN_TRACKER_PROJECT_ID` is absent, the console stays in synthetic review mode and does not call the backend. When it is present, the console reads import snapshot summaries, the selected or latest snapshot detail, and the optional export preview batch. The refresh button repeats those read-only calls.
+When `VITE_SHUTDOWN_TRACKER_PROJECT_ID` is absent, the normal console stays in synthetic review mode and does not call the backend.
 
-The task-progress review surfaces are visual/product-review only and use synthetic data. They do not add production task execution APIs, supervisor review APIs, planner review APIs, production offline sync, evidence upload, handover workflow, generated artifacts, or Microsoft Project write-back.
+## Microsoft Project round-trip acceptance workspace
 
-The console imports `@shutdown-tracker/api-client` and can be configured with `VITE_SHUTDOWN_TRACKER_API_BASE_URL`. It does not upload source files, store uploaded files, parse Project files, create import batches, create live execution records, generate MSPDI/XML, approve exports, calculate schedules, or write back to Microsoft Project.
+Enable the acceptance workspace with:
+
+```text
+VITE_SHUTDOWN_TRACKER_ROUND_TRIP_MODE=true
+```
+
+The workspace is intentionally useful before a backend is connected. A Microsoft Project `.xml` or `.mspdi.xml` file is parsed locally in the browser with `DOMParser`, validated as Project MSPDI by its root namespace, and shown as a searchable schedule table with WBS, task hierarchy, UID/ID, planned dates, duration, percent complete and actual dates. This browser inspection does not upload or mutate the source file.
+
+MPP files cannot be inspected in the browser. They may still be sent to the project worker for import review when the backend is connected, but complete-source candidate generation currently requires Microsoft Project XML.
+
+### Clean test state
+
+The workspace has a `Start clean test` action. When the review backend is reachable it creates a new isolated synthetic review project through:
+
+```text
+POST /api/review-project/new
+```
+
+This is the acceptance-test reset mechanism. It does **not** delete previous export, approval, or audit history because current policy records are deliberately append-only. The new project gives the tester an empty active data scope while preserving old test evidence.
+
+`Clear current review` clears the current browser file, preview, snapshot, candidate and activity state without changing saved connection settings.
+
+### Connected round-trip flow
+
+With PostgreSQL, the API and project worker available, the workspace can drive:
+
+```text
+choose and review Project XML
+-> import source into a fresh/reused synthetic test project
+-> project worker parses imported task facts
+-> API persists a reviewable snapshot
+-> planner reviews and accepts/rejects the snapshot
+-> select a leaf task and direct input
+-> one primary UI action creates the exact candidate, records approval,
+   seals the preview, approves the batch and generates the candidate
+-> download complete-source candidate XML
+-> open in Microsoft Project
+-> Project recalculates
+-> planner reviews the result
+-> record Project-open and verification metadata
+```
+
+The consolidated candidate action removes repetitive acceptance-test clicks; the backend still performs the exact candidate/approval binding, freshness, sealing, policy, source-hash and worker checks at each stage.
+
+During local Vite development, `/api` and `/actuator` are proxied to `http://localhost:8080`, so `VITE_SHUTDOWN_TRACKER_API_BASE_URL` can normally be omitted. The API local profile enables project-worker parse/export clients and the synthetic review-project bootstrap by default. Run the API on port 8080, the project worker on port 8081, and local PostgreSQL before using the persisted handoff path.
+
+The round-trip test deliberately expects Microsoft Project to recalculate. Project-calculated changes to planned dates, durations, summaries, work/assignments, timephased data, slack, criticality, or project finish are reviewable schedule consequences, not automatic direct-input integrity failures.
+
+The acceptance importer currently persists the task facts required by this path. It does not yet claim final full Project import persistence for resources, assignments, calendars, custom-field definitions, or timephased data.
+
+The normal console remains isolated from the acceptance workspace: the round-trip component and its stylesheet are dynamically loaded only when the mode flag is enabled.
 
 ## Visual shell limitations
 
-The current Task Progress Review surfaces are static/synthetic visual review surfaces. They should not be treated as production route structure or backend API contracts.
-
-The initial cleanup pass now:
-
-- locks the console top-level IA to Today, Tasks, Problems, Evidence, Exports;
-- treats Supervisor Review and Planner Review as Today/Exports sections rather than permanent navigation;
-- treats Project Verification as part of Exports;
-- reduces card/chip density and uses sanitised operational examples;
-- keeps write-like controls disabled until APIs exist;
-- keeps Project-boundary warnings visible.
-
-Remaining visual-only scope includes Critical Watch, Critical Updates, and entity-linked Discussion surfaces. These must remain clearly labelled and non-functional until their product/API contracts are approved.
+The current Task Progress Review surfaces outside the acceptance workspace are static/synthetic visual review surfaces. They should not be treated as final production route structure or backend API contracts.
 
 Relevant product source docs:
 
@@ -54,6 +81,7 @@ Relevant product source docs:
 - `docs/product/ux-anti-slop-rules.md`
 - `docs/product/design-language-and-status-semantics.md`
 - `docs/product/task-progress-review-export-approval.md`
+- `docs/product/project-candidate-schedule-handoff.md`
 
 ## Local commands
 

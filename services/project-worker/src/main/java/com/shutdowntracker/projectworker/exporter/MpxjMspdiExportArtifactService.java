@@ -5,122 +5,372 @@ import com.shutdowntracker.projectexport.contract.ProjectExportArtifactFieldValu
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactRequest;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactSummary;
 import com.shutdowntracker.projectexport.contract.ProjectExportArtifactTask;
+import com.shutdowntracker.projectexport.contract.ProjectExportValueNormalizer;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
 import java.util.List;
-import org.mpxj.ProjectFile;
-import org.mpxj.Task;
-import org.mpxj.mspdi.MSPDIWriter;
-import org.mpxj.mspdi.SaveVersion;
+import java.util.Map;
+import java.util.OptionalInt;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
+import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
+import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.dom.DOMSource;
+import javax.xml.transform.stream.StreamResult;
 import org.springframework.stereotype.Service;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
+/**
+ * Produces a complete candidate schedule by applying approved execution inputs to the accepted
+ * MSPDI/XML source.
+ *
+ * <p>The source XML is edited directly rather than rebuilt through an intermediate schedule model,
+ * so calendars, dependencies, WBS, summaries, resources, assignments, constraints, durations and
+ * any source constructs not modelled by MPXJ survive byte-for-byte at the semantic element level.
+ * Authority is proved after writing by comparing candidate to source and allowing differences only
+ * at the exact approved task/field pairs.
+ */
 @Service
 public class MpxjMspdiExportArtifactService implements ProjectExportArtifactService {
 
     private static final String ARTIFACT_FORMAT = "mspdi_xml";
+    private static final String MSPDI_NAMESPACE = "http://schemas.microsoft.com/project";
+    private static final DateTimeFormatter MSPDI_DATE_TIME =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
     private static final String NO_SCHEDULE_NOTE =
-            "MSPDI/XML artifact only; no schedule calculations or Microsoft Project write-back were run.";
+            "Candidate schedule derived from the accepted source; no schedule calculations or "
+                    + "Microsoft Project write-back were run by Shutdown Tracker.";
 
     @Override
-    public ProjectExportArtifactSummary generate(ProjectExportArtifactRequest request, Path outputPath) {
+    public ProjectExportArtifactSummary generate(
+            ProjectExportArtifactRequest request,
+            Path sourcePath,
+            Path outputPath
+    ) {
         Path normalizedOutputPath = validateOutputPath(outputPath);
-        ProjectFile project = buildProjectFile(request);
+        request.tasks().forEach(MpxjMspdiExportArtifactService::validateLeafExportTask);
+
+        byte[] sourceBytes = readSource(sourcePath);
+        verifySourceHash(sourceBytes, request.source().contentHash(), sourcePath);
+
+        Document candidate = parseMspdi(sourceBytes);
+        int sourceTaskCount = applyApprovedInputs(candidate, request);
 
         try {
             Path parent = normalizedOutputPath.getParent();
             if (parent != null) {
                 Files.createDirectories(parent);
             }
+            Files.write(normalizedOutputPath, serialize(candidate));
 
-            MSPDIWriter writer = new MSPDIWriter();
-            writer.setSaveVersion(SaveVersion.Project2016);
-            try (OutputStream outputStream = Files.newOutputStream(normalizedOutputPath)) {
-                writer.write(project, outputStream);
-            }
+            Document sourceDocument = parseMspdi(sourceBytes);
+            Document writtenCandidate = parseMspdi(Files.readAllBytes(normalizedOutputPath));
+            verifyOnlyApprovedInputsChanged(sourceDocument, writtenCandidate, request);
 
             return new ProjectExportArtifactSummary(
                     normalizedOutputPath.getFileName().toString(),
                     ARTIFACT_FORMAT,
                     request.tasks().size(),
+                    sourceTaskCount,
                     exportedFieldCount(request),
                     Files.size(normalizedOutputPath),
                     sha256(normalizedOutputPath),
                     List.of(NO_SCHEDULE_NOTE)
             );
-        } catch (IOException ex) {
+        } catch (IOException exception) {
             throw new IllegalStateException(
-                    "Failed to generate MSPDI/XML export artifact: " + normalizedOutputPath.getFileName(),
-                    ex
+                    "Failed to generate MSPDI/XML candidate schedule: " + normalizedOutputPath.getFileName(),
+                    exception
             );
         }
     }
 
-    ProjectFile buildProjectFile(ProjectExportArtifactRequest request) {
-        ProjectFile project = new ProjectFile();
-        project.getProjectProperties().setName(request.projectName());
-        project.addDefaultBaseCalendar();
+    private byte[] readSource(Path sourcePath) {
+        try {
+            return Files.readAllBytes(sourcePath);
+        } catch (IOException exception) {
+            throw new IllegalStateException(
+                    "Accepted source schedule could not be read: " + sourcePath.getFileName(),
+                    exception
+            );
+        }
+    }
 
-        for (ProjectExportArtifactTask sourceTask : request.tasks()) {
-            validateLeafExportTask(sourceTask);
+    private void verifySourceHash(byte[] sourceBytes, String expectedHash, Path sourcePath) {
+        String actualHash = sha256(sourceBytes);
+        if (!actualHash.equalsIgnoreCase(expectedHash)) {
+            throw new IllegalStateException(
+                    "Accepted source schedule no longer matches the hash recorded at import: "
+                            + sourcePath.getFileName()
+            );
+        }
+    }
 
-            Task task = project.addTask();
-            task.setName(sourceTask.taskName());
-            task.setUniqueID(parsePositiveInteger(sourceTask.microsoftProjectTaskUid(), "microsoftProjectTaskUid"));
-            task.setID(parsePositiveInteger(sourceTask.microsoftProjectTaskId(), "microsoftProjectTaskId"));
+    private int applyApprovedInputs(Document candidate, ProjectExportArtifactRequest request) {
+        Map<String, ProjectExportArtifactTask> approvedByUid = new LinkedHashMap<>();
+        for (ProjectExportArtifactTask task : request.tasks()) {
+            String uid = Integer.toString(
+                    parsePositiveInteger(task.microsoftProjectTaskUid(), "microsoftProjectTaskUid")
+            );
+            approvedByUid.put(uid, task);
+        }
 
-            for (ProjectExportArtifactFieldValue fieldValue : sourceTask.fieldValues()) {
-                applyFieldValue(task, fieldValue);
+        List<Element> sourceTasks = taskElements(candidate);
+        for (Element taskElement : sourceTasks) {
+            Element uidElement = firstChild(taskElement, "UID");
+            if (uidElement == null) {
+                continue;
+            }
+            ProjectExportArtifactTask approved = approvedByUid.remove(uidElement.getTextContent().trim());
+            if (approved == null) {
+                continue;
+            }
+            requireMatchingIdentity(taskElement, approved);
+            for (ProjectExportArtifactFieldValue fieldValue : approved.fieldValues()) {
+                setTaskField(candidate, taskElement, fieldValue);
             }
         }
 
-        return project;
+        if (!approvedByUid.isEmpty()) {
+            throw new IllegalStateException(
+                    "Approved Microsoft Project task UIDs are absent from the accepted source schedule: "
+                            + String.join(", ", approvedByUid.keySet())
+            );
+        }
+        return sourceTasks.size();
     }
 
-    private void validateLeafExportTask(ProjectExportArtifactTask task) {
+    private void requireMatchingIdentity(Element taskElement, ProjectExportArtifactTask approved) {
+        String expectedId = Integer.toString(
+                parsePositiveInteger(approved.microsoftProjectTaskId(), "microsoftProjectTaskId")
+        );
+        requireExactText(taskElement, "ID", expectedId, approved);
+        requireExactText(taskElement, "Name", approved.taskName(), approved);
+
+        Element summary = firstChild(taskElement, "Summary");
+        if (summary != null && "1".equals(summary.getTextContent().trim())) {
+            throw new IllegalStateException(
+                    "Approved task UID " + approved.microsoftProjectTaskUid()
+                            + " is a summary task in the accepted source schedule; "
+                            + "summary actuals are calculated by Microsoft Project."
+            );
+        }
+    }
+
+    private void requireExactText(
+            Element taskElement,
+            String localName,
+            String expected,
+            ProjectExportArtifactTask approved
+    ) {
+        Element element = firstChild(taskElement, localName);
+        String actual = element == null ? null : element.getTextContent().trim();
+        if (!expected.equals(actual)) {
+            throw new IllegalStateException(
+                    "Accepted source schedule task UID " + approved.microsoftProjectTaskUid()
+                            + " no longer matches the reviewed " + localName + "."
+            );
+        }
+    }
+
+    private void setTaskField(Document document, Element taskElement, ProjectExportArtifactFieldValue fieldValue) {
+        String elementName = xmlElementName(fieldValue.field());
+        String value = canonicalValue(fieldValue);
+
+        Element existing = firstChild(taskElement, elementName);
+        if (existing != null) {
+            existing.setTextContent(value);
+            return;
+        }
+
+        Element created = document.createElementNS(MSPDI_NAMESPACE, elementName);
+        created.setTextContent(value);
+        taskElement.insertBefore(created, insertionPointFor(taskElement, elementName));
+    }
+
+    private Node insertionPointFor(Element taskElement, String elementName) {
+        int target = MspdiTaskElementOrder.positionOf(elementName);
+        Node child = taskElement.getFirstChild();
+        while (child != null) {
+            if (child instanceof Element element) {
+                OptionalInt position = MspdiTaskElementOrder.knownPositionOf(element.getLocalName());
+                if (position.isPresent() && position.getAsInt() > target) {
+                    return element;
+                }
+            }
+            child = child.getNextSibling();
+        }
+        return null;
+    }
+
+    private void verifyOnlyApprovedInputsChanged(
+            Document source,
+            Document candidate,
+            ProjectExportArtifactRequest request
+    ) {
+        Map<String, Map<String, String>> approved = new HashMap<>();
+        for (ProjectExportArtifactTask task : request.tasks()) {
+            Map<String, String> fields = new HashMap<>();
+            for (ProjectExportArtifactFieldValue fieldValue : task.fieldValues()) {
+                fields.put(xmlElementName(fieldValue.field()), canonicalValue(fieldValue));
+            }
+            approved.put(
+                    Integer.toString(parsePositiveInteger(task.microsoftProjectTaskUid(), "microsoftProjectTaskUid")),
+                    fields
+            );
+        }
+
+        List<String> differences =
+                MspdiCandidateDifference.find(source.getDocumentElement(), candidate.getDocumentElement(), approved);
+        if (!differences.isEmpty()) {
+            throw new IllegalStateException(
+                    "Generated candidate schedule differs from the accepted source outside the approved inputs: "
+                            + String.join("; ", differences)
+            );
+        }
+
+        for (Element taskElement : taskElements(candidate)) {
+            Element uidElement = firstChild(taskElement, "UID");
+            if (uidElement == null) {
+                continue;
+            }
+            Map<String, String> fields = approved.get(uidElement.getTextContent().trim());
+            if (fields == null) {
+                continue;
+            }
+            for (Map.Entry<String, String> entry : fields.entrySet()) {
+                Element applied = firstChild(taskElement, entry.getKey());
+                if (applied == null || !entry.getValue().equals(applied.getTextContent().trim())) {
+                    throw new IllegalStateException(
+                            "Approved " + entry.getKey()
+                                    + " did not reach the generated candidate schedule for task UID "
+                                    + uidElement.getTextContent().trim() + "."
+                    );
+                }
+            }
+        }
+    }
+
+    private String canonicalValue(ProjectExportArtifactFieldValue fieldValue) {
+        return switch (fieldValue.field()) {
+            case PERCENT_COMPLETE -> parsePercentage(fieldValue.newValue(), fieldValue.field()).toPlainString();
+            case ACTUAL_START, ACTUAL_FINISH ->
+                    parseDateTime(fieldValue.newValue(), fieldValue.field()).format(MSPDI_DATE_TIME);
+        };
+    }
+
+    private Document parseMspdi(byte[] xml) {
+        try {
+            Document document = hardenedDocumentBuilderFactory().newDocumentBuilder()
+                    .parse(new ByteArrayInputStream(xml));
+            Element root = document.getDocumentElement();
+            if (!MSPDI_NAMESPACE.equals(root.getNamespaceURI()) || !"Project".equals(root.getLocalName())) {
+                throw new IllegalStateException("Accepted source schedule is not an MSPDI/XML Project document.");
+            }
+            return document;
+        } catch (ParserConfigurationException | SAXException | IOException exception) {
+            throw new IllegalStateException("Accepted source schedule could not be parsed as MSPDI/XML.", exception);
+        }
+    }
+
+    private DocumentBuilderFactory hardenedDocumentBuilderFactory() throws ParserConfigurationException {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        factory.setXIncludeAware(false);
+        factory.setExpandEntityReferences(false);
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+        factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+        factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+        return factory;
+    }
+
+    private byte[] serialize(Document document) {
+        try {
+            TransformerFactory transformerFactory = TransformerFactory.newInstance();
+            transformerFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+            transformerFactory.setAttribute(XMLConstants.ACCESS_EXTERNAL_STYLESHEET, "");
+            Transformer transformer = transformerFactory.newTransformer();
+            transformer.setOutputProperty(OutputKeys.ENCODING, "UTF-8");
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            transformer.transform(new DOMSource(document), new StreamResult(output));
+            return output.toByteArray();
+        } catch (TransformerException exception) {
+            throw new IllegalStateException("Candidate schedule could not be written as MSPDI/XML.", exception);
+        }
+    }
+
+    private List<Element> taskElements(Document document) {
+        List<Element> tasks = new ArrayList<>();
+        NodeList nodes = document.getElementsByTagNameNS(MSPDI_NAMESPACE, "Task");
+        for (int index = 0; index < nodes.getLength(); index++) {
+            tasks.add((Element) nodes.item(index));
+        }
+        return tasks;
+    }
+
+    private Element firstChild(Element parent, String localName) {
+        Node child = parent.getFirstChild();
+        while (child != null) {
+            if (child instanceof Element element && localName.equals(element.getLocalName())) {
+                return element;
+            }
+            child = child.getNextSibling();
+        }
+        return null;
+    }
+
+    private static void validateLeafExportTask(ProjectExportArtifactTask task) {
         if (!task.leafTask()) {
             throw new IllegalArgumentException("Only leaf-task export candidates may be included in MSPDI/XML artifacts.");
         }
     }
 
-    private void applyFieldValue(Task task, ProjectExportArtifactFieldValue fieldValue) {
-        switch (fieldValue.field()) {
-            case PERCENT_COMPLETE -> task.setPercentageComplete(parsePercentage(fieldValue.newValue(), fieldValue.field()));
-            case PHYSICAL_PERCENT_COMPLETE -> task.setPhysicalPercentComplete(parsePercentage(fieldValue.newValue(), fieldValue.field()));
-            case ACTUAL_START -> task.setActualStart(parseDateTime(fieldValue.newValue(), fieldValue.field()));
-            case ACTUAL_FINISH -> task.setActualFinish(parseDateTime(fieldValue.newValue(), fieldValue.field()));
-        }
-    }
-
     private BigDecimal parsePercentage(String value, ProjectExportArtifactField field) {
-        try {
-            BigDecimal parsed = new BigDecimal(value);
-            if (parsed.compareTo(BigDecimal.ZERO) < 0 || parsed.compareTo(BigDecimal.valueOf(100)) > 0) {
-                throw new IllegalArgumentException(field.fieldName() + " must be between 0 and 100.");
-            }
-            return parsed;
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(field.fieldName() + " must be a decimal percentage.", ex);
-        }
+        return new BigDecimal(ProjectExportValueNormalizer.normalize(field, value));
     }
 
     private LocalDateTime parseDateTime(String value, ProjectExportArtifactField field) {
+        String normalized = ProjectExportValueNormalizer.normalize(field, value);
         try {
-            return OffsetDateTime.parse(value).toLocalDateTime();
-        } catch (DateTimeParseException ignored) {
-            try {
-                return LocalDateTime.parse(value);
-            } catch (DateTimeParseException ex) {
-                throw new IllegalArgumentException(field.fieldName() + " must be an ISO-8601 date-time value.", ex);
-            }
+            return OffsetDateTime.parse(normalized).toLocalDateTime();
+        } catch (DateTimeParseException exception) {
+            throw new IllegalArgumentException(
+                    field.fieldName() + " was not a canonical offset date-time.",
+                    exception
+            );
         }
+    }
+
+    private String xmlElementName(ProjectExportArtifactField field) {
+        return switch (field) {
+            case PERCENT_COMPLETE -> "PercentComplete";
+            case ACTUAL_START -> "ActualStart";
+            case ACTUAL_FINISH -> "ActualFinish";
+        };
     }
 
     private int parsePositiveInteger(String value, String fieldName) {
@@ -133,14 +383,16 @@ public class MpxjMspdiExportArtifactService implements ProjectExportArtifactServ
                 throw new IllegalArgumentException(fieldName + " must be positive.");
             }
             return parsed;
-        } catch (NumberFormatException ex) {
-            throw new IllegalArgumentException(fieldName + " must be a positive integer.", ex);
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(fieldName + " must be a positive integer.", exception);
         }
     }
 
     private Path validateOutputPath(Path outputPath) {
         Path normalizedPath = outputPath.toAbsolutePath().normalize();
-        String fileName = normalizedPath.getFileName() == null ? "" : normalizedPath.getFileName().toString().toLowerCase();
+        String fileName = normalizedPath.getFileName() == null
+                ? ""
+                : normalizedPath.getFileName().toString().toLowerCase();
         if (!fileName.endsWith(".xml")) {
             throw new IllegalArgumentException("MSPDI/XML export artifact path must end with .xml.");
         }
@@ -153,13 +405,19 @@ public class MpxjMspdiExportArtifactService implements ProjectExportArtifactServ
                 .sum();
     }
 
-    private String sha256(Path path) throws IOException {
+    private String sha256(Path path) {
         try {
-            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-            byte[] bytes = Files.readAllBytes(path);
-            return HexFormat.of().formatHex(digest.digest(bytes));
-        } catch (Exception ex) {
-            throw new IOException("Failed to hash generated MSPDI/XML export artifact.", ex);
+            return sha256(Files.readAllBytes(path));
+        } catch (IOException exception) {
+            throw new IllegalStateException("Could not hash the generated candidate schedule.", exception);
+        }
+    }
+
+    private String sha256(byte[] bytes) {
+        try {
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is required to record artifact provenance.", exception);
         }
     }
 }
