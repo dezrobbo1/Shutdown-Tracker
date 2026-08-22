@@ -42,7 +42,7 @@ During local Vite development, `/api` and `/actuator` are proxied to `http://loc
 The browser flow can now:
 
 1. create/reuse the guarded synthetic local review project;
-2. choose an `.xml`, `.mspdi.xml`, or `.mpp` source file;
+2. choose an `.xml`, `.mspdi.xml`, or `.mpp` source file for import/review;
 3. upload the source and create its import batch;
 4. ask the project worker to parse imported task facts;
 5. persist those task facts as a reviewable Project snapshot;
@@ -51,15 +51,20 @@ The browser flow can now:
 8. create an authoritative `percent_complete`, `actual_start`, or `actual_finish` input candidate;
 9. record its exact candidate-bound planner approval;
 10. create and approve a sealed export preview batch;
-11. generate the worker-backed MSPDI/XML candidate;
+11. generate a complete-source MSPDI/XML candidate from the accepted source plus the approved input;
 12. download the generated candidate through the API with its recorded SHA-256 rechecked before delivery;
 13. open the downloaded candidate manually in Microsoft Project;
-14. record that it was opened; and
-15. record the planner verification result.
+14. allow Microsoft Project to recalculate normally;
+15. record that it was opened; and
+16. record the planner verification result.
 
 The round-trip test deliberately expects Microsoft Project to recalculate. Project-calculated changes to planned dates, durations, summaries, work/assignments, timephased data, slack, criticality, or project finish are reviewable schedule consequences, not automatic direct-input integrity failures.
 
-This acceptance importer currently persists task facts required for the test path. It does not yet claim final full Project import persistence for resources, assignments, calendars, custom-field definitions, or timephased data. The current export worker also remains the existing direct-input/diagnostic writer until the complete-source candidate implementation is finished.
+The acceptance importer currently persists the task facts required for this test path. It does not yet claim final full Project import persistence for resources, assignments, calendars, custom-field definitions, or timephased data.
+
+The complete-source candidate mechanism currently requires Microsoft Project XML/MSPDI as the accepted source. An MPP file may be imported and reviewed, but candidate generation is disabled for that source until the schedule is saved/exported as Microsoft Project XML. Ordinary `.xml` filenames are allowed through to the worker, which validates that the content is an actual MSPDI Project document before applying any approved input.
+
+Before Microsoft Project opens the candidate, the worker verifies the accepted source hash and proves that only the exact approved input changed. That pre-Project invariant does not apply after Project recalculates the schedule.
 
 The normal console is isolated from the acceptance harness: round-trip code and its global test-only stylesheet are dynamically loaded only when the mode flag is enabled.
 
