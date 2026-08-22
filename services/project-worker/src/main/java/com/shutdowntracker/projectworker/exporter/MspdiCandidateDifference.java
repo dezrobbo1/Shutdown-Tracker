@@ -1,6 +1,7 @@
 package com.shutdowntracker.projectworker.exporter;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,8 +14,11 @@ import org.w3c.dom.Node;
 /**
  * Reports every way a generated candidate schedule differs from the accepted source.
  *
- * <p>This is the proof that Shutdown Tracker authored nothing but the approved execution inputs.
- * Repeated siblings are matched by name and occurrence, while tasks are matched by Project UID.
+ * <p>This is the pre-Microsoft-Project proof that Shutdown Tracker authored nothing but the
+ * approved execution inputs. Repeated siblings are matched by name and occurrence, tasks are
+ * matched by Project UID for value comparison, and unexpected sibling/task reordering is also
+ * reported. Approved task fields are excluded from the order comparison so inserting or replacing
+ * an exact approved input does not look like structural drift.
  */
 final class MspdiCandidateDifference {
 
@@ -52,9 +56,10 @@ final class MspdiCandidateDifference {
 
         Map<String, Element> sourceByKey = indexByKey(sourceChildren);
         Map<String, Element> candidateByKey = indexByKey(candidateChildren);
+        compareOrder(sourceChildren, candidateChildren, path, approved, differences);
 
         for (String key : sourceByKey.keySet()) {
-            if (!candidateByKey.containsKey(key)) {
+            if (!candidateByKey.containsKey(key) && !isApprovedField(path, key, approved)) {
                 differences.add("removed " + path + "/" + key);
             }
         }
@@ -70,6 +75,45 @@ final class MspdiCandidateDifference {
             }
             compare(entry.getValue(), candidateChild, path + "/" + entry.getKey(), approved, differences);
         }
+    }
+
+    private static void compareOrder(
+            List<Element> sourceChildren,
+            List<Element> candidateChildren,
+            String parentPath,
+            Map<String, Map<String, String>> approved,
+            List<String> differences
+    ) {
+        List<String> sourceOrder = orderedKeysExcludingApprovedFields(sourceChildren, parentPath, approved);
+        List<String> candidateOrder = orderedKeysExcludingApprovedFields(candidateChildren, parentPath, approved);
+
+        if (sourceOrder.size() != candidateOrder.size()) {
+            return;
+        }
+        if (!new HashSet<>(sourceOrder).equals(new HashSet<>(candidateOrder))) {
+            return;
+        }
+        if (!sourceOrder.equals(candidateOrder)) {
+            differences.add("reordered " + (parentPath.isBlank() ? "/" : parentPath));
+        }
+    }
+
+    private static List<String> orderedKeysExcludingApprovedFields(
+            List<Element> elements,
+            String parentPath,
+            Map<String, Map<String, String>> approved
+    ) {
+        Map<String, Integer> seen = new LinkedHashMap<>();
+        List<String> keys = new ArrayList<>();
+        for (Element element : elements) {
+            String identity = identityOf(element);
+            int occurrence = seen.merge(identity, 1, Integer::sum) - 1;
+            String key = identity + "#" + occurrence;
+            if (!isApprovedField(parentPath, key, approved)) {
+                keys.add(key);
+            }
+        }
+        return List.copyOf(keys);
     }
 
     private static void compareAttributes(
