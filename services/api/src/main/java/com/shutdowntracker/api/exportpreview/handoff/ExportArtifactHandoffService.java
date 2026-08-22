@@ -156,9 +156,9 @@ public class ExportArtifactHandoffService {
         if (!isXmlCandidateSource(sourceFile.fileKind())) {
             throw new ResponseStatusException(
                     HttpStatus.CONFLICT,
-                    "Complete-source candidate generation requires Microsoft Project XML/MSPDI content; this snapshot "
-                            + "was imported from '" + sourceFile.fileKind() + "'. Save/export the source as XML from "
-                            + "Microsoft Project for this handoff mode."
+                    "Candidate schedule generation requires an MSPDI/XML source schedule; this snapshot was imported "
+                            + "from '" + sourceFile.fileKind() + "'. Save/export the source as XML from Microsoft "
+                            + "Project for this handoff mode."
             );
         }
 
