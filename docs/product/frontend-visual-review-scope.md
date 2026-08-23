@@ -4,22 +4,24 @@ This document defines how current and future frontend visual-review work relates
 
 ## Current implementation boundary
 
-The ordinary Console and Mobile App contain static/synthetic Task Progress Review surfaces. They are useful for visual review but are not the approved production information architecture and do not imply production write APIs.
+The ordinary Console and Mobile App now represent the approved information architecture as static/synthetic visual shells. This proves placement and visual hierarchy only; it does not imply production authentication, project, assignment, task, Critical, mapping, offline, or write APIs.
 
-The ordinary Console may fetch read-only snapshot list/detail and optional export-preview data when explicitly configured. Its remaining product panels are synthetic and its write-like controls are disabled.
+The Console represents `Login -> Projects Home -> Project Console`, with Today, Tasks, Task Dashboard, Critical, Import / Export, and Project Settings. The Mobile App represents `Assigned Tasks -> Task Detail`. Their ordinary product data is synthetic and their write-like controls are disabled. Login and project/task navigation use non-persisted local React state for visual review only.
 
-The separate, guarded Microsoft Project round-trip acceptance workspace is verified in the repository. It is enabled by:
+The ordinary Console may fetch read-only snapshot list/detail and optional export-preview data when explicitly configured. Those GET-only reads are the sole production API wiring in the ordinary shell.
+
+The guarded Microsoft Project round-trip acceptance workspace is verified in the repository and integrated beneath Console Import / Export. Its entry is enabled by:
 
 ```text
 VITE_SHUTDOWN_TRACKER_ROUND_TRIP_MODE=true
 ```
 
-That workspace drives the PR #48 acceptance path and remains isolated from the ordinary Console. It must not be mistaken for Projects Home, the ordinary Task Dashboard, or a production project lifecycle UI.
+That workspace drives the PR #48 acceptance path while preserving its feature flag and backend contracts. It remains a review-only capability, not a production project, Task Dashboard, lifecycle, or ordinary import/export write workflow. Its dynamically loaded component stays mounted after entry so an in-memory acceptance session is not discarded while switching project sections.
 
 The current visual shells do not implement:
 
-- OIDC/login;
-- Projects Home or a production project switcher;
+- OIDC or production login/session handling;
+- production Projects Home, project creation, or project switching APIs;
 - production project creation/lifecycle;
 - three-tier membership or direct-report relationships;
 - Tracker task assignments;
@@ -28,8 +30,8 @@ The current visual shells do not implement:
 - Tier 2 tracking-validation or Tier 1 review writes in the ordinary Console;
 - production discussion, delay/problem, action, or evidence workflows;
 - IndexedDB offline queue/background sync;
-- production Critical reporting UI;
-- Operational Mapping UI/runtime;
+- production Critical reporting APIs or writes;
+- Operational Mapping services/APIs or writes;
 - automated Microsoft Project verification or Project write-back.
 
 See [Implementation Status Map](implementation-status-map.md) for the evidence-based capability classification.
@@ -96,16 +98,16 @@ There is no separate Mobile Today, Problems, Evidence, Sync, or Critical destina
 | History | Task Dashboard |
 | Tier 2 tracking validation | Assigned Task Detail or Tier 1 task context; no mandatory separate application screen |
 | Tier 1 Project-input review | Import / Export, linked back to the Task Dashboard |
-| Project verification | Guarded acceptance workspace today; future Import / Export surface |
+| Project verification | Guarded review workspace beneath Console Import / Export |
 | Critical reporting | Console Critical oversight; assigned task or summary-work-pack Task Detail on Mobile |
 | Needs response | Today attention queue and task context; not a chat inbox |
 | Announcements | Controlled Today banner |
 
 ## Visual-only current areas
 
-Current source includes static/synthetic examples for task progress, tracking review, Project-input review, export preview, Project verification, problems/blockers, handover, assigned mobile work, progress capture, and sync queue states.
+Current source includes static/synthetic examples for Login, Projects Home, project switching, Today, the Tasks explorer, Task Dashboard records, Critical reporting, Project Settings, assigned mobile work, progress capture, and compact sync/recovery state. These examples demonstrate the approved ordinary placement but not production workflow implementation.
 
-These examples must not be used as evidence that the approved ordinary shell or its production workflows are implemented. Existing source labels may remain until a separately reviewed runtime visual PR changes them.
+The configured ordinary Console import/export reads remain **Read-only API-wired**. The guarded browser round-trip path remains a **Verified in repository** review workspace. Neither classification promotes the surrounding visual shell to a production client.
 
 ## Visual review copy
 
@@ -202,4 +204,4 @@ Revise a visual PR if it:
 - increases assigned-task card density beyond the minimum useful information;
 - infers authority from category, discipline, contractor, work group, area, WBS, Resource `Group`, saved view, or Critical membership.
 
-The next ordinary-shell runtime work requires a separately reviewed implementation PR. This documentation change does not alter frontend source.
+Future production work must replace static data and disabled controls with separately reviewed authentication, authorization, project, assignment, task, Critical, mapping, and offline contracts. The browser round-trip workspace remains available for the pending real-human Microsoft Project gate through Console Import / Export.

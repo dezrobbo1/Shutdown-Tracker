@@ -2,7 +2,7 @@
 
 Purpose: React/Vite mobile-first PWA satellite for Tier 2 and Tier 3 assigned work.
 
-Current status: scaffolded static/synthetic visual shell. It contains hard-coded assigned-work, task-progress, evidence-indicator, comment, and sync-state examples. It has no production assignment, execution, offline queue, discussion, evidence, or review writes.
+Current status: static/synthetic `Assigned Tasks -> Task Detail` visual shell. It contains hard-coded Tier 2 and Tier 3 assignment examples, task-owned execution and operational sections, an assigned Tier 2 Critical reporting example, and compact sync/recovery states. It has no production assignment, execution, offline queue, discussion, evidence, Critical reporting, or review writes.
 
 ## Approved application target
 
@@ -22,9 +22,17 @@ Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical
 
 Sync is a compact, persistent transport/recovery state. Queued, sending, server-received, failed, and conflict states must remain visible without becoming an operational page.
 
-## Current visual-shell limitations
+## Implemented visual shell
 
-The current source still contains legacy static navigation and review examples. This documentation change does not modify frontend source. A separately reviewed runtime PR must replace those examples with the approved Assigned Tasks / Task Detail shell.
+- `Assigned Tasks` is the only top-level operational destination.
+- A local visual-review persona selector distinguishes Tier 2 tracking responsibility from Tier 3 `WORKING_ON` and `FIELD_CONTROL` assignments.
+- Opening a synthetic assigned task uses local React view state and reveals its Task Detail. This transition is not routing, authentication, project membership, or assignment persistence.
+- Task Detail keeps Execution, People, Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical context attached to the task.
+- Execution state and schedule attention are presented separately. The visual `Not Started` / `Late to Start` example has no Tracker Start/Resume event, no imported Actual Start, and imported progress of zero.
+- Sync is a compact status with embedded recovery examples, not a navigation destination.
+- All write-like controls are disabled. Only visual persona selection and local list/detail navigation are interactive.
+
+## Implementation boundary
 
 The current Mobile App does not implement:
 
@@ -43,7 +51,7 @@ The current Mobile App does not implement:
 - production Critical reporting;
 - import/export or Microsoft Project write-back.
 
-All current write-like controls are disabled/read-only and all displayed work/sync data is synthetic.
+There is no service worker, IndexedDB store, replay client, background sync implementation, or Mobile API wiring. The web manifest supplies install/display metadata only. All displayed task and sync data is synthetic and must not be treated as operational state.
 
 ## Required offline copy
 
