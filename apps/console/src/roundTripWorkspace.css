@@ -1,20 +1,24 @@
-:root {
+.rt-workspace {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #182027;
   background: #edf0f2;
-}
-
-* { box-sizing: border-box; }
-body { margin: 0; min-width: 320px; background: #edf0f2; }
-button, input, select, textarea { font: inherit; }
-button { cursor: pointer; }
-button:disabled { cursor: not-allowed; opacity: .48; }
-
-.rt-workspace {
   width: min(1440px, calc(100% - 36px));
   margin: 0 auto;
   padding: 24px 0 44px;
 }
+
+.rt-workspace,
+.rt-workspace *,
+.rt-workspace *::before,
+.rt-workspace *::after { box-sizing: border-box; }
+
+.rt-workspace button,
+.rt-workspace input,
+.rt-workspace select,
+.rt-workspace textarea { font: inherit; }
+
+.rt-workspace button { cursor: pointer; }
+.rt-workspace button:disabled { cursor: not-allowed; opacity: .48; }
 
 .rt-topbar {
   display: flex;

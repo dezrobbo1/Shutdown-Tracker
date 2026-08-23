@@ -1,340 +1,193 @@
+import { createShutdownTrackerApiClient } from "@shutdown-tracker/api-client";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { createShutdownTrackerApiClient } from "@shutdown-tracker/api-client";
 import { App } from "./App";
-import {
-  buildConsoleReviewConfig,
-  loadConsoleReviewData,
-  reviewApiConnection
-} from "./apiReviewClient";
-import {
-  buildExportPreviewRows,
-  buildExportPreviewSignals,
-  buildReviewRows,
-  consoleNavItems,
-  exportPreviewSignals
-} from "./consoleData";
-import {
-  exportPreviewSequence,
-  plannerReviewQueue,
-  progressCandidates,
-  progressReviewStateGroups,
-  supervisorReviewQueue,
-  todayProgressReviewItems
-} from "./progressReviewData";
+import { buildConsoleReviewConfig, loadConsoleReviewData } from "./apiReviewClient";
+import { consoleNavItems, taskDashboardSections } from "./consoleData";
+import { ProjectSettingsView } from "./ConsoleViews";
+import { initialMicrosoftProjectVerificationNotes, microsoftProjectVerificationLabel, microsoftProjectVerificationPlaceholder, RoundTripWorkspace } from "./RoundTripWorkspace";
 
-describe("console scaffold", () => {
-  it("renders the planned console navigation", () => {
+describe("approved Master Console information architecture", () => {
+  it("starts with a clearly synthetic Login view", () => {
     const html = renderToString(<App />);
-
-    expect(consoleNavItems.map((item) => item.label)).toEqual([
-      "Today",
-      "Tasks",
-      "Problems",
-      "Evidence",
-      "Exports"
-    ]);
-
-    for (const item of consoleNavItems) {
-      expect(html).toContain(item.label);
-    }
+    expect(html).toContain("Shutdown Tracker");
+    expect(html).toContain("Continue to Projects Home");
+    expect(html).toContain("OIDC and production session handling are not yet implemented");
+    expect(html).not.toContain("type=\"password\"");
   });
 
-  it("renders export preview status signals", () => {
-    const html = renderToString(<App />);
-
-    for (const signal of exportPreviewSignals) {
-      expect(html).toContain(signal.label);
-      expect(html).toContain(signal.value);
-    }
+  it("represents Projects Home, creation, switching, search, and all lifecycle groups", () => {
+    const html = renderToString(<App initialView="projects" />);
+    expect(html).toContain("Projects Home");
+    expect(html).toContain("Create Project");
+    expect(html).toContain("Search name, code, or site");
+    for (const status of ["Active", "Draft", "Closed", "Archived"]) expect(html).toContain(status);
+    expect(html).toContain("Open project");
+    expect(html).toContain("Static visual only");
   });
 
-  it("renders the wired import and export review API client operations", () => {
-    const html = renderToString(<App />);
-
-    expect(reviewApiConnection.operationCount).toBeGreaterThanOrEqual(10);
-    expect(html).toContain("Import/export review operations");
-    expect(html).toContain("List import snapshots");
-    expect(html).toContain("Create export preview");
-    expect(html).toContain("Wired operations");
+  it("uses exactly the five approved project-level destinations", () => {
+    const html = renderToString(<App initialView="console" />);
+    expect(consoleNavItems.map((item) => item.label)).toEqual(["Today", "Tasks", "Critical", "Import / Export", "Project Settings"]);
+    const nav = html.match(/<nav class="nav-list">([\s\S]*?)<\/nav>/)?.[1] ?? "";
+    for (const label of consoleNavItems.map((item) => item.label)) expect(nav).toContain(label);
+    for (const removed of ["Problems", "Evidence", "Exports", "Handover", "Discussion", "Review", "Reports"]) expect(nav).not.toContain(`>${removed}<`);
   });
 
-  it("renders the task progress review and export approval shell", () => {
-    const html = renderToString(<App />);
-
-    expect(html).not.toContain("Synthetic Task A1");
-    expect(html).not.toContain("Synthetic Summary A");
-    expect(html).toContain("Progress review");
-    expect(html).toContain("Supervisor Review Queue");
-    expect(html).toContain("Planner Progress Review Queue");
-    expect(html).toContain("Progress candidates in this batch");
-    expect(html).toContain("Project verification");
-    expect(html).toContain("Handover Summary");
-
-    for (const item of todayProgressReviewItems) {
-      expect(html).toContain(item.label);
-      expect(html).toContain(item.chip);
-    }
-
-    for (const group of progressReviewStateGroups) {
-      expect(html).toContain(group.label);
-      for (const state of group.states) {
-        expect(html).toContain(state);
-      }
-    }
-
-    for (const item of supervisorReviewQueue) {
-      expect(html).toContain(item.state);
-    }
-
-    for (const item of plannerReviewQueue) {
-      expect(html).toContain(item.task);
-      expect(html).toContain(item.exportEligibility);
-    }
-
-    for (const candidate of progressCandidates) {
-      expect(html).toContain(candidate.task);
-      expect(html).toContain(candidate.exclusionReason);
-    }
+  it("renders Today as a 24-hour project projection with separate state and attention", () => {
+    const html = renderToString(<App initialView="console" initialSection="Today" />);
+    expect(html).toContain("24 August 2026 · 06:00 to 25 August 2026 · 06:00");
+    for (const state of ["Not Started", "In Progress", "Paused", "Blocked", "Completed"]) expect(html).toContain(state);
+    expect(html).toContain("Late to Start");
+    expect(html).toContain("No Tracker start; imported progress 0%");
+    expect(html).toContain("A passed planned start never creates In Progress");
+    expect(html).toContain("Critical reports due / overdue");
+    expect(html).toContain("Active delays / problems");
   });
 
-  it("renders Microsoft Project boundary copy for progress review", () => {
-    const html = renderToString(<App />);
-
-    expect(html).toContain("Discussion and progress review only. This does not update Microsoft Project.");
-    expect(html).toContain("Supervisor review confirms operational validity. It does not approve Microsoft Project export.");
-    expect(html).toContain(
-      "Planner approval marks this progress as eligible for export preview. The master .mpp is not updated."
-    );
-    expect(html).toContain("Summary task. Not eligible for direct progress export.");
-    expect(html).toContain("Leaf task. Eligible fields may be reviewed for export.");
-    expect(html).toContain("Shutdown Tracker records verification metadata only.");
-
-    for (const step of exportPreviewSequence) {
-      expect(html).toContain(step);
-    }
+  it("renders the Project-like Tasks explorer without schedule editing", () => {
+    const html = renderToString(<App initialView="console" initialSection="Tasks" />);
+    for (const tool of ["Filter", "Group", "Columns", "Saved views"]) expect(html).toContain(tool);
+    expect(html).toContain("WBS / task");
+    expect(html).toContain('aria-expanded="true"');
+    expect(html).toContain("Tier 2 tracking owner");
+    expect(html).toContain("Schedule editing and date recalculation are not available");
+    expect(html).not.toMatch(/\bGantt\b|\bCPM\b|critical path calculation/i);
   });
 
-  it("does not surface schedule-authoring language", () => {
-    const html = renderToString(<App />);
-    const forbidden = [
-      /critical path/i,
-      /\bfloat\b/i,
-      /\bCPM\b/i,
-      /\bGantt\b/i,
-      /resource levell?ing/i,
-      /recovery scheduling/i,
-      /automatic date movement/i,
-      /schedule optimization/i
-    ];
+  it("keeps all operational records inside the Task Dashboard", () => {
+    const html = renderToString(<App initialView="console" initialSection="Tasks" initialTaskId="1.1.2" />);
+    const todayHtml = renderToString(<App initialView="console" initialSection="Today" initialTaskId="1.1.2" />);
+    expect(html).toContain("Inspect refractory lining");
+    expect(html).toMatch(/Back to.*Tasks/);
+    expect(todayHtml).toMatch(/Back to.*Today/);
+    for (const section of taskDashboardSections) expect(html).toContain(section);
+    expect(html).toContain("One operational record for this task");
+    expect(html).toContain("Not yet implemented");
+  });
 
-    for (const pattern of forbidden) {
-      expect(html).not.toMatch(pattern);
-    }
+  it("renders explicit Critical selection and reporting without calculation claims", () => {
+    const html = renderToString(<App initialView="console" initialSection="Critical" />);
+    expect(html).toContain("Project-critical leaf");
+    expect(html).toContain("Critical Work Pack");
+    expect(html).toContain("Summary task 1.1 plus all descendants");
+    expect(html).toContain("Tier 2 reporting owner");
+    expect(html).toContain("Fixed interval");
+    expect(html).toContain("Overdue");
+    expect(html).toContain("does not calculate critical path");
+  });
+
+  it("renders the complete static Project Settings shell and lifecycle boundary", () => {
+    const html = renderToString(<App initialView="console" initialSection="Project Settings" />);
+    const users = renderToString(<ProjectSettingsView initialSection="Users" />);
+    const mapping = renderToString(<ProjectSettingsView initialSection="Operational Mapping" />);
+    const lifecycle = renderToString(<ProjectSettingsView initialSection="Lifecycle" />);
+    for (const section of ["General", "Users", "Operational Mapping", "Project History", "Lifecycle"]) expect(html).toContain(section);
+    expect(html).toContain("Australia/Perth");
+    expect(users).toContain("Exactly three application tiers");
+    expect(mapping).toContain("never an authorization scope");
+    expect(lifecycle).toContain("Draft");
+    expect(lifecycle).toContain("Archived");
+    expect(lifecycle).not.toContain(">Clear Project</button>");
+  });
+
+  it("integrates the guarded acceptance entry under Import / Export", () => {
+    const disabled = renderToString(<App initialView="console" initialSection="Import / Export" />);
+    const enabled = renderToString(<App initialView="console" initialSection="Import / Export" roundTripMode />);
+    for (const section of ["Current Schedule", "Import", "Export", "History"]) expect(enabled).toContain(section);
+    expect(disabled).toContain("Feature flag disabled");
+    expect(enabled).toContain("Review workspace enabled");
+    expect(enabled).toContain("Open round-trip review workspace");
+    expect(enabled).toContain("complete-source generation");
+    expect(enabled).toContain("Static shell project");
+    expect(enabled).toContain("Configured review API project");
+    expect(enabled).toContain("real Microsoft Project recalculation and human review has not yet been performed");
   });
 });
 
-describe("console review data fetching", () => {
-  it("stays synthetic until a project id is configured", async () => {
-    const config = buildConsoleReviewConfig({
-      VITE_SHUTDOWN_TRACKER_API_BASE_URL: " http://localhost:8080 ",
-      VITE_SHUTDOWN_TRACKER_PROJECT_ID: " "
-    });
+describe("preserved round-trip workspace", () => {
+  it("renders the existing guarded controls without a browser or backend call", () => {
+    const html = renderToString(<RoundTripWorkspace />);
+    for (const label of [
+      "Clear current review",
+      "Start clean test",
+      "Choose Microsoft Project XML",
+      "Import into round-trip backend",
+      "Review the persisted snapshot",
+      "Load existing snapshots",
+      "Choose the execution input",
+      "Approve input and build candidate XML",
+      "Open and review in Microsoft Project"
+    ]) expect(html).toContain(label);
+    expect(html).toContain("Microsoft Project round-trip acceptance workspace");
+    expect(microsoftProjectVerificationLabel).toBe("Microsoft Project verification notes");
+    expect(microsoftProjectVerificationLabel).not.toContain("Tier 1");
+    expect(initialMicrosoftProjectVerificationNotes).toBe("");
+    expect(html).not.toContain("Microsoft Project recalculated the candidate and the resulting schedule was reviewed");
+    expect(microsoftProjectVerificationPlaceholder).toContain("Candidate disposition remains a separate decision");
+    expect(microsoftProjectVerificationPlaceholder).not.toContain("human disposition");
+    expect(html).toContain("Tier 1 owns the in-application candidate disposition");
+    expect(html).not.toContain("Tier 1 verification notes");
+    expect(html).not.toContain("round trip has passed");
+  });
+});
 
+describe("ordinary Console review data fetching", () => {
+  it("stays synthetic until a project ID is configured", async () => {
+    const config = buildConsoleReviewConfig({ VITE_SHUTDOWN_TRACKER_API_BASE_URL: " http://localhost:8080 ", VITE_SHUTDOWN_TRACKER_PROJECT_ID: " " });
     const data = await loadConsoleReviewData(config);
-
     expect(config.liveEnabled).toBe(false);
     expect(data.mode).toBe("synthetic");
     expect(data.snapshots).toEqual([]);
   });
 
-  it("loads import snapshots, selected snapshot detail, and optional export preview", async () => {
-    const calls: string[] = [];
+  it("uses GET only for configured ordinary review reads", async () => {
+    const calls: Array<{ url: string; method: string }> = [];
     const client = createShutdownTrackerApiClient({
-      fetchImpl: async (input) => {
-        calls.push(input);
-
-        if (input.endsWith("/import-review/snapshots")) {
-          return jsonResponse([
-            {
-              id: "snapshot-a",
-              projectId: "project-a",
-              importBatchId: "batch-a",
-              status: "PARSED",
-              externalProjectUid: null,
-              externalProjectName: "Synthetic Basic WBS",
-              projectStatusDate: null,
-              snapshotVersion: 1,
-              parserName: "mpxj",
-              parserVersion: "13",
-              warningCount: 0,
-              errorCount: 0,
-              taskCount: 6,
-              summaryTaskCount: 2,
-              leafTaskCount: 4,
-              resourceCount: 0,
-              assignmentCount: 0,
-              extendedAttributeCount: 0
-            }
-          ]);
-        }
-
-        if (input.endsWith("/import-review/snapshots/snapshot-a")) {
-          return jsonResponse({
-            snapshot: {
-              id: "snapshot-a",
-              projectId: "project-a",
-              importBatchId: "batch-a",
-              status: "PARSED",
-              externalProjectUid: null,
-              externalProjectName: "Synthetic Basic WBS",
-              projectStatusDate: null,
-              snapshotVersion: 1,
-              parserName: "mpxj",
-              parserVersion: "13",
-              warningCount: 0,
-              errorCount: 0,
-              taskCount: 6,
-              summaryTaskCount: 2,
-              leafTaskCount: 4,
-              resourceCount: 0,
-              assignmentCount: 0,
-              extendedAttributeCount: 0
-            },
-            tasks: [
-              {
-                id: "task-a1",
-                externalUid: "1",
-                externalId: "1",
-                name: "Synthetic Task A1",
-                wbs: "1.1",
-                outlineNumber: "1.1",
-                outlineLevel: 2,
-                summary: false,
-                parentExternalUid: null,
-                parentImportedTaskId: null,
-                plannedStart: null,
-                plannedFinish: null,
-                actualStart: null,
-                actualFinish: null,
-                percentComplete: null,
-                physicalPercentComplete: null,
-                notes: null
-              }
-            ],
-            resources: [],
-            assignments: [],
-            extendedAttributes: []
-          });
-        }
-
-        return jsonResponse({
-          batch: {
-            id: "export-batch-a",
-            projectId: "project-a",
-            projectSnapshotId: "snapshot-a",
-            status: "DRAFT_PREVIEW",
-            previewCreatedAt: null,
-            approvedAt: null,
-            approvedByUserId: null,
-            generatedAt: null,
-            generatedByUserId: null,
-            verifiedAt: null,
-            verifiedByUserId: null,
-            exportFileUri: null,
-            exportFileHash: null,
-            failureReason: null,
-            lineCount: 1,
-            eligibleLineCount: 1,
-            ineligibleLineCount: 0
-          },
-          lines: [
-            {
-              id: "line-a",
-              exportBatchId: "export-batch-a",
-              projectId: "project-a",
-              projectSnapshotId: "snapshot-a",
-              importedTaskId: "task-a1",
-              importedTaskExternalUid: "1",
-              importedTaskExternalId: "1",
-              importedTaskName: "Synthetic Task A1",
-              sourceEntityType: "TASK_PROGRESS",
-              sourceEntityId: "progress-a",
-              approvalState: "APPROVED_FOR_EXPORT",
-              fieldName: "percent_complete",
-              oldValue: "0",
-              newValue: "50",
-              sourceActorUserId: null,
-              sourceTimestamp: null,
-              reason: null,
-              leafTask: true,
-              exportEligible: true
-            }
-          ],
-          message: "Synthetic preview"
-        });
+      fetchImpl: async (input, init) => {
+        calls.push({ url: input, method: init?.method ?? "GET" });
+        if (input.endsWith("/import-review/snapshots")) return jsonResponse([snapshotSummary]);
+        if (input.endsWith("/import-review/snapshots/snapshot-a")) return jsonResponse({ snapshot: snapshotSummary, tasks: [taskRow], resources: [], assignments: [], extendedAttributes: [] });
+        return jsonResponse({ batch: exportBatch, lines: [exportLine] });
       }
     });
-
-    const data = await loadConsoleReviewData(
-      {
-        baseUrl: "",
-        projectId: "project-a",
-        importSnapshotId: "",
-        exportBatchId: "export-batch-a",
-        liveEnabled: true
-      },
-      client
-    );
-
-    expect(calls).toEqual([
-      "/api/projects/project-a/import-review/snapshots",
-      "/api/projects/project-a/import-review/snapshots/snapshot-a",
-      "/api/projects/project-a/export-preview/export-batch-a"
-    ]);
+    const config = buildConsoleReviewConfig({
+      VITE_SHUTDOWN_TRACKER_API_BASE_URL: "http://localhost:8080",
+      VITE_SHUTDOWN_TRACKER_PROJECT_ID: "project-a",
+      VITE_SHUTDOWN_TRACKER_IMPORT_SNAPSHOT_ID: "snapshot-a",
+      VITE_SHUTDOWN_TRACKER_EXPORT_BATCH_ID: "export-a"
+    });
+    const data = await loadConsoleReviewData(config, client);
     expect(data.mode).toBe("live");
-    expect(data.selectedSnapshotId).toBe("snapshot-a");
-    expect(buildReviewRows(data).map((row) => row.item)).toContain("Synthetic Task A1");
-    expect(buildExportPreviewRows(data)[0]).toMatchObject({
-      field: "percent_complete",
-      candidate: "Synthetic Task A1",
-      eligibility: "Eligible leaf update"
-    });
-    expect(buildExportPreviewSignals(data)).toContainEqual({
-      label: "Lines",
-      value: "1/1 eligible"
-    });
-  });
-
-  it("does not create write endpoints for live console data loading", async () => {
-    const methods: string[] = [];
-    const client = createShutdownTrackerApiClient({
-      fetchImpl: async (_input, init) => {
-        methods.push(init?.method ?? "GET");
-        return jsonResponse([]);
-      }
-    });
-
-    await loadConsoleReviewData(
-      {
-        baseUrl: "",
-        projectId: "project-a",
-        importSnapshotId: "",
-        exportBatchId: "",
-        liveEnabled: true
-      },
-      client
-    );
-
-    expect(methods).toEqual(["GET"]);
+    expect(data.snapshotDetail?.tasks).toHaveLength(1);
+    expect(data.exportPreview?.lines).toHaveLength(1);
+    expect(calls).toHaveLength(3);
+    expect(calls.every((call) => call.method === "GET")).toBe(true);
   });
 });
 
-function jsonResponse(payload: unknown) {
-  return new Response(JSON.stringify(payload), {
-    status: 200,
-    headers: {
-      "Content-Type": "application/json"
-    }
-  });
+const snapshotSummary = {
+  id: "snapshot-a", projectId: "project-a", importBatchId: "batch-a", status: "PARSED", externalProjectUid: null,
+  externalProjectName: "Synthetic Basic WBS", projectStatusDate: null, snapshotVersion: 1, parserName: "mpxj", parserVersion: "13",
+  warningCount: 0, errorCount: 0, taskCount: 1, summaryTaskCount: 0, leafTaskCount: 1, resourceCount: 0, assignmentCount: 0, extendedAttributeCount: 0
+};
+const taskRow = {
+  id: "task-a", externalUid: "1", externalId: "1", name: "Synthetic Task A1", wbs: "1.1", outlineNumber: "1.1", outlineLevel: 2,
+  summary: false, parentExternalUid: null, parentImportedTaskId: null, plannedStart: null, plannedFinish: null, actualStart: null,
+  actualFinish: null, percentComplete: 0, physicalPercentComplete: null, notes: null
+};
+const exportBatch = {
+  id: "export-a", projectId: "project-a", projectSnapshotId: "snapshot-a", status: "DRAFT_PREVIEW", previewCreatedAt: null,
+  approvedAt: null, approvedByUserId: null, generatedAt: null, generatedByUserId: null, verifiedAt: null, verifiedByUserId: null,
+  exportFileUri: null, exportFileHash: null, failureReason: null, lineCount: 1, eligibleLineCount: 1, ineligibleLineCount: 0
+};
+const exportLine = {
+  id: "line-a", exportBatchId: "export-a", projectId: "project-a", projectSnapshotId: "snapshot-a", importedTaskId: "task-a",
+  importedTaskExternalUid: "1", importedTaskExternalId: "1", importedTaskName: "Synthetic Task A1", fieldName: "percent_complete" as const,
+  valueText: "25", valueNumber: 25, valueTimestamp: null, sourceEventId: null, sourceProgressUpdateId: null, sourceReviewId: null,
+  exportEligible: true, exclusionReason: null, createdAt: null
+};
+
+function jsonResponse(body: unknown) {
+  return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 }

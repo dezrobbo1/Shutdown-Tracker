@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createShutdownTrackerApiClient,
   type ExportArtifactGenerationResponse,
@@ -21,6 +21,9 @@ import "./roundTripWorkspace.css";
 const ACTOR_KEY = "shutdown-tracker.round-trip.actor-id";
 const BASE_URL_KEY = "shutdown-tracker.round-trip.api-base-url";
 const DEFAULT_ACTOR_ID = "00000000-0000-0000-0000-000000000001";
+export const microsoftProjectVerificationLabel = "Microsoft Project verification notes";
+export const initialMicrosoftProjectVerificationNotes = "";
+export const microsoftProjectVerificationPlaceholder = "Record what was checked in Microsoft Project and the observed recalculation outcome. Candidate disposition remains a separate decision.";
 
 type ActivityItem = {
   at: string;
@@ -62,6 +65,10 @@ type ReviewRow = {
 type BackendState = "browser_only" | "connected" | "unavailable";
 
 function stored(key: string, fallback: string) {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
   try {
     return window.localStorage.getItem(key) ?? fallback;
   } catch {
@@ -70,6 +77,10 @@ function stored(key: string, fallback: string) {
 }
 
 function save(key: string, value: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
   try {
     window.localStorage.setItem(key, value);
   } catch {
@@ -242,7 +253,7 @@ function TaskReviewTable({
   );
 }
 
-export function RoundTripWorkspace() {
+export function RoundTripWorkspace({ onBusyChange }: { onBusyChange?: (busy: boolean) => void } = {}) {
   const envBaseUrl = typeof import.meta.env.VITE_SHUTDOWN_TRACKER_API_BASE_URL === "string"
     ? import.meta.env.VITE_SHUTDOWN_TRACKER_API_BASE_URL.trim()
     : "";
@@ -254,6 +265,7 @@ export function RoundTripWorkspace() {
   const [projectId, setProjectId] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [fileInputKey, setFileInputKey] = useState(0);
+  const [sourceHash, setSourceHash] = useState("");
   const [sourcePreview, setSourcePreview] = useState<ProjectXmlPreview | null>(null);
   const [sourcePreviewError, setSourcePreviewError] = useState("");
   const [snapshots, setSnapshots] = useState<ImportReviewSnapshotSummary[]>([]);
@@ -270,9 +282,7 @@ export function RoundTripWorkspace() {
     "XML review works in the browser without a backend. Connect the API only when you are ready to run the controlled round trip."
   );
   const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [verificationNotes, setVerificationNotes] = useState(
-    "Approved input present. Microsoft Project recalculated the candidate and the resulting schedule was reviewed."
-  );
+  const [verificationNotes, setVerificationNotes] = useState(initialMicrosoftProjectVerificationNotes);
 
   const client = useMemo(() => createShutdownTrackerApiClient({ baseUrl }), [baseUrl]);
   const activeProjectId = projectId || project?.id || "";
@@ -285,6 +295,11 @@ export function RoundTripWorkspace() {
   const browserRows = useMemo(() => sourceRows(sourcePreview), [sourcePreview]);
   const importedRows = useMemo(() => snapshotRows(snapshotDetail), [snapshotDetail]);
 
+  useEffect(() => {
+    onBusyChange?.(Boolean(busy));
+    return () => onBusyChange?.(false);
+  }, [busy, onBusyChange]);
+
   function log(label: string, detail: string, isError = false) {
     setActivity((current) => [
       { at: new Date().toLocaleTimeString(), label, detail, error: isError },
@@ -293,12 +308,20 @@ export function RoundTripWorkspace() {
   }
 
   function resetBackendWorkflow() {
+    setSourceHash("");
     setSnapshots([]);
     setSnapshotDetail(null);
     setTaskId("");
     setCandidate(null);
     setPreview(null);
     setArtifact(null);
+  }
+
+  function resetCandidateWorkflow() {
+    setCandidate(null);
+    setPreview(null);
+    setArtifact(null);
+    setVerificationNotes(initialMicrosoftProjectVerificationNotes);
   }
 
   function resetReviewSession(clearProject: boolean) {
@@ -309,6 +332,7 @@ export function RoundTripWorkspace() {
     resetBackendWorkflow();
     setError("");
     setActivity([]);
+    setVerificationNotes(initialMicrosoftProjectVerificationNotes);
     if (clearProject) {
       setProject(null);
       setProjectId("");
@@ -370,11 +394,14 @@ export function RoundTripWorkspace() {
         "Fresh isolated test project created. Prior export/audit history was not deleted because those records are intentionally immutable."
       );
       log("Clean test started", `${result.name} · ${result.id}`);
-    } catch {
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : String(caught);
       setBackendState("browser_only");
+      setError(`Clean test backend unavailable: ${message}`);
       setNotice(
         "Browser review was cleared. No backend is reachable from this deployment, so XML inspection still works here but persisted round-trip actions remain unavailable."
       );
+      log("Clean test backend unavailable", message, true);
     } finally {
       setBusy("");
     }
@@ -437,7 +464,8 @@ export function RoundTripWorkspace() {
       if (!upload.accepted || !upload.importBatch) {
         throw new Error(upload.rejectionReason ?? upload.message ?? "The source upload was rejected.");
       }
-      log("Source uploaded", `${file.name} · import batch ${upload.importBatch.id}`);
+      setSourceHash(upload.sourceFile?.contentHash ?? "");
+      log("Source uploaded", `${file.name} · import batch ${upload.importBatch.id} · SHA-256 ${upload.sourceFile?.contentHash ?? "not returned"}`);
 
       const parsed = await fetchJson<ParseSnapshotResponse>(
         `/api/projects/${encodeURIComponent(id)}/import-batches/${encodeURIComponent(upload.importBatch.id)}/request-parse-snapshot`,
@@ -486,10 +514,9 @@ export function RoundTripWorkspace() {
   async function loadSnapshot(snapshotId: string) {
     if (!activeProjectId) return;
     const detail = await client.importReview.getSnapshot(activeProjectId, snapshotId);
+    setSourceHash("");
     setSnapshotDetail(detail);
-    setCandidate(null);
-    setPreview(null);
-    setArtifact(null);
+    resetCandidateWorkflow();
     const firstLeaf = detail.tasks.find((task) => !task.summary && task.externalUid && task.externalId && task.name) ?? null;
     setTaskId(firstLeaf?.id ?? "");
     setProposedValue(defaultValue(fieldName, firstLeaf));
@@ -552,6 +579,7 @@ export function RoundTripWorkspace() {
     setCandidate(null);
     setPreview(null);
     setArtifact(null);
+    setVerificationNotes(initialMicrosoftProjectVerificationNotes);
     try {
       const nextCandidate = await client.exportCandidates.create(activeProjectId, {
         projectSnapshotId: snapshotDetail.snapshot.id,
@@ -599,7 +627,7 @@ export function RoundTripWorkspace() {
       });
       setArtifact(generated);
       setPreview(generated.exportPreview);
-      setNotice("Candidate generated. Download it and open it in Microsoft Project for recalculation and planner review.");
+      setNotice("Candidate generated. Download it and open it in Microsoft Project for recalculation and human schedule review.");
       log(
         "Candidate generated",
         `${generated.workerResponse.artifactSummary.outputFilename} · SHA-256 ${generated.workerResponse.exportFileHash}`
@@ -636,12 +664,17 @@ export function RoundTripWorkspace() {
 
   async function verify() {
     if (!preview || !activeProjectId || !actorId.trim()) return;
+    const notes = verificationNotes.trim();
+    if (!notes) {
+      setError("Enter deliberate Microsoft Project verification notes before recording verification.");
+      return;
+    }
     setBusy("Record verification");
     setError("");
     try {
       const result = await client.exportPreview.verify(activeProjectId, preview.batch.id, {
         verifiedByUserId: actorId.trim(),
-        reason: verificationNotes.trim() || "Manual Microsoft Project review completed.",
+        reason: notes,
         metadata: {
           source: "round-trip-workspace",
           localAcceptance: true,
@@ -650,7 +683,7 @@ export function RoundTripWorkspace() {
       });
       setPreview(result);
       setNotice("Microsoft Project verification recorded for this candidate.");
-      log("Planner verification recorded", result.batch.status);
+      log("Microsoft Project verification recorded", result.batch.status);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : String(caught);
       setError(message);
@@ -666,7 +699,7 @@ export function RoundTripWorkspace() {
     : "";
 
   return (
-    <main className="rt-workspace">
+    <section className="rt-workspace" aria-label="Microsoft Project round-trip acceptance workspace">
       <header className="rt-topbar">
         <div>
           <p className="rt-eyebrow">Shutdown Tracker · acceptance workspace</p>
@@ -708,6 +741,7 @@ export function RoundTripWorkspace() {
             type="file"
             accept=".xml,.mspdi.xml,.mpp"
             onChange={(event) => void chooseFile(event.target.files?.[0] ?? null)}
+            disabled={Boolean(busy)}
           />
           <span className="rt-file-zone-copy">
             <strong>{file?.name ?? "Choose Microsoft Project XML"}</strong>
@@ -768,13 +802,11 @@ export function RoundTripWorkspace() {
             <TaskReviewTable
               rows={importedRows}
               selectedKey={taskId}
-              onSelect={(key) => {
+              onSelect={busy ? undefined : (key) => {
                 setTaskId(key);
                 const task = leafTasks.find((item) => item.id === key) ?? null;
                 setProposedValue(defaultValue(fieldName, task));
-                setCandidate(null);
-                setPreview(null);
-                setArtifact(null);
+                resetCandidateWorkflow();
               }}
               label="persisted snapshot"
             />
@@ -798,11 +830,9 @@ export function RoundTripWorkspace() {
                 setTaskId(event.target.value);
                 const task = leafTasks.find((item) => item.id === event.target.value) ?? null;
                 setProposedValue(defaultValue(fieldName, task));
-                setCandidate(null);
-                setPreview(null);
-                setArtifact(null);
+                resetCandidateWorkflow();
               }}
-              disabled={!snapshotDetail}
+              disabled={Boolean(busy) || !snapshotDetail}
             >
               <option value="">Select task</option>
               {leafTasks.map((task) => (
@@ -818,11 +848,9 @@ export function RoundTripWorkspace() {
                 const next = event.target.value as ExportCandidateFieldName;
                 setFieldName(next);
                 setProposedValue(defaultValue(next, selectedTask));
-                setCandidate(null);
-                setPreview(null);
-                setArtifact(null);
+                resetCandidateWorkflow();
               }}
-              disabled={!snapshotDetail}
+              disabled={Boolean(busy) || !snapshotDetail}
             >
               <option value="percent_complete">Percent Complete</option>
               <option value="actual_start">Actual Start</option>
@@ -831,7 +859,14 @@ export function RoundTripWorkspace() {
           </label>
           <label>
             <span>Proposed value</span>
-            <input value={proposedValue} onChange={(event) => setProposedValue(event.target.value)} disabled={!selectedTask} />
+            <input
+              value={proposedValue}
+              onChange={(event) => {
+                setProposedValue(event.target.value);
+                resetCandidateWorkflow();
+              }}
+              disabled={Boolean(busy) || !selectedTask}
+            />
           </label>
         </div>
 
@@ -867,8 +902,13 @@ export function RoundTripWorkspace() {
           <>
             <div className="rt-artifact-grid">
               <div><span>Candidate</span><a href={downloadUrl}>Download candidate XML</a></div>
-              <div><span>SHA-256</span><code>{artifactHash || "—"}</code></div>
+              <div><span>Candidate SHA-256</span><code>{artifactHash || "—"}</code></div>
+              <div><span>Accepted source SHA-256</span><code>{sourceHash || "Not available in this browser session"}</code></div>
               <div><span>Batch</span><code>{preview?.batch.id}</code></div>
+              <div><span>Candidate binding policy</span><code>{candidate?.bindingPolicyVersion ?? "—"}</code></div>
+              <div><span>Source event / payload fingerprint</span><code>{candidate?.sourceEventOrPayloadHash ?? "—"}</code></div>
+              <div><span>Preview integrity policy</span><code>{preview?.batch.integrityPolicyVersion ?? "—"}</code></div>
+              <div><span>Preview line set</span><strong>{preview?.batch.lineSetSealed ? "SEALED" : "NOT SEALED"}</strong></div>
             </div>
             <div className="rt-project-checks">
               <strong>Review in Project</strong>
@@ -885,11 +925,11 @@ export function RoundTripWorkspace() {
               <span>Record this only after you have actually opened the downloaded candidate.</span>
             </div>
             <label className="rt-verification-notes">
-              <span>Planner verification notes</span>
-              <textarea value={verificationNotes} onChange={(event) => setVerificationNotes(event.target.value)} rows={4} />
+              <span>{microsoftProjectVerificationLabel}</span>
+              <textarea value={verificationNotes} onChange={(event) => setVerificationNotes(event.target.value)} rows={4} placeholder={microsoftProjectVerificationPlaceholder} required disabled={Boolean(busy)} />
             </label>
             <div className="rt-primary-row">
-              <button type="button" className="primary" onClick={() => void verify()} disabled={Boolean(busy) || preview?.batch.status !== "OPENED_IN_MICROSOFT_PROJECT"}>Record verification</button>
+              <button type="button" className="primary" onClick={() => void verify()} disabled={Boolean(busy) || preview?.batch.status !== "OPENED_IN_MICROSOFT_PROJECT" || !verificationNotes.trim()}>Record verification</button>
             </div>
           </>
         ) : (
@@ -903,22 +943,22 @@ export function RoundTripWorkspace() {
           <div className="rt-form-grid technical">
             <label>
               <span>API base URL</span>
-              <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="blank uses same origin / Vite proxy" />
+              <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="blank uses same origin / Vite proxy" disabled={Boolean(busy)} />
             </label>
             <label>
               <span>Review project UUID</span>
-              <input value={activeProjectId} onChange={(event) => setProjectId(event.target.value)} placeholder="created automatically" />
+              <input value={activeProjectId} onChange={(event) => setProjectId(event.target.value)} placeholder="created automatically" disabled={Boolean(busy)} />
             </label>
             <label>
-              <span>Planner/test actor UUID</span>
-              <input value={actorId} onChange={(event) => setActorId(event.target.value)} />
+              <span>Tier 1/test actor UUID</span>
+              <input value={actorId} onChange={(event) => setActorId(event.target.value)} disabled={Boolean(busy)} />
             </label>
           </div>
           <div className="rt-button-row">
             <button type="button" onClick={() => void connectBackend()} disabled={Boolean(busy)}>{busy === "Connect backend" ? "Connecting…" : "Connect backend"}</button>
             <button type="button" onClick={() => void loadExistingSnapshots()} disabled={Boolean(busy) || !activeProjectId}>Load existing snapshots</button>
             {snapshots.length > 0 && (
-              <select value={snapshotDetail?.snapshot.id ?? ""} onChange={(event) => void loadSnapshot(event.target.value)}>
+              <select value={snapshotDetail?.snapshot.id ?? ""} onChange={(event) => void loadSnapshot(event.target.value)} disabled={Boolean(busy)}>
                 <option value="">Choose snapshot</option>
                 {snapshots.map((snapshot) => <option key={snapshot.id} value={snapshot.id}>v{snapshot.snapshotVersion} · {snapshot.status}</option>)}
               </select>
@@ -938,8 +978,8 @@ export function RoundTripWorkspace() {
       </details>
 
       <footer className="rt-authority-footer">
-        <strong>Authority boundary:</strong> Shutdown Tracker supplies reviewed direct inputs. Microsoft Project owns schedule recalculation. The planner owns candidate adoption or rejection.
+        <strong>Authority boundary:</strong> Shutdown Tracker supplies reviewed direct inputs. Microsoft Project owns schedule recalculation. Tier 1 owns the in-application candidate disposition; the relevant schedule owner or Microsoft Project operator performs any external Project action.
       </footer>
-    </main>
+    </section>
   );
 }
