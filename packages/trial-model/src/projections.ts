@@ -177,6 +177,10 @@ export function selectCriticalObligationProjections(state: TrialState): Critical
       const reports = state.criticalReports.filter((report) => report.obligationId === obligation.id).sort((left, right) => left.submittedAt - right.submittedAt);
       const supersededIds = new Set(reports.map((report) => report.supersedesReportId).filter((value): value is string => value !== undefined));
       const currentReport = [...reports].reverse().find((report) => !supersededIds.has(report.id)) ?? null;
+      const reportHistory = reports.map((report) => ({
+        report,
+        state: supersededIds.has(report.id) ? "superseded" as const : "submitted" as const
+      }));
       const prepopulatedFacts = selectPrepopulatedFacts(state, item, policy.requiredFields);
       const requiredInputFields = policy.requiredFields.filter((field) => prepopulatedFacts[field] === undefined);
       return {
@@ -187,6 +191,7 @@ export function selectCriticalObligationProjections(state: TrialState): Critical
         owner: requiredUser(state, obligation.ownerUserId),
         state: obligationState(state, obligation.dueAt, currentReport, obligation.satisfiedByEventId),
         currentReport,
+        reportHistory,
         prepopulatedFacts,
         requiredInputFields
       };

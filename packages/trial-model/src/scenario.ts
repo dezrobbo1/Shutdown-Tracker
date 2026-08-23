@@ -58,7 +58,7 @@ export const GUIDED_TRIAL_STEPS: GuidedTrialStep[] = [
   { minute: 405, label: "06:45", instruction: "Review Today as Tier 1.", expected: "The issue, due action, late start, and reporting attention are visible." },
   { minute: 420, label: "07:00", instruction: "Resolve the access issue, then Start the task with late-start context.", expected: "A system-timestamped Start establishes In Progress." },
   { minute: 480, label: "08:00", instruction: "Open the Tier 2 Critical obligation and submit the required judgement fields.", expected: "The report is immutable and the obligation becomes Submitted." },
-  { minute: 555, label: "09:15", instruction: "Pause for a material issue and classify it as an adverse delay.", expected: "Execution becomes Paused and the linked problem/action remain distinct records." },
+  { minute: 555, label: "09:15", instruction: "Pause for a material issue and classify it as an adverse delay.", expected: "Execution becomes Paused while the linked problem and any recovery action remain distinct records." },
   { minute: 600, label: "10:00", instruction: "Review Critical from the Console.", expected: "The material issue and due/overdue reporting state are visible." },
   { minute: 630, label: "10:30", instruction: "Resume while leaving the linked material issue open.", expected: "Execution returns to In Progress without silently resolving the problem." },
   { minute: 720, label: "12:00", instruction: "Resolve the remaining material problem.", expected: "Problem history records resolution separately from Resume." },
@@ -81,7 +81,7 @@ const tasks: TrialTask[] = [
   task("shutdown", null, "1", "Calciner trial shutdown", "Shutdown programme", true, 0, 360, 2160, 0, false),
   task("wp-cyclone", "shutdown", "1.1", "Cyclone access and refractory", "CLW-001", true, 1, 330, 1080, 0, false),
   task("task-access-cover", "wp-cyclone", "1.1.1", "C2 Cyclone — remove access cover", "Mechanical access", false, 2, 330, 370, 100, true, undefined, 355),
-  task("task-scaffold-access", "wp-cyclone", "1.1.2", "D2 Stack — scaffold access release", "Access and scaffold", false, 2, 375, 840, 0, true),
+  task("task-scaffold-access", "wp-cyclone", "1.1.2", "D2 Stack — scaffold access release", "Access and scaffold", false, 2, 370, 840, 0, true),
   task("task-refractory-inspection", "wp-cyclone", "1.1.3", "C2 Cyclone — inspect refractory lining", "Refractory inspection", false, 2, 420, 720, 0, true, undefined, undefined, "Photo set required at completion"),
   task("task-dust-hood", "wp-cyclone", "1.1.4", "C2 Cyclone — remove dust hood", "Mechanical access", false, 2, 330, 480, 35, false, 330),
 

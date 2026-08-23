@@ -36,8 +36,37 @@ describe("deterministic operational trial model", () => {
     expect(applyTrialAction(changed, { type: "reset" })).toEqual(createInitialTrialState());
   });
 
+  it("starts from a compact scenario with unique record identifiers", () => {
+    const state = createInitialTrialState();
+    const collections = [
+      state.users,
+      state.tasks,
+      state.trackingAssignments,
+      state.fieldAssignments,
+      state.executionEvents,
+      state.pauseIntervals,
+      state.progressObservations,
+      state.problems,
+      state.actions,
+      state.criticalTemplates,
+      state.criticalItems,
+      state.criticalPolicies,
+      state.criticalObligations,
+      state.criticalReports,
+      state.shiftProgressNeeds,
+      state.history
+    ];
+
+    for (const collection of collections) {
+      const ids = collection.map((record) => record.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+    expect(state.tasks.filter((task) => task.summary && task.id !== "shutdown")).toHaveLength(4);
+    expect(state.tasks.filter((task) => !task.summary)).toHaveLength(16);
+  });
+
   it("does not infer In Progress from planned time passage", () => {
-    const state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 405 });
+    const state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 375 });
 
     expect(selectExecutionState(state, "task-scaffold-access")).toBe("Not Started");
     expect(selectTaskProjection(state, "task-scaffold-access").attention).toContain("Late to Start");
@@ -203,7 +232,12 @@ describe("deterministic operational trial model", () => {
 
     expect(corrected.criticalReports.find((report) => report.id === original.id)).toEqual(original);
     expect(corrected.criticalReports.at(-1)).toMatchObject({ supersedesReportId: original.id, values: { "forecast-completion": "14:30" } });
-    expect(selectCriticalObligationProjections(corrected).find((item) => item.obligation.id === obligation.obligation.id)?.state).toBe("submitted");
+    const correctedProjection = selectCriticalObligationProjections(corrected).find((item) => item.obligation.id === obligation.obligation.id);
+    expect(correctedProjection?.state).toBe("submitted");
+    expect(correctedProjection?.reportHistory).toEqual(expect.arrayContaining([
+      expect.objectContaining({ report: expect.objectContaining({ id: original.id }), state: "superseded" }),
+      expect.objectContaining({ report: expect.objectContaining({ supersedesReportId: original.id }), state: "submitted" })
+    ]));
   });
 
   it("derives Today and Task Dashboard history from the shared history", () => {
@@ -216,6 +250,74 @@ describe("deterministic operational trial model", () => {
     expect(today.lateStarts).toBeGreaterThan(0);
     expect(today.activeProblems).toBeGreaterThan(0);
     expect(history.map((item) => item.type)).toEqual(expect.arrayContaining(["cant-start", "problem-created"]));
+  });
+
+  it("replays the documented guided execution and reporting path end to end", () => {
+    let state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 380 });
+    state = applyTrialAction(state, {
+      type: "cant-start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Access or scaffold unavailable",
+      whatIsNeeded: "Release the scaffold tag",
+      createProblem: true,
+      createAction: true
+    });
+    const accessProblemId = state.problems.find((problem) => problem.taskId === "task-scaffold-access" && problem.status === "open")!.id;
+    state = applyTrialAction(state, { type: "advance-to", minute: 420 });
+    state = applyTrialAction(state, { type: "resolve-problem", problemId: accessProblemId, actorId: "tier3-riley" });
+    state = applyTrialAction(state, {
+      type: "start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      lateCause: "Scaffold release completed after the planned start",
+      actionStillNeeded: "Monitor access controls"
+    });
+    state = applyTrialAction(state, { type: "advance-to", minute: 480 });
+    state = applyTrialAction(state, {
+      type: "submit-critical-report",
+      obligationId: "obligation-scaffold-1",
+      actorId: "tier2-morgan",
+      values: { constraint: "Access released; no active constraint", "next-target": "Begin scaffold removal", "forecast-completion": "14:00" }
+    });
+    state = applyTrialAction(state, { type: "advance-to", minute: 555 });
+    state = applyTrialAction(state, {
+      type: "pause",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Material unavailable",
+      adverseDelay: true,
+      whatIsNeeded: "Deliver the verified replacement material",
+      createAction: true
+    });
+    const materialProblemId = state.problems.find((problem) => problem.taskId === "task-scaffold-access" && problem.status === "open")!.id;
+    state = applyTrialAction(state, { type: "advance-to", minute: 630 });
+    state = applyTrialAction(state, {
+      type: "resume",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      issueResolution: "remains-open"
+    });
+    state = applyTrialAction(state, { type: "advance-to", minute: 720 });
+    state = applyTrialAction(state, { type: "resolve-problem", problemId: materialProblemId, actorId: "tier3-riley" });
+    state = applyTrialAction(state, { type: "advance-to", minute: 840 });
+    state = applyTrialAction(state, { type: "finish", taskId: "task-scaffold-access", actorId: "tier3-riley" });
+    state = applyTrialAction(state, { type: "advance-to", minute: 1080 });
+    const shiftNeed = selectShiftProgressNeedsForUser(state, "tier3-casey").find((need) => need.taskId === "task-night-handover")!;
+    state = applyTrialAction(state, {
+      type: "end-shift-progress",
+      needId: shiftNeed.id,
+      actorId: "tier3-casey",
+      completionPercent: 45,
+      remainingWork: "Complete liner reinstatement and inspection",
+      nextShiftIssue: "Await final liner set"
+    });
+
+    expect(selectExecutionState(state, "task-scaffold-access")).toBe("Completed");
+    expect(state.criticalReports.some((report) => report.obligationId === "obligation-scaffold-1")).toBe(true);
+    expect(state.problems.find((problem) => problem.id === materialProblemId)?.status).toBe("resolved");
+    expect(selectShiftProgressNeedsForUser(state, "tier3-casey").some((need) => need.id === shiftNeed.id)).toBe(false);
+    expect(applyTrialAction(state, { type: "reset" })).toEqual(createInitialTrialState());
   });
 
   it("removes every generated event and report on reset", () => {

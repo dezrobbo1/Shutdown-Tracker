@@ -330,6 +330,7 @@ export type CriticalObligationProjection = {
   owner: TrialUser;
   state: ObligationState;
   currentReport: CriticalReport | null;
+  reportHistory: Array<{ report: CriticalReport; state: "submitted" | "superseded" }>;
   prepopulatedFacts: Partial<Record<ReportingField, string>>;
   requiredInputFields: ReportingField[];
 };

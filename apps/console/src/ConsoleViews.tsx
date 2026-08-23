@@ -27,7 +27,7 @@ function stateTone(state: OperationalTask["state"]): StatusTone {
   return "info";
 }
 
-export function LoginView({ onContinue }: { onContinue: () => void }) {
+export function LoginView({ onContinue, trialMode = false }: { onContinue: () => void; trialMode?: boolean }) {
   return (
     <main className="entry-screen">
       <section className="entry-panel" aria-labelledby="login-title">
@@ -36,8 +36,8 @@ export function LoginView({ onContinue }: { onContinue: () => void }) {
         <h1 id="login-title">Shutdown Tracker</h1>
         <p className="entry-lead">Whole-project operational control, schedule-source review, and shutdown oversight.</p>
         <div className="implementation-note">
-          <strong>Static visual only</strong>
-          <span>OIDC and production session handling are not yet implemented. This transition exists only for visual review.</span>
+          <strong>{trialMode ? "Synthetic operational trial" : "Static visual only"}</strong>
+          <span>{trialMode ? "Deterministic local state. No production persistence or backend execution API is used." : "OIDC and production session handling are not yet implemented. This transition exists only for visual review."}</span>
         </div>
         <button className="button-primary" type="button" onClick={onContinue}>Continue to Projects Home</button>
         <p className="entry-footnote">No credentials are collected or stored by this review shell.</p>
@@ -46,10 +46,11 @@ export function LoginView({ onContinue }: { onContinue: () => void }) {
   );
 }
 
-export function ProjectsHome({ onOpenProject }: { onOpenProject: (projectId: string) => void }) {
+export function ProjectsHome({ onOpenProject, trialProject }: { onOpenProject: (projectId: string) => void; trialProject?: { id: string; name: string; code: string; site: string } }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ProjectStatus | "All">("All");
-  const visibleProjects = projects.filter((project) => {
+  const availableProjects = trialProject ? [{ ...trialProject, status: "Active" as const, period: "24–25 August 2026 · deterministic clock", updated: "Resettable synthetic scenario" }] : projects;
+  const visibleProjects = availableProjects.filter((project) => {
     const matchesStatus = status === "All" || project.status === status;
     const searchText = `${project.name} ${project.code} ${project.site}`.toLowerCase();
     return matchesStatus && searchText.includes(query.trim().toLowerCase());
@@ -64,7 +65,7 @@ export function ProjectsHome({ onOpenProject }: { onOpenProject: (projectId: str
           <p>Open or switch a project before entering its Console.</p>
         </div>
         <div className="header-control-group">
-          <StatusLabel tone="warning">Static visual only</StatusLabel>
+          <StatusLabel tone="warning">{trialProject ? "Synthetic operational trial" : "Static visual only"}</StatusLabel>
           <button type="button" disabled title="Project creation API is not implemented">Create Project</button>
         </div>
       </header>
@@ -78,7 +79,7 @@ export function ProjectsHome({ onOpenProject }: { onOpenProject: (projectId: str
         <div className="segmented-control">
           {(["All", "Active", "Draft", "Closed", "Archived"] as const).map((value) => (
             <button key={value} type="button" className={status === value ? "selected" : ""} onClick={() => setStatus(value)}>
-              {value} {value === "All" ? projects.length : projects.filter((project) => project.status === value).length}
+              {value} {value === "All" ? availableProjects.length : availableProjects.filter((project) => project.status === value).length}
             </button>
           ))}
         </div>

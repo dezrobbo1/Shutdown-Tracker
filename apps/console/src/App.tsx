@@ -1,5 +1,14 @@
+import {
+  applyTrialAction,
+  createInitialTrialState,
+  formatTrialTime,
+  isTrialBridgeMessage,
+  trialStateMessage,
+  type TrialAction,
+  type TrialState
+} from "@shutdown-tracker/trial-model";
 import { ChevronDown, LogOut, RefreshCw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   formatConsoleReviewError,
   initialConsoleReviewLoadState,
@@ -19,6 +28,14 @@ import {
   TodayView
 } from "./ConsoleViews";
 import { ImportExportView } from "./ImportExportView";
+import {
+  TrialClock,
+  TrialCriticalView,
+  TrialTaskDashboard,
+  TrialTasksView,
+  TrialTodayView
+} from "./TrialConsoleViews";
+import { trialConsoleRuntimeConfig } from "./trialMode";
 
 export type ConsoleView = "login" | "projects" | "console";
 
@@ -26,24 +43,88 @@ export type AppProps = {
   initialView?: ConsoleView;
   initialSection?: ConsoleSection;
   initialTaskId?: string | null;
+  trialMode?: boolean;
 };
 
 export function App({
   initialView = "login",
   initialSection = "Today",
-  initialTaskId = null
+  initialTaskId = null,
+  trialMode
 }: AppProps) {
+  const trialEnabled = trialMode ?? trialConsoleRuntimeConfig.enabled;
+  const initialTrialState = useRef<TrialState | null>(null);
+  if (initialTrialState.current === null) initialTrialState.current = createInitialTrialState();
+  const [trialState, setTrialState] = useState<TrialState>(initialTrialState.current);
+  const trialStateRef = useRef(trialState);
+  const mobileWindowRef = useRef<Window | null>(null);
+  const mobileOriginRef = useRef("");
+  const [trialError, setTrialError] = useState("");
   const [view, setView] = useState<ConsoleView>(initialView);
   const [activeSection, setActiveSection] = useState<ConsoleSection>(initialSection);
   const [taskId, setTaskId] = useState<string | null>(initialTaskId);
   const [taskOrigin, setTaskOrigin] = useState<"Today" | "Tasks">(initialSection === "Today" ? "Today" : "Tasks");
-  const [projectId, setProjectId] = useState("calciner-2026");
+  const [projectId, setProjectId] = useState(trialEnabled ? initialTrialState.current.project.id : "calciner-2026");
   const [reviewData, setReviewData] = useState<ConsoleReviewData | null>(null);
-  const [loadState, setLoadState] = useState<ConsoleReviewLoadState>(() => initialConsoleReviewLoadState(reviewApiRuntimeConfig));
+  const [loadState, setLoadState] = useState<ConsoleReviewLoadState>(() => trialEnabled ? trialReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
   const [reviewAttempted, setReviewAttempted] = useState(false);
+
+  const dispatchTrialAction = useCallback((action: TrialAction) => {
+    try {
+      const next = applyTrialAction(trialStateRef.current, action);
+      trialStateRef.current = next;
+      setTrialState(next);
+      setTrialError("");
+    } catch (error) {
+      setTrialError(error instanceof Error ? error.message : "The deterministic trial action could not be applied.");
+    }
+  }, []);
+
+  const postTrialState = useCallback((state: TrialState) => {
+    const mobileWindow = mobileWindowRef.current;
+    const targetOrigin = mobileOriginRef.current;
+    if (!mobileWindow || mobileWindow.closed || !targetOrigin) return;
+    mobileWindow.postMessage(trialStateMessage(state), targetOrigin);
+  }, []);
+
+  useEffect(() => {
+    trialStateRef.current = trialState;
+    if (trialEnabled) postTrialState(trialState);
+  }, [postTrialState, trialEnabled, trialState]);
+
+  useEffect(() => {
+    if (!trialEnabled) return undefined;
+    function receiveMobileTrialMessage(event: MessageEvent) {
+      if (event.source !== mobileWindowRef.current || event.origin !== mobileOriginRef.current || !isTrialBridgeMessage(event.data)) return;
+      if (event.data.kind === "mobile-ready") postTrialState(trialStateRef.current);
+      if (event.data.kind === "action") dispatchTrialAction(event.data.action);
+    }
+    window.addEventListener("message", receiveMobileTrialMessage);
+    return () => window.removeEventListener("message", receiveMobileTrialMessage);
+  }, [dispatchTrialAction, postTrialState, trialEnabled]);
+
+  const openMobileTrial = useCallback(() => {
+    try {
+      const url = new URL(trialConsoleRuntimeConfig.mobileTrialUrl, window.location.href);
+      if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("The Mobile trial URL must use HTTP or HTTPS.");
+      url.searchParams.set("trialHostOrigin", window.location.origin);
+      mobileOriginRef.current = url.origin;
+      const mobileWindow = window.open(url.toString(), "shutdown-tracker-mobile-trial");
+      if (!mobileWindow) throw new Error("The Mobile trial window was blocked by the browser.");
+      mobileWindowRef.current = mobileWindow;
+      setTrialError("");
+    } catch (error) {
+      setTrialError(error instanceof Error ? error.message : "The configured Mobile trial URL is invalid.");
+    }
+  }, []);
 
   const refreshReviewData = useCallback(async () => {
     setReviewAttempted(true);
+    if (trialEnabled) {
+      setReviewData(null);
+      setLoadState(trialReviewLoadState());
+      return;
+    }
     if (reviewApiRuntimeConfig.liveEnabled) setLoadState({ status: "loading", message: "Fetching read-only import snapshot data." });
     try {
       const next = await loadConsoleReviewData();
@@ -52,7 +133,7 @@ export function App({
     } catch (error) {
       setLoadState({ status: "error", message: formatConsoleReviewError(error) });
     }
-  }, []);
+  }, [trialEnabled]);
 
   useEffect(() => {
     if (view === "console" && activeSection === "Import / Export" && !reviewAttempted) void refreshReviewData();
@@ -61,7 +142,7 @@ export function App({
   function resetProjectScopedState() {
     setTaskId(null);
     setReviewData(null);
-    setLoadState(initialConsoleReviewLoadState(reviewApiRuntimeConfig));
+    setLoadState(trialEnabled ? trialReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
     setReviewAttempted(false);
   }
 
@@ -78,12 +159,14 @@ export function App({
     setView(nextView);
   }
 
-  if (view === "login") return <LoginView onContinue={() => setView("projects")} />;
+  if (view === "login") return <LoginView trialMode={trialEnabled} onContinue={() => setView("projects")} />;
   if (view === "projects") {
-    return <ProjectsHome onOpenProject={openProject} />;
+    return <ProjectsHome trialProject={trialEnabled ? trialState.project : undefined} onOpenProject={openProject} />;
   }
 
-  const selectedProject = projects.find((project) => project.id === projectId) ?? projects[0];
+  const selectedProject = trialEnabled
+    ? { id: trialState.project.id, name: trialState.project.name, code: trialState.project.code, site: trialState.project.site, status: "Active" as const }
+    : projects.find((project) => project.id === projectId) ?? projects[0];
 
   function navigate(section: ConsoleSection) {
     setTaskId(null);
@@ -108,22 +191,26 @@ export function App({
             return <button className={active ? "nav-item active" : "nav-item"} type="button" key={item.label} aria-current={active ? "page" : undefined} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true" /><span>{item.label}</span></button>;
           })}
         </nav>
-        <div className="sidebar-footer"><span>Static product shell</span><button type="button" onClick={() => leaveProject("login")}><LogOut size={15} aria-hidden="true" /> Exit review</button></div>
+        <div className="sidebar-footer"><span>{trialEnabled ? "Synthetic operational trial" : "Static product shell"}</span>{trialEnabled && <small>Deterministic local state<br />No production persistence</small>}<button type="button" onClick={() => leaveProject("login")}><LogOut size={15} aria-hidden="true" /> Exit review</button></div>
       </aside>
 
       <main className="workspace">
         <header className="workspace-bar">
           <div><span>{selectedProject.site}</span><strong>{selectedProject.code}</strong></div>
-          <div><span>Operational day · 06:00</span><button type="button" disabled aria-label="Refresh project data"><RefreshCw size={16} aria-hidden="true" /> Live refresh not implemented</button></div>
+          <div><span>{trialEnabled ? `Simulated time · ${formatTrialTime(trialState.now)}` : "Operational day · 06:00"}</span><button type="button" disabled aria-label="Refresh project data"><RefreshCw size={16} aria-hidden="true" /> {trialEnabled ? "No backend connection" : "Live refresh not implemented"}</button></div>
         </header>
 
         <div className="workspace-content">
-          {taskId ? <TaskDashboard taskId={taskId} backLabel={taskOrigin} onBack={() => setTaskId(null)} /> : (
+          {trialEnabled && <TrialClock state={trialState} onAction={dispatchTrialAction} onOpenMobile={openMobileTrial} mobileConfigured={trialConsoleRuntimeConfig.mobileTrialUrl.length > 0} />}
+          {trialError && <p className="trial-form-error trial-global-error" role="alert">{trialError}</p>}
+          {taskId ? trialEnabled
+            ? <TrialTaskDashboard state={trialState} taskId={taskId} backLabel={taskOrigin} onBack={() => setTaskId(null)} onAction={dispatchTrialAction} />
+            : <TaskDashboard taskId={taskId} backLabel={taskOrigin} onBack={() => setTaskId(null)} /> : (
             <>
-              {activeSection === "Today" && <TodayView onOpenTask={openTask} />}
-              {activeSection === "Tasks" && <TasksView onOpenTask={openTask} />}
-              {activeSection === "Critical" && <CriticalView />}
-              {activeSection === "Import / Export" && <ImportExportView shellProjectLabel={`${selectedProject.name} (${selectedProject.code})`} reviewData={reviewData} loadState={loadState} onRefresh={() => void refreshReviewData()} />}
+              {activeSection === "Today" && (trialEnabled ? <TrialTodayView state={trialState} onOpenTask={openTask} onAction={dispatchTrialAction} /> : <TodayView onOpenTask={openTask} />)}
+              {activeSection === "Tasks" && (trialEnabled ? <TrialTasksView state={trialState} onOpenTask={openTask} /> : <TasksView onOpenTask={openTask} />)}
+              {activeSection === "Critical" && (trialEnabled ? <TrialCriticalView state={trialState} onAction={dispatchTrialAction} /> : <CriticalView />)}
+              {activeSection === "Import / Export" && <ImportExportView trialMode={trialEnabled} shellProjectLabel={`${selectedProject.name} (${selectedProject.code})`} reviewData={reviewData} loadState={loadState} onRefresh={() => void refreshReviewData()} />}
               {activeSection === "Project Settings" && <ProjectSettingsView />}
             </>
           )}
@@ -132,4 +219,8 @@ export function App({
       </main>
     </div>
   );
+}
+
+function trialReviewLoadState(): ConsoleReviewLoadState {
+  return { status: "synthetic", message: "Deterministic trial mode does not load backend snapshot data." };
 }
