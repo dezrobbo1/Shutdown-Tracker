@@ -18,8 +18,8 @@ Git history and pull requests are the source for implementation chronology. Do n
 ## Research governance
 
 - [Source Quality Register](source-quality-register.md) defines source-strength expectations.
-- [Research Decision Source Map](source-map.md) maps important decisions to supporting sources.
-- [Research Decisions Summary](research-decisions-summary.md) consolidates accepted research conclusions.
+- [Research Decision Source Map](source-map.md) preserves decision-to-evidence provenance, including explicitly superseded decisions.
+- [Research Decisions Summary](research-decisions-summary.md) preserves an earlier research synthesis; current product and ADR authority takes precedence.
 - [Research Index](research-index.md) lists the research packets and their current status/use.
 
 When research conflicts with authoritative primary documentation, product/ADR decisions, or verified implementation constraints, resolve the conflict explicitly rather than silently carrying both positions forward.

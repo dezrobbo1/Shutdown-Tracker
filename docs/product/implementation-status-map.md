@@ -1,6 +1,6 @@
 # Implementation Status Map
 
-This document is primary product authority for distinguishing approved product direction from behaviour present in the `product/trial-foundation` tree. That tree is based directly on main at `c6f4cdf86355c5d2a9c16df485271e48675af109`; PR #48 is not its runtime or product-authority base.
+This document is primary product authority for distinguishing approved product direction from behaviour present in the current product-trial foundation. The foundation was established directly from `main`; PR #48 is not its runtime or product-authority base.
 
 ## Status labels
 
@@ -52,8 +52,8 @@ A document, visual shell, enum, migration table, disabled control, or compatibil
 | Operational Mapping | Static visual only | Project Settings represents mapping health and its classification/filter/group/display/bulk-selection purpose. No Source Catalogue, profile/category mapping, membership resolution, mapping-health service, API, or production UI write path exists. |
 | Retained export-preview compatibility | Verified in repository | Main retains `infra/migrations/V005__approval_and_export_batches.sql`, `services/api/src/main/java/com/shutdowntracker/api/exportpreview`, `packages/project-export-contract`, and `services/project-worker/src/main/java/com/shutdowntracker/projectworker/exporter/MpxjMspdiExportArtifactService.java`. This is experimental technical compatibility only: the writer creates a patch-shaped ProjectFile from selected task fields and is not the approved final export or round-trip design. |
 | Ordinary Console Export | Static visual only | Import / Export marks export as not finalised. It must not present main's compatibility preview/writer or PR #48's candidate pipeline as the required product workflow. |
-| PR #48 candidate approval, sealed preview, and browser RoundTripWorkspace | Explicitly excluded | Those changes are not present in `product/trial-foundation` and are not prerequisites or active product authority. PR #48 remains a superseded technical/research workstream. |
-| Final Microsoft Project export / round trip | Designed, not built | Format, reviewed inputs, comparison, adoption, and verification design will be revisited after operational frontend trials. There is no required real-human PR #48 manual gate on this branch. |
+| PR #48 candidate approval, sealed preview, and browser RoundTripWorkspace | Explicitly excluded | Those changes are not present in the active product foundation and are not prerequisites or active product authority. PR #48 remains a superseded technical/research workstream. |
+| Final Microsoft Project export / round trip | Designed, not built | Format, reviewed inputs, comparison, adoption, and verification design will be revisited after operational frontend trials. There is no required real-human PR #48 manual gate on the active foundation. |
 | Native `.mpp` output | Explicitly excluded | Shutdown Tracker does not provide a server-side native `.mpp` writer. The final interchange format and external Microsoft Project interaction are intentionally deferred rather than inferred from the compatibility writer. |
 | Scheduler / CPM functionality | Explicitly excluded | Shutdown Tracker does not calculate CPM, critical path, float, resource levelling, dependency consequences, schedule optimisation, or Project recalculation. Imported Project Critical remains read-only context. |
 

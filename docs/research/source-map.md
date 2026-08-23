@@ -1,6 +1,8 @@
 # Research Decision Source Map
 
-This map links current Shutdown Tracker product and architecture decisions to the source evidence that should support them.
+> **Historical research provenance.** This map predates [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md) and the approved Tier 1/Tier 2/Tier 3 two-client model. Rows describing planner/supervisor application roles, the old Console/Mobile navigation, or the PR #48 candidate/approval flow are superseded evidence mappings, not current product authority.
+
+This map records Shutdown Tracker decision-to-evidence relationships, including decisions later superseded by primary product documents and ADRs.
 
 Use this file when updating product docs, ADRs, implementation briefs, or Codex prompts. Hard claims should cite Tier A sources from the source quality register where possible.
 

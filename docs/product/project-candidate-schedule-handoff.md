@@ -276,6 +276,6 @@ Do not fail a candidate merely because Microsoft Project legitimately recalculat
 
 ## Current implementation implication
 
-The repository verifies guarded complete-source MSPDI/XML candidate generation from the accepted source plus approved inputs. That automated evidence does not satisfy the pending real-human Microsoft Project open/recalculation/review gate. Any retained minimal/patch-shaped writer remains diagnostic only and must not be presented as the final product output.
+The superseded PR #48 workstream reported guarded complete-source MSPDI/XML candidate generation from the accepted source plus approved inputs. That implementation and its real-human Microsoft Project gate are not present in, or required by, the active product foundation. Any minimal/patch-shaped writer retained from `main` remains experimental diagnostic compatibility only and must not be presented as the final product output.
 
-Security controls around authoritative candidates, exact approvals, stale-data rejection, immutable audit, and batch provenance remain valuable and should be preserved regardless of which candidate-calculation mechanism is selected.
+The earlier security controls remain useful research inputs. They do not become current requirements unless a replacement export contract independently selects and validates them.

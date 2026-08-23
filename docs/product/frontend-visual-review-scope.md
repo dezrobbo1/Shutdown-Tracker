@@ -1,6 +1,6 @@
 # Frontend Visual Review Scope
 
-This document defines how frontend visual-review work relates to the approved two-application product model on `product/trial-foundation`.
+This document defines how frontend visual-review work relates to the approved two-application product-trial foundation.
 
 ## Current implementation boundary
 

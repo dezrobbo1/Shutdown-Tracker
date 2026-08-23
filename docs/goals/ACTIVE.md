@@ -40,4 +40,4 @@ Maintain a reviewable product and frontend foundation directly on `main` for det
 
 ## Completion conditions
 
-The foundation is complete when it is validated directly against `main`, the replacement draft PR is open, the old stacked PRs remain unchanged, and the retained/excluded technical work is explicit enough for reviewers to confirm that no hidden dependency remains.
+The foundation is complete when it is validated and merged directly into `main`, the superseded stacked PRs are closed without merge after the new main is verified, and the retained/excluded technical work is explicit enough for reviewers to confirm that no hidden dependency remains.

@@ -94,7 +94,7 @@ The six product documents listed first are primary authority. No old named-role 
 ## Repository map
 
 - `apps/console`: React/Vite Master Console.
-- `apps/mobile-pwa`: React/Vite Field App.
+- `apps/mobile-pwa`: React/Vite Mobile App.
 - `packages/api-client`: shared TypeScript API client.
 - `services/api`: Java 21 Spring Boot API.
 - `services/project-worker`: Java 21 Spring Boot MPXJ worker.

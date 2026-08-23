@@ -1,6 +1,8 @@
 # Research Decisions Summary
 
-This file is a decision-oriented index. Accepted ADRs and current product documents take precedence over research summaries when wording conflicts.
+> **Historical research synthesis.** The planner/supervisor roles, candidate pipeline, and navigation described below predate [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md) and the approved Tier 1/Tier 2/Tier 3 two-client model. They are retained as research provenance and are not current product authority or an implementation roadmap.
+
+This file is a decision-oriented historical index. Accepted ADRs and current product documents take precedence over research summaries when wording conflicts.
 
 ## Executive decision
 

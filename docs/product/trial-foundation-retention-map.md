@@ -26,7 +26,7 @@ This document records how the active product foundation treats work associated w
 | Complete-source candidate generation changes | Excluded | Coupled to the superseded candidate contract. |
 | Narrow direct-input allowlist as product policy | Excluded | Operational trials must first establish the required progress semantics. |
 | Browser round-trip acceptance workspace | Excluded | Mixed import inspection with candidate approval, generation, download, and verification. |
-| Synthetic review-project bootstrap | Excluded | Acceptance-harness support, not product project creation. |
+| PR #48 synthetic fresh-review bootstrap endpoint/workflow | Excluded | Acceptance-harness support, not product project creation. Main's disabled review runner remains compatibility infrastructure and is not a production create-project path. |
 | Candidate download and Project-open/verification controls | Excluded | Belong to the deferred export design. |
 | Manual Microsoft Project round-trip gate | Excluded as active prerequisite | Historical acceptance procedure, not a gate for operational frontend trials. |
 | PR #48 candidate API-client additions | Excluded | Coupled to exact candidate, approval, preview, and generation endpoints. |
