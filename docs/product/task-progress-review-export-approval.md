@@ -61,7 +61,8 @@ Do not collapse task condition into one status.
 
 | Dimension | Examples |
 | --- | --- |
-| Execution state | Not Started, In Progress, Paused, Blocked, Completed |
+| Execution state | Not Started, In Progress, Paused, Completed |
+| Operational condition / attention | Late to Start, delayed/blocked before start, adverse delay/block, running beyond planned finish |
 | Tracking review state | Draft, Submitted, Tier 2 validated where required, Correction requested, Rejected, Superseded |
 | Tier 1 input state | Needs review, Approved as input, Rejected, Clarification requested, Superseded |
 | Candidate schedule state | Not prepared, Calculation pending, Candidate produced, Delta ready, Accepted, Rejected, Superseded |
@@ -72,14 +73,14 @@ Do not collapse task condition into one status.
 
 | Field action | Tracker meaning | Automatic Project mapping? |
 | --- | --- | --- |
-| Start | Work genuinely started at a recorded time | No; may create an Actual Start candidate after review |
-| Pause | Temporary stop with reason | No |
-| Resume | Work restarted | No |
-| Block | Work cannot continue; create/link a Problem | No |
-| Progress update | Report measured progress using configured method | No automatic mapping until reviewed |
-| Complete | Field completion claim with evidence/policy checks | No; may create one or more review candidates |
+| Can't Start | System-timestamped blocked-before-start observation; execution remains Not Started; capture reason/need and link action/problem where appropriate | No |
+| Start | System-timestamped evidence that work genuinely started; late-start context is requested only when late | No; may create an Actual Start candidate after review |
+| Pause | System-timestamped temporary stop; capture reason and separately classify/link any adverse delay/problem | No |
+| Resume | System-timestamped restart that closes the pause interval without silently closing a linked problem | No |
+| Finish | System-timestamped field completion claim with confirmation and configured evidence/policy checks | No; may create one or more review candidates |
+| End-of-shift observation | Plain-language completion percentage, remaining work, next-shift issue, and optional note/evidence for unfinished work | No automatic mapping until reviewed |
 
-Start/Pause/Resume/Block/Complete are execution events, not Project field aliases.
+Can't Start/Start/Pause/Resume/Finish are the ordinary Mobile execution actions, not Project field aliases. Tier 2/Tier 3 users do not ordinarily type Actual Start/Actual Finish or execution date/time values. Any future manual correction/backdating is a separate audited workflow.
 
 ## Tier 1 Console entry
 
@@ -107,6 +108,8 @@ A project/import profile may define the progress method that best matches the wo
 | State only | No percentage is meaningful | none | Always valid Tracker option |
 
 The product must not choose a field merely because it has fewer recalculation side effects. The field must represent the business fact being reported.
+
+These Project methods govern later reviewed interpretation. Ordinary Mobile users answer plain operational questions and are not shown `% Work Complete` or `Physical % Complete` field terminology.
 
 ## Authoritative input candidates
 

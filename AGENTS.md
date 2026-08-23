@@ -102,6 +102,8 @@ The six product documents listed first are primary authority. No old named-role 
 - The current worker's narrow field allowlist is a **direct-input boundary**. It does not mean a Microsoft Project-calculated candidate may differ from the source only in those fields.
 - A pre-Project protected-fingerprint test may prove that Shutdown Tracker did not inject unapproved direct inputs. Do not apply that same invariant to a candidate after Microsoft Project has recalculated it.
 - Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist.
+- Keep the ordinary Mobile execution flow to Can't Start, Start, Pause, Resume, and Finish with system-captured action timestamps. Can't Start must leave execution Not Started; manual backdating/correction requires a separately reviewed audited workflow.
+- Keep Critical reporting policy versioned per item, configurable from supported timing/trigger mechanisms and a controlled content catalogue. Reuse known task facts and do not introduce a generic form builder or a second execution-state model.
 - Keep the Console top-level structure fixed to Today, Tasks, Critical, Import / Export, and Project Settings.
 - Keep the Mobile App top-level model fixed to Assigned Tasks only. Sync is a visible transport/recovery state, not a destination.
 - Keep Problems, Discussion, Actions, Evidence, and History inside the relevant Task Dashboard. Do not recreate them as top-level applications.

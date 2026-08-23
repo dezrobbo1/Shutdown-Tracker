@@ -18,7 +18,7 @@ Likewise, a complete candidate schedule may be successfully produced and still b
 
 ### Execution state
 
-Initial activation derives `not_started`, `in_progress`, or `completed` from accepted Project facts. After Tracker execution begins, audited Start, Pause, Resume, Block, Complete, Correction, and Reversal events drive the current projection.
+Initial activation derives `not_started`, `in_progress`, or `completed` from accepted Project facts. After Tracker execution begins, audited Can't Start, Start, Pause, Resume, Finish, Correction, and Reversal events drive the current projection. Can't Start leaves execution `not_started`; adverse blocked/delayed context is linked operational state rather than an alternate start event. A retained technical `Block` term is compatibility vocabulary, not another ordinary Mobile action.
 
 Readiness and schedule variance remain separate attention conditions; passing a planned start never establishes `in_progress`. Corrections use explicit events/supersession rather than destructive history edits. See [Task Operational Model](task-operational-model.md).
 
