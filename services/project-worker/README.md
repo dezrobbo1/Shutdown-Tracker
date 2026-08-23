@@ -6,7 +6,7 @@ Purpose: Spring Boot worker service for bounded Microsoft Project parsing and co
 
 Microsoft Project remains the schedule calculation authority. The worker does not calculate CPM, critical path, float, resource levelling, recovery schedules, dependency consequences, or project-finish movement.
 
-The worker may apply an exact set of planner-approved direct execution inputs to an accepted Microsoft Project XML/MSPDI source. The resulting pre-Project candidate is then opened in Microsoft Project so Project can perform its normal recalculation.
+The worker may apply an exact set of Tier 1-approved direct execution inputs to an accepted Microsoft Project XML/MSPDI source. The resulting pre-Project candidate is then opened in Microsoft Project so Project can perform its normal recalculation.
 
 Current direct-input fields are limited to:
 
@@ -60,7 +60,7 @@ A source imported from native `.mpp` can be reviewed, but this complete-source g
 
 This check proves that **Shutdown Tracker** did not author anything beyond the reviewed inputs before the candidate reaches Project.
 
-It must not be applied as a post-Project invariant. Once Microsoft Project opens the candidate it may legitimately recalculate dates, durations, summaries, assignment/work values, timephased data, slack, criticality, project finish and other dependent schedule state. Those are Project-calculated consequences for planner review.
+It must not be applied as a post-Project invariant. Once Microsoft Project opens the candidate it may legitimately recalculate dates, durations, summaries, assignment/work values, timephased data, slack, criticality, project finish and other dependent schedule state. Those are Project-calculated consequences for Tier 1 review.
 
 ## Value normalization
 
@@ -74,7 +74,7 @@ The API and worker share the proposed-value normalizer.
 
 The Master Console round-trip mode can now drive source upload, task-snapshot parsing, snapshot acceptance, candidate creation/approval, sealed preview, batch approval, candidate generation and candidate download without manually assembling backend API calls.
 
-Microsoft Project is still opened manually for the external acceptance gate. The planner then records Project-open and verification metadata through the console.
+Microsoft Project is still opened manually for the external acceptance gate. The Tier 1 schedule owner then records Project-open and verification metadata through the Console.
 
 ## Runtime and local development
 

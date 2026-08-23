@@ -69,8 +69,8 @@ Discussion should attach to an operational object.
 | Export preview line | Tier 1 clarification about old/new value | Later | Export-review audit trail; does not update Project |
 | Export batch | Approval/rejection rationale | Later | Export audit trail |
 | Project verification step | Manual Project check notes | Later | Verification audit trail; no `.mpp` save implied |
-| Critical WP / watchlist | Reporting clarification | Later | Reporting context; no scheduling effect |
-| Area / shift / discipline | Context marker for filtering, not a free-form channel | Later | Scoped visibility only |
+| Critical item / work pack | Reporting clarification | Later | Reporting context; no scheduling effect |
+| Area / shift / discipline | Context marker for filtering, not a free-form channel | Later | Display/filter context only; no access authority |
 
 ## Structured record promotion rules
 

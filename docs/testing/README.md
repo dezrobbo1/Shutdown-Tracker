@@ -61,7 +61,7 @@ Use [Import/Export Fixture Strategy](import-export-fixture-strategy.md).
 
 Automated MSPDI/XML generation tests do not replace human Microsoft Project verification.
 
-Use [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md) for text-only evidence of representative reopen checks. The planner remains responsible for deciding whether a verified artifact is applied/saved into the master `.mpp`.
+Use [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md) for text-only evidence of representative reopen checks. The Tier 1 schedule owner remains responsible for deciding whether a verified artifact is applied/saved into the master `.mpp`.
 
 Never commit real Project files, generated artifacts, screenshots, or confidential schedule data as round-trip evidence.
 
@@ -81,7 +81,7 @@ Tests should verify:
 
 As the corresponding features are implemented, tests should verify:
 
-- field progress does not bypass supervisor/planner review;
+- assigned field progress does not bypass Tier 2 tracking validation where required or Tier 1 Project-input review;
 - export eligibility remains limited to explicitly approved candidates;
 - summary-task and unsupported-field export attempts are rejected;
 - candidate/task/source/approval identities cannot be substituted or become stale before artifact generation;
@@ -93,7 +93,7 @@ As the corresponding features are implemented, tests should verify:
 
 ## Permission and audit tests
 
-Verify project-scoped authorization, least-privilege behavior, review/export authority, evidence access, delegation boundaries, and immutable audit records for material actions.
+Verify project-scoped Tier 1/Tier 2/Tier 3 membership, Tier 2-to-Tier 3 direct-report checks, explicit task/reporting assignments, Tier 1 whole-project authority, evidence access, Project-input/export authority, and immutable audit records for material actions.
 
 Imported category/classification membership must never become an implicit permission grant.
 

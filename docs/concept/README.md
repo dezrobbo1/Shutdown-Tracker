@@ -8,39 +8,35 @@ The platform separates three responsibilities:
 
 - **Shutdown Tracker** captures and approves execution inputs.
 - **Microsoft Project** recalculates a disposable candidate schedule.
-- **The planner** accepts, rejects, supersedes, or manually adopts the candidate.
+- **The Tier 1 schedule owner** accepts, rejects, supersedes, or manually adopts the candidate.
 
 Shutdown Tracker does not calculate CPM, critical path, float, recovery schedules, resource levelling, or dependency consequences itself. It does not silently overwrite the accepted master and does not provide server-side native `.mpp` writing.
 
 Microsoft Project may change planned dates, durations, summary roll-ups, work, slack, criticality, and related values when approved execution inputs are applied. Those are candidate-schedule consequences to review, not hidden Shutdown Tracker-authored schedule values.
 
-## Application experiences
+## Application clients
 
 ### Master Console
 
-Desktop-optimised for shutdown control, planners, coordinators, supervisors, package owners, and managers.
+Tier 1-only project-control application with unrestricted project visibility and operational update authority.
 
-Baseline zones:
+Approved top-level sections:
 
 - Today
 - Tasks
-- Problems
-- Evidence
-- Exports
+- Critical
+- Import / Export
+- Project Settings
 
-### Field App
+### Mobile App
 
-Mobile-optimised for supervisors, leading hands, contractors, inspectors, and execution crews.
+Tier 2/Tier 3 satellite application limited to explicitly assigned tasks.
 
-Baseline zones:
+Approved top-level model:
 
-- My Work
-- Today
-- Problems
-- Evidence
-- Sync
+- Assigned Tasks only
 
-Offline-capable field workflows are core direction. Delivery technology must not create a separate authority or data model.
+Problems, discussion, actions, evidence, and history live inside the relevant Task Dashboard/Task Detail. Sync is a visible transport/recovery state, not navigation. Offline-capable field workflows are core direction. Delivery technology must not create a separate authority or data model.
 
 ## Candidate schedule handoff
 
@@ -49,11 +45,11 @@ The target handoff is:
 ```text
 immutable accepted Project source
 -> reviewed execution facts
--> planner-approved input manifest
+-> Tier 1-approved input manifest
 -> disposable Project candidate
 -> Microsoft Project recalculation
 -> source-versus-candidate delta
--> planner candidate decision
+-> Tier 1 candidate decision
 -> optional manual master adoption
 ```
 
@@ -61,7 +57,7 @@ A read-only schedule-impact comparison is allowed in the Master Console. Editabl
 
 ## Project Operational Mapping
 
-Microsoft Project supplies source facts, structure, and classifications. Shutdown Tracker adds planner-configured operational interpretation without rewriting those source facts.
+Microsoft Project supplies source facts, structure, and classifications. Shutdown Tracker adds Tier 1-configured operational interpretation without rewriting those source facts.
 
 Initial source modes:
 
@@ -69,7 +65,7 @@ Initial source modes:
 2. task hierarchy/WBS/selected summary ancestry;
 3. task assignments resolved through Resource `Group`.
 
-Operational Categories may support filtering, grouping, Scope, Saved Views, Critical Watch, Problems, Actions, Evidence, Handover, reporting, and mobile relevance.
+Operational Categories may support filtering, grouping, query-only Scope, Saved Views, Today, Critical selection/reporting, Task Dashboard context, and bulk Tier 2 assignment.
 
 Resource-derived categories must support multiple values where a task has assignments from more than one Resource Group.
 
@@ -79,11 +75,11 @@ Classification never grants application authority by itself.
 
 ## Critical Work Package reporting
 
-A Critical Watchlist is an operational reporting list. A Critical Work Package is a reporting object, not a scheduling object.
+A Critical item is an operational reporting object, not a scheduling object.
 
-Default source is a selected Project summary task plus descendants; multi-summary sources are also valid when reporting crosses WBS boundaries.
+The first approved Critical Work Pack UX selects one Project summary task plus descendants. Existing V006 multi-summary compatibility is retained but not exposed unless separately approved.
 
-Project Critical/slack fields may be displayed as read-only Project context but do not automatically define Critical Watch membership.
+Project Critical/slack fields may be displayed as read-only Project context but do not automatically define Critical reporting membership.
 
 ## Execution model
 
@@ -91,10 +87,10 @@ The platform should support:
 
 - Start, Pause, Resume, Block, Complete;
 - structured progress;
-- supervisor review;
-- planner input review;
-- Problems and Actions;
-- Evidence and Handover;
+- Tier 2 tracking validation where required;
+- Tier 1 input review;
+- task-owned Delays / Problems and Actions;
+- task-owned Evidence and History;
 - Critical Updates and reporting;
 - candidate schedule review and audit.
 
@@ -118,11 +114,11 @@ The MVP focuses on:
 - immutable Project snapshot import;
 - Project source discovery and Operational Mapping;
 - execution state and structured progress;
-- supervisor/planner review;
-- Problems, Actions, Evidence, and Handover;
-- Critical Watch reporting;
+- Tier 2 validation where required and Tier 1 Project-input review;
+- Task Dashboard-owned Discussion, Delays / Problems, Actions, Evidence, and History;
+- Critical reporting;
 - approved-input/candidate-schedule handoff;
-- users, roles, permissions, delegation, and offline foundations;
+- three-tier membership, direct reports, explicit assignments, and offline foundations;
 - browser/installable delivery for both application experiences.
 
 Explicitly excluded:
@@ -137,4 +133,4 @@ Explicitly excluded:
 - automatic permissions from Project categories;
 - generic chat clone behaviour.
 
-A read-only candidate-impact Gantt/timeline is not considered a scheduling UI and is permitted when it helps planner review.
+A read-only candidate-impact Gantt/timeline is not considered a scheduling UI and is permitted when it helps Tier 1 review.

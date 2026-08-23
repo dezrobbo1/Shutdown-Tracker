@@ -15,7 +15,7 @@ The UI should answer:
 - what is late;
 - who owns it;
 - what action is next;
-- what needs supervisor or planner review;
+- what needs Tier 2 tracking validation or Tier 1 review;
 - what is not yet synced;
 - what is safe or unsafe for Project handoff.
 
@@ -28,7 +28,7 @@ Anything that does not answer those questions should be pushed down, filtered, s
 | One job per screen | Do not combine every workflow into one overview wall |
 | Attention first | Surface blocked, failed, overdue, awaiting review, export exceptions before passive counts |
 | Operational before decorative | Avoid marketing-style headers, glossy cards, excessive icons, and decorative metrics |
-| Role-appropriate complexity | Field users see field actions; planners see import/export and diffs; managers see read-only summaries |
+| Client/tier-appropriate complexity | Tier 2/Tier 3 see assigned-task actions; Tier 1 sees whole-project control, import/export, and diffs |
 | Structured records first | Blockers, actions, evidence, handover, export review, and progress are not comments |
 | Visible state, not noise | Use persistent indicators and queues, not popups or badge soup |
 | Offline honesty | Never imply queued local work reached the server |
@@ -62,26 +62,22 @@ Master Console:
 ```text
 Today
 Tasks
-Problems
-Evidence
-Exports
+Critical
+Import / Export
+Project Settings
 ```
 
-Mobile Field App:
+Mobile App:
 
 ```text
-My Work
-Today
-Problems
-Evidence
-Sync
+Assigned Tasks
 ```
 
-New work should use saved views, filters, detail pages, drawers, or sub-sections inside those zones.
+Problems, Discussion, Actions, Evidence, and History belong inside the relevant Task Dashboard. Mobile uses Task Detail beneath Assigned Tasks. Sync remains a visible transport/recovery state rather than navigation.
 
 ## Console Today rules
 
-Today is a control-room attention surface, not a full workflow dump.
+Today is a high-signal 24-hour project attention surface, not a full workflow dump.
 
 Today should show by default:
 
@@ -89,8 +85,8 @@ Today should show by default:
 - blocked work;
 - overdue actions;
 - failed syncs/uploads;
-- awaiting supervisor review;
-- awaiting planner approval;
+- awaiting Tier 2 validation where required;
+- awaiting Tier 1 approval;
 - export exceptions;
 - handover due this shift;
 - last import/export status.
@@ -110,18 +106,18 @@ Today should not show by default:
 
 | Surface | Placement |
 | --- | --- |
-| Supervisor review | Today summary + Tasks saved view |
-| Planner review | Today summary + Exports review surface |
-| Project verification | Exports |
-| Critical Watch | Today summary + detail drill-down |
-| Import validation | Exports or project setup / planner flow |
-| Handover | Today summary + Handover detail/report surface |
+| Tier 2 tracking validation | Assigned Task Detail; Today/Tasks attention context for Tier 1 |
+| Tier 1 input review | Today summary + Import / Export review surface |
+| Project verification | Import / Export |
+| Critical reporting | Critical oversight + task/summary-work-pack dashboard |
+| Import validation | Import / Export or Project Settings |
+| Handover context | Relevant Task Dashboard History/Discussion |
 | Needs Response | Today/top chrome/user menu; not generic inbox |
 | Communications | Entity detail panels; not top-level chat |
 
-## Mobile My Work rules
+## Mobile Assigned Tasks rules
 
-My Work should show assigned work before review/demo metadata.
+Assigned Tasks should show assigned work before sync/review metadata.
 
 Minimum viable task card:
 
@@ -139,7 +135,7 @@ Do not put these on every mobile task card by default:
 
 - four or more chips;
 - full review lifecycle;
-- planner/export terms;
+- Tier 1/export terms;
 - long comments;
 - detailed history;
 - all evidence links;
@@ -152,12 +148,12 @@ Use operational language.
 
 Prefer:
 
-- `Assigned work`;
-- `Needs supervisor review`;
+- `Assigned tasks`;
+- `Needs Tier 2 validation`;
 - `Evidence missing`;
 - `Export blocked`;
 - `Queued on this device. Not yet sent.`;
-- `Planner approval marks this progress as eligible for export preview. The master .mpp is not updated.`
+- `Tier 1 approval authorises this exact input for an updated Project candidate. The current master schedule is unchanged.`
 
 Avoid:
 
@@ -189,7 +185,7 @@ Avoid visible labels like:
 
 - `Synthetic Task A1`;
 - `Synthetic Summary Mobile`;
-- `Field user A`;
+- `Tier 3 user A`;
 - `Demo record`.
 
 Prefer:
@@ -200,8 +196,8 @@ Prefer:
 - `Furnace bottom — install blanking plate`;
 - `Permit isolation — await operations release`;
 - `Crane lift — wait for lift plan sign-off`;
-- `Refractory crew lead`;
-- `Day shift supervisor`.
+- `Tier 2 user A`;
+- `Tier 3 user B`.
 
 ## Chip and card rules
 
@@ -222,7 +218,7 @@ Avoid:
 - color-only meaning;
 - rows of chips replacing structured fields.
 
-Cards should not replace tables where comparison matters. Planner review and export preview should use comparison tables/lists, not only cards.
+Cards should not replace tables where comparison matters. Tier 1 review and export preview should use comparison tables/lists, not only cards.
 
 ## Status and notification rules
 
@@ -237,7 +233,7 @@ High-salience states:
 - blocked critical work;
 - failed sync/evidence upload;
 - overdue action;
-- awaiting planner export approval;
+- awaiting Tier 1 export approval;
 - export generation failure;
 - re-import conflict;
 - Project verification failed.
@@ -273,16 +269,16 @@ Every future Codex UI prompt should include:
 - label static/synthetic surfaces clearly;
 - use sanitized realistic examples, not `Synthetic Task A1` labels;
 - keep mobile cards minimal;
-- use tables/lists for planner/export comparison;
+- use tables/lists for Tier 1 Import / Export comparison;
 - include acceptance criteria for IA, sync honesty, and Project boundary.
 
 ## UX cleanup acceptance criteria
 
 A UI cleanup is successful when:
 
-- a supervisor can find the highest-priority blocked/review item quickly;
-- a planner can find export-review and Project-verification surfaces under Exports;
-- a field user sees assigned work before prototype status tiles;
+- Tier 1 can find the highest-priority blocked/review item quickly;
+- Tier 1 can find export-review and Project-verification surfaces under Import / Export;
+- Tier 2/Tier 3 sees assigned work before sync/status diagnostics;
 - queued/failed/server-received states are explicit but not visually dominant;
 - the top-level IA remains stable;
 - the UI no longer looks like a generic generated dashboard;

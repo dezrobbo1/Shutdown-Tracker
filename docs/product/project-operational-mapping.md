@@ -149,7 +149,7 @@ Shutdown Tracker must not infer code meaning automatically. A code such as `W4M1
 
 ## Formula and lookup-backed fields
 
-Project formula-backed fields may be useful operational dimensions, for example a Project `Day` field. Shutdown Tracker may import and use the evaluated value for filtering, grouping, scope, and Saved Views.
+Project formula-backed fields may be useful operational dimensions, for example a Project `Day` field. Shutdown Tracker may import and use the evaluated value for filtering, grouping, query-only Scope, and Saved Views.
 
 It must not implement or reproduce the Project formula engine.
 
@@ -181,10 +181,10 @@ Where appropriate, Scope may filter:
 - Today;
 - Critical selection and reporting;
 - Tasks;
-- Problems;
-- Actions;
-- Evidence;
-- Handover;
+- task-owned Delays / Problems;
+- task-owned Actions;
+- task-owned Evidence;
+- task-owned History and handover context;
 - operational counts;
 - execution reports.
 
@@ -204,7 +204,7 @@ A Saved View may persist:
 - time window;
 - Critical reporting selection/filtering where applicable.
 
-Views may be private, project-shared, or role-default subject to permissions.
+Views may be private, project-shared, or tier-default. A Saved View changes presentation only and never grants authority.
 
 The initial rule capability should remain deliberately simple: AND across filter dimensions with multi-select/OR within one dimension. Do not introduce arbitrary scripting, schedule expressions, predecessor logic, or formula evaluation.
 

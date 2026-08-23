@@ -61,7 +61,7 @@ Do not collapse task condition into one status.
 
 | Dimension | Examples |
 | --- | --- |
-| Execution state | Not started, Ready, In progress, Paused, Blocked, Completed |
+| Execution state | Not Started, In Progress, Paused, Blocked, Completed |
 | Tracking review state | Draft, Submitted, Tier 2 validated where required, Correction requested, Rejected, Superseded |
 | Tier 1 input state | Needs review, Approved as input, Rejected, Clarification requested, Superseded |
 | Candidate schedule state | Not prepared, Calculation pending, Candidate produced, Delta ready, Accepted, Rejected, Superseded |

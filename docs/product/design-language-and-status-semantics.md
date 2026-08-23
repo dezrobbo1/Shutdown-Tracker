@@ -12,7 +12,7 @@ The product is used during industrial shutdown execution. Visual certainty, stat
 | Restraint | Use fewer colours, fewer chips, fewer panels, and less decorative chrome |
 | Consistency | The same state must look and read the same across console and mobile |
 | Accessibility | Never rely on colour alone; maintain focus, text, and target-size rules |
-| Role fit | Field screens are sparse; planner/control screens can be denser but still structured |
+| Client/tier fit | Assigned-task Mobile screens are sparse; Tier 1 Console screens can be denser but still structured |
 | Project boundary visibility | Export/review/verification screens must prevent `.mpp` misunderstanding |
 
 ## Typography and copy
@@ -40,7 +40,7 @@ Examples:
 | Avoid | Use |
 | --- | --- |
 | Execution review console | Execution review |
-| Field shell | My work |
+| Mobile shell | Assigned tasks |
 | Visual state only | Visual review shell. Static/synthetic data. No production write workflow. |
 | Thread may be out of date | Last synced at [time] for task/progress surfaces |
 | Real-time collaboration | Needs response / assigned action / blocker owner |
@@ -50,11 +50,12 @@ Examples:
 ### Console
 
 - Use a compact top status strip for project/shift/import/export/sync context.
-- Use Today for attention queues and exceptions.
+- Use Today as a high-signal 24-hour project view for attention queues and exceptions.
 - Use Tasks for browsing and task detail.
-- Use Problems for blockers/actions/delays/holds.
-- Use Evidence for file/photo review.
-- Use Exports for planner review, export preview, and Project verification.
+- Use the Task Dashboard for Discussion, Delays / Problems, Actions, Evidence, and History.
+- Use Critical for operational reporting configuration/oversight, not schedule calculation.
+- Use Import / Export for Tier 1 input review, export preview, and Project verification.
+- Use Project Settings for membership, direct reports, mappings, time settings, and lifecycle.
 - Use tables/lists for comparison and review.
 - Use cards only for summary/attention blocks or mobile-style surfaces.
 - Use drawers or detail pages for deep record detail.
@@ -62,13 +63,13 @@ Examples:
 
 ### Mobile
 
-- My Work is the default landing view.
+- Assigned Tasks is the only top-level operational destination.
 - Show assigned work before diagnostics.
 - Use a compact sync banner.
 - Use cards for work items.
 - Keep forms short.
 - Keep primary actions thumb-friendly.
-- Put evidence and problem shortcuts near task actions.
+- Put evidence and delay/problem shortcuts inside Task Detail near execution actions.
 - Push history and review metadata into detail screens.
 
 ## Status classes
@@ -79,10 +80,10 @@ Use a small semantic palette. Do not create a new colour for every state.
 | --- | --- | --- |
 | Neutral | Context, unavailable, no issue, archived | Not started, No blocker, Context only |
 | Info | Active but not urgent | In progress, Server received, Review context |
-| Warning | Needs attention but not critical failure | Needs supervisor review, Needs planner review, Queued, Evidence pending, Paused |
+| Warning | Needs attention but not critical failure | Needs Tier 2 validation, Needs Tier 1 review, Queued, Evidence pending, Paused |
 | Critical | Work blocked, failed, unsafe, conflict, export blocked | Blocked, Failed, Conflict, Evidence missing, Export blocked, Re-import conflict |
-| Success | Accepted, approved, complete, verified | Supervisor accepted, Planner approved, Verified, Completed |
-| Restricted | Read-only or policy-blocked state | Summary task not export eligible, Contractor restricted, Planner only |
+| Success | Accepted, approved, complete, verified | Tier 2 validated, Tier 1 approved, Verified, Completed |
+| Restricted | Read-only or policy-blocked state | Summary task not export eligible, Assignment restricted, Tier 1 only |
 
 ## Domain state mapping
 
@@ -90,12 +91,13 @@ Use a small semantic palette. Do not create a new colour for every state.
 
 | State | Class | Notes |
 | --- | --- | --- |
-| Not started | Neutral | Imported but not active |
-| Ready | Info | Available to start |
-| In progress | Info | Active work |
+| Not Started | Neutral | No imported or Tracker evidence of start, and not complete |
+| In Progress | Info | Imported start/progress evidence or an active Tracker-event projection |
 | Paused | Warning | Temporary stop; reason required |
 | Blocked | Critical | Structured blocker required |
-| Completed | Success | Field completion; may still need review/evidence |
+| Completed | Success | Imported completion or Tracker completion; may still need review/evidence |
+
+Readiness and schedule variance are separate attention conditions. A planned start passing, a task appearing in Today, or a task being ready to start does not establish **In Progress**. See [Task Operational Model](task-operational-model.md) for the authoritative derivation.
 
 ### Progress review state
 
@@ -103,19 +105,19 @@ Use a small semantic palette. Do not create a new colour for every state.
 | --- | --- | --- |
 | Draft | Neutral | Not submitted |
 | Submitted | Info | Server received, review pending |
-| Needs supervisor review | Warning | Supervisor action required |
-| Supervisor accepted | Success | Operationally valid, not export approval |
-| Correction requested | Warning | User/supervisor action needed |
+| Needs Tier 2 validation | Warning | Tier 2 action required where project policy enables validation |
+| Tier 2 validated | Success | Operationally credible, not Project-input approval |
+| Correction requested | Warning | Assigned user/Tier 2 action needed |
 | Rejected | Critical | Not accepted |
 | Superseded | Neutral | Replaced by newer record |
 
-### Planner review state
+### Tier 1 input-review state
 
 | State | Class | Notes |
 | --- | --- | --- |
-| Needs planner review | Warning | Planner decision required |
-| Planner approved | Success | Eligible for export preview only |
-| Planner rejected | Critical | Not exportable |
+| Needs Tier 1 review | Warning | Tier 1 decision required |
+| Tier 1 approved | Success | Exact input eligible for the sealed candidate path only |
+| Tier 1 rejected | Critical | Not exportable |
 
 ### Export state
 
@@ -124,7 +126,7 @@ Use a small semantic palette. Do not create a new colour for every state.
 | Not eligible | Restricted | Policy or task type blocks export |
 | Eligible | Info | Candidate may be reviewed |
 | Export blocked | Critical | Blocker/evidence/lineage/policy issue |
-| Approved for export | Success | Planner-approved candidate |
+| Approved for export | Success | Tier 1-approved candidate |
 | In export preview | Info | Draft preview; `.mpp` not updated |
 | Artifact generated | Info | MSPDI/XML generated; `.mpp` not updated |
 | Opened in Microsoft Project | Warning | Manual check underway |
@@ -147,12 +149,12 @@ Use a small semantic palette. Do not create a new colour for every state.
 Use exact Project-boundary copy where appropriate.
 
 ```text
-Planner approval marks this progress as eligible for export preview. The master .mpp is not updated.
+Tier 1 approval authorises this exact input for an updated Project candidate. The current master schedule is unchanged.
 Draft export preview — master .mpp not updated.
 Export batch approved — master .mpp not updated.
 MSPDI/XML artifact generated — master .mpp not updated.
-Planner must manually open/check the artifact in Microsoft Project.
-Verified in Microsoft Project — master .mpp update remains planner-controlled.
+The Tier 1 schedule owner must manually open/check the artifact in Microsoft Project.
+Verified in Microsoft Project — master .mpp update remains Tier 1-controlled.
 Shutdown Tracker records verification metadata only.
 ```
 
@@ -183,7 +185,7 @@ Maximum default chips:
 | --- | --- |
 | Mobile task card | 2-3 |
 | Console summary card | 2 |
-| Planner review row | 2-4 because review/export comparison is the task |
+| Tier 1 review row | 2-4 because review/export comparison is the task |
 | Task detail | As needed, grouped by state dimension |
 
 ## Component guidance
@@ -196,8 +198,8 @@ Maximum default chips:
 | ProgressComparisonTable | Old/new value comparison | Card-only export diff |
 | SyncBanner | Compact mobile/console sync summary | Oversized top diagnostic tiles |
 | TaskCard | Mobile assigned work | Full review/export lifecycle on every card |
-| DetailDrawer | Console task/problem/evidence detail | Modal sprawl |
-| DataTable | Planner/control review | Spreadsheet-like inline editing across many columns |
+| TaskDashboardSection | Console task/problem/evidence detail | Detached modal sprawl |
+| DataTable | Tier 1 review | Spreadsheet-like inline editing across many columns |
 
 ## Empty, loading, and error states
 
@@ -229,9 +231,9 @@ Before accepting a frontend visual PR, confirm:
 
 - top-level navigation remains within approved IA;
 - state labels follow this status model;
-- mobile My Work shows work before diagnostics;
+- Mobile Assigned Tasks shows work before diagnostics;
 - console Today prioritizes attention and exceptions;
-- planner/export screens use old/new/source comparison;
+- Tier 1 Import / Export screens use old/new/source comparison;
 - Project handoff copy is visible;
 - queued/failed/server-received states are explicit;
 - no screen implies hidden `.mpp` update;

@@ -6,13 +6,13 @@
 - Imported WBS, tasks, resources, assignments, calendars, and custom-field metadata
 - Project Operational Mapping and Source Catalogue
 - Versioned Import Profiles and Operational Categories
-- Scope and Saved Operational Views
+- Query-only Operational Scope and Saved Views
 - Task execution and structured progress
 - Tier 1 input review
 - Project Candidate Schedule Handoff
-- Problems and Actions
-- Evidence and Handover
-- Critical Watchlists, Critical Work Packages, Reporting Policies, and Critical Updates
+- Task-owned Delays / Problems and Actions
+- Task-owned Evidence, Discussion, and History
+- Critical items, Critical Work Packs, reporting policies, and immutable reports
 - Candidate/input approval, candidate-schedule review, adoption/merge disposition, and audit
 - Entity-linked Discussion / Communications Layer
 - Tier 1/Tier 2/Tier 3 project membership, direct reports, and explicit assignments
@@ -142,7 +142,7 @@ MVP source modes include:
 - WBS/hierarchy/selected summary ancestry;
 - task assignments resolved through Resource `Group`.
 
-Original Project values are never overwritten. Tracker display aliases, roll-ups, Scope, Saved Views, and responsibility configuration remain separate.
+Original Project values are never overwritten. Tracker display aliases, roll-ups, query-only Scope, Saved Views, and explicit assignment configuration remain separate.
 
 Classification is not authorisation. Categories and saved views support filtering, grouping, display, Critical selection, and bulk Tier 2 assignment. Active membership and saved task/reporting assignments determine access.
 
@@ -150,13 +150,13 @@ Classification is not authorisation. Categories and saved views support filterin
 
 A Critical item is an operational reporting object, not a scheduling object. The first approved Critical Work Pack UX selects one imported summary task plus descendants.
 
-Project `Critical`, Total Slack, Free Slack, or other schedule-calculated values may be displayed as read-only Project context but do not automatically define Critical Watch membership.
+Project `Critical`, Total Slack, Free Slack, or other schedule-calculated values may be displayed as read-only Project context but do not automatically create a Critical reporting item or assignment.
 
-## Problems, Actions, Evidence, Handover, and Discussion
+## Task-owned operational records
 
-Problems describe execution constraints. Actions assign ownership. Evidence stores controlled file/photo metadata. Handover is explicit shift-transfer information.
+Delays / Problems describe execution constraints. Actions assign ownership. Evidence stores controlled file/photo metadata. Discussion provides contextual comments. History preserves events, corrections, supersessions, and relevant handover context.
 
-Entity-linked Discussion may support these structured records later, but comments must not replace progress, blockers, actions, evidence, or handover.
+Entity-linked Discussion may support these structured records later, but comments must not replace progress, blockers, actions, evidence, completion, or explicit handover context.
 
 ## Approved application structure
 

@@ -18,9 +18,9 @@ Likewise, a complete candidate schedule may be successfully produced and still b
 
 ### Execution state
 
-`not_started -> ready -> in_progress -> paused/blocked -> completed`
+Initial activation derives `not_started`, `in_progress`, or `completed` from accepted Project facts. After Tracker execution begins, audited Start, Pause, Resume, Block, Complete, Correction, and Reversal events drive the current projection.
 
-Corrections use explicit events/supersession rather than destructive history edits.
+Readiness and schedule variance remain separate attention conditions; passing a planned start never establishes `in_progress`. Corrections use explicit events/supersession rather than destructive history edits. See [Task Operational Model](task-operational-model.md).
 
 ### Progress review state
 

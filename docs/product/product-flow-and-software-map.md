@@ -47,7 +47,7 @@ Project lifecycle meaning and project-creation rules are defined in [Project Lif
 
 The Console top-level sections are:
 
-1. **Today** — high-signal view of the next operational day, attention conditions, due reporting, and exceptions.
+1. **Today** — high-signal view of the configured 24-hour operational day, attention conditions, due reporting, and exceptions.
 2. **Tasks** — project task explorer, filters, saved views, and entry to each Task Dashboard.
 3. **Critical** — Tier 1 configuration and oversight of selected operational reporting items.
 4. **Import / Export** — schedule intake, immutable snapshot history, candidate preparation, and the Microsoft Project handoff.

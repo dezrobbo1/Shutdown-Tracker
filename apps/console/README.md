@@ -1,10 +1,25 @@
 # Master Console
 
-Purpose: React and Vite application for shutdown control, planners, coordinators, supervisors, package owners, and managers.
+Purpose: React/Vite Tier 1 Master Console for whole-project operational control.
 
-Current status: scaffolded React/Vite shell with shared API client wiring, opt-in live import/export review data fetching, a static Task Progress Review visual shell, and a separate Microsoft Project round-trip acceptance workspace.
+Current status: scaffolded React/Vite shell with read-only API wiring for configured import/export review data, a static Task Progress Review visual shell, and a separate guarded Microsoft Project round-trip acceptance workspace.
 
-The normal console renders synthetic review state by default for source validation, imported snapshots, export preview, planner/supervisor review, Project verification, blockers, and handover examples.
+The ordinary Console renders synthetic review state by default for source validation, imported snapshots, export preview, tracking/input review, Project verification, blockers, and handover examples. It does not yet implement the approved ordinary shell.
+
+Approved ordinary shell target:
+
+```text
+Login
+Projects Home
+Today
+Tasks
+Task Dashboard
+Critical
+Import / Export
+Project Settings
+```
+
+Problems, Discussion, Actions, Evidence, and History belong inside the relevant Task Dashboard. Console access is Tier 1 only.
 
 To fetch live review data from the API in the normal console, configure:
 
@@ -50,14 +65,14 @@ choose and review Project XML
 -> import source into a fresh/reused synthetic test project
 -> project worker parses imported task facts
 -> API persists a reviewable snapshot
--> planner reviews and accepts/rejects the snapshot
+-> Tier 1 reviews and accepts/rejects the snapshot
 -> select a leaf task and direct input
 -> one primary UI action creates the exact candidate, records approval,
    seals the preview, approves the batch and generates the candidate
 -> download complete-source candidate XML
 -> open in Microsoft Project
 -> Project recalculates
--> planner reviews the result
+-> Tier 1 schedule owner reviews the result
 -> record Project-open and verification metadata
 ```
 
@@ -73,10 +88,15 @@ The normal console remains isolated from the acceptance workspace: the round-tri
 
 ## Visual shell limitations
 
-The current Task Progress Review surfaces outside the acceptance workspace are static/synthetic visual review surfaces. They should not be treated as final production route structure or backend API contracts.
+The current Task Progress Review surfaces outside the acceptance workspace are static/synthetic visual review surfaces. They are not the approved production route structure or backend API contracts.
 
 Relevant product source docs:
 
+- `docs/product/product-flow-and-software-map.md`
+- `docs/product/user-tier-and-assignment-model.md`
+- `docs/product/task-operational-model.md`
+- `docs/product/project-lifecycle-and-import-export.md`
+- `docs/product/implementation-status-map.md`
 - `docs/product/frontend-visual-review-scope.md`
 - `docs/product/ux-anti-slop-rules.md`
 - `docs/product/design-language-and-status-semantics.md`

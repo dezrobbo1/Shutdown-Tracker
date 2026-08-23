@@ -80,14 +80,14 @@ projects/{projectId}/export-artifacts/{exportBatchId}/{exportBatchId}.mspdi.xml
 projects/{projectId}/evidence/{evidenceId}/{safeFilename}
 ```
 
-Storage URIs should be treated as internal references. User-facing access should go through the API or short-lived signed URLs issued after project/role checks.
+Storage URIs should be treated as internal references. User-facing access should go through the API or short-lived signed URLs issued after project-membership, tier, and explicit-assignment checks.
 
 ## Access Model
 
 Production object storage should follow these rules:
 
 - Buckets or containers are private.
-- The API mediates access decisions using project membership, role permissions, and audit policy.
+- The API mediates access decisions using active project membership, Tier 1 whole-project authority or Tier 2/Tier 3 task assignments, and audit policy.
 - Workers receive only the object references required for their specific import/export job.
 - Signed URLs, when used, are short lived and scoped to one object operation.
 - Source-file and export-artifact bytes are never stored in PostgreSQL.

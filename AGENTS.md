@@ -32,9 +32,9 @@ The handoff is intended to produce a **complete updated Project candidate schedu
 
 Use this three-part authority model:
 
-- **Execution/input authority — Shutdown Tracker.** Capture and approve field execution facts and authorised planner-entered inputs such as progress or actuals under the active handoff policy.
+- **Execution/input authority — Shutdown Tracker.** Capture and approve field execution facts and authorised Tier 1-entered inputs such as progress or actuals under the active handoff policy.
 - **Calculation authority — Microsoft Project.** A complete updated candidate schedule may be recalculated by Microsoft Project after approved inputs are applied. Project-calculated dates, durations, roll-ups, work, assignment values, timephased data, slack, criticality, and related consequences are not treated as Shutdown Tracker-authored inputs.
-- **Candidate/adoption authority — Planner.** A planner reviews the candidate and its source-versus-candidate delta and decides whether to reject it, retain it for review, use it as the next schedule/master, or use Microsoft Project to merge/import it into another existing schedule.
+- **Candidate/adoption authority — Tier 1 schedule owner.** Tier 1 reviews the candidate and its source-versus-candidate delta and decides whether to reject it, retain it for review, use it as the next schedule/master, or use Microsoft Project to merge/import it into another existing schedule.
 
 Shutdown Tracker must not:
 
@@ -48,35 +48,41 @@ Shutdown Tracker must not:
 Shutdown Tracker may:
 
 - prepare exact, reviewed execution inputs against an immutable accepted Project snapshot;
-- accept permitted planner-entered inputs in the Master Console with full provenance and policy checks;
+- accept permitted Tier 1-entered inputs in the Master Console with full provenance and policy checks;
 - generate a sealed approved-input manifest;
 - generate a complete updated MSPDI/XML candidate from the accepted source plus approved inputs;
-- invoke or support a planner-controlled Microsoft Project process against a disposable copy, subject to an accepted implementation ADR and safety controls;
+- invoke or support a Tier 1-controlled Microsoft Project process against a disposable copy, subject to an accepted implementation ADR and safety controls;
 - allow Microsoft Project to recalculate the disposable candidate;
 - present a read-only source-versus-candidate impact comparison, including Project-calculated schedule consequences;
-- allow the planner to reject, retain, adopt, or merge/import the candidate through Microsoft Project;
-- record candidate hashes, deltas, Project version, planner decision, destination-before/result-after merge provenance, and later master-adoption metadata.
+- allow the Tier 1 schedule owner to reject, retain, adopt, or merge/import the candidate through Microsoft Project;
+- record candidate hashes, deltas, Project version, Tier 1 decision, destination-before/result-after merge provenance, and later master-adoption metadata.
 
-The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating or a planner deliberately using a reviewed candidate schedule.
+The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating or a Tier 1 schedule owner deliberately using a reviewed candidate schedule.
 
 Other non-negotiable rules:
 
-- Field progress must pass through supervisor review where required, planner input review, input eligibility, and preview before candidate generation.
-- Planner-originated Console inputs may skip supervisor review only when project policy explicitly allows it; they must not skip provenance, stale-data checks, policy checks, or planner input authority.
+- Field progress must pass through Tier 2 tracking validation where required, Tier 1 input review, input eligibility, and preview before candidate generation.
+- Tier 1-originated Console inputs may skip Tier 2 tracking validation only when project policy explicitly allows it; they must not skip provenance, stale-data checks, policy checks, exact approval binding, or Tier 1 input authority.
 - Approved input authority is limited to explicitly reviewed facts under the active handoff policy. Summary-task actual inputs, dependencies, constraints, calendars, baselines, WBS structure, and unreviewed planned-date changes remain prohibited direct inputs unless a later explicit product decision expands authority.
 - A Project-calculated consequence may differ from the source after Microsoft Project recalculates; label it as a Project-calculated consequence rather than an approved Shutdown Tracker input.
-- Planner edits made directly in Microsoft Project during candidate review must be distinguished from both approved Tracker inputs and Project-calculated consequences.
+- Tier 1 schedule-owner edits made directly in Microsoft Project during candidate review must be distinguished from both approved Tracker inputs and Project-calculated consequences.
 - Candidate acceptance is not the same as `adopted_as_new_master` or `merged_into_existing`; record those outcomes separately.
 - Merge/import testing must be separate from standalone candidate testing and must use a disposable/backed-up destination schedule before production use.
-- Critical Work Packages and Critical Watchlists are configurable reporting constructs, not calculated critical-path features.
+- Critical items and Critical Work Packs are configurable reporting constructs, not calculated critical-path features.
 - Project Operational Mapping may interpret imported fields, hierarchy, and resource-assignment metadata operationally, but imported source values remain immutable.
-- Project-derived category membership is not application authorization. Visibility/relevance, responsibility, update permission, review permission, and export authority remain separate.
+- Project-derived category membership is not application authorization. Tier 1 whole-project authority and explicit Tier 2/Tier 3 task or reporting assignments determine access; categories remain filter, display, reporting, and bulk-selection context only.
 - Mapping revalidation must never silently remap an uncertain Project source after re-import.
 - Communications must start with structured domain records. Entity-linked Discussion may support those records later; generic chat, channels, and private messaging are not an operational source of truth by default.
 - Preserve append-only audit history and explicit approval, correction, rejection, supersession, candidate-disposition, adoption, and merge provenance.
 
 Relevant authority documents include:
 
+- [Product Flow and Software Map](docs/product/product-flow-and-software-map.md)
+- [User Tier and Assignment Model](docs/product/user-tier-and-assignment-model.md)
+- [Task Operational Model](docs/product/task-operational-model.md)
+- [Critical Reporting Model](docs/product/critical-reporting-model.md)
+- [Project Lifecycle and Import / Export](docs/product/project-lifecycle-and-import-export.md)
+- [Implementation Status Map](docs/product/implementation-status-map.md)
 - [ADR-001: Microsoft Project Integration](docs/adr/ADR-001-microsoft-project-integration.md)
 - [ADR-007: Data Ownership and Schedule Authority](docs/adr/ADR-007-data-ownership-and-schedule-authority.md)
 - [ADR-008: MVP Scope Boundary](docs/adr/ADR-008-mvp-scope-boundary.md)
@@ -87,6 +93,8 @@ Relevant authority documents include:
 - [Communications Layer](docs/product/communications-layer.md)
 - [Offline Audit and Sync Rules](docs/product/offline-audit-sync-rules.md)
 
+The six product documents listed first are primary authority. No old named-role matrix or area/package/contract/watchlist permission-scope model is authoritative. The application user types are Tier 1, Tier 2, and Tier 3 only.
+
 ## Current implementation guardrails
 
 - Do not infer that a documented target workflow already exists in runtime code.
@@ -94,12 +102,14 @@ Relevant authority documents include:
 - The current worker's narrow field allowlist is a **direct-input boundary**. It does not mean a Microsoft Project-calculated candidate may differ from the source only in those fields.
 - A pre-Project protected-fingerprint test may prove that Shutdown Tracker did not inject unapproved direct inputs. Do not apply that same invariant to a candidate after Microsoft Project has recalculated it.
 - Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist.
-- Keep the console top-level navigation fixed to Today, Tasks, Problems, Evidence, and Exports.
-- Keep the mobile top-level navigation fixed to My Work, Today, Problems, Evidence, and Sync.
-- A read-only planner candidate-impact comparison is allowed; an editable Gantt, dependency editor, or replacement scheduling UI is not.
+- Keep the Console top-level structure fixed to Today, Tasks, Critical, Import / Export, and Project Settings.
+- Keep the Mobile App top-level model fixed to Assigned Tasks only. Sync is a visible transport/recovery state, not a destination.
+- Keep Problems, Discussion, Actions, Evidence, and History inside the relevant Task Dashboard. Do not recreate them as top-level applications.
+- Console access is Tier 1 only. Mobile access is Tier 2/Tier 3 only and remains explicitly assignment-bounded.
+- A read-only Tier 1 candidate-impact comparison is allowed; an editable Gantt, dependency editor, or replacement scheduling UI is not.
 - Follow [docs/product/ux-anti-slop-rules.md](docs/product/ux-anti-slop-rules.md) and [docs/product/design-language-and-status-semantics.md](docs/product/design-language-and-status-semantics.md).
-- The API owns request/response workflows and persistence orchestration. Project parsing and candidate/artifact processing belong in the project worker or a separately reviewed planner companion; do not move Project processing into arbitrary API code.
-- For Project Operational Mapping, the worker returns Project source facts/metadata only. The API owns Tracker category/profile meaning, validation decisions, resolved membership orchestration, Scope/Saved Views, authorization, and audit.
+- The API owns request/response workflows and persistence orchestration. Project parsing and candidate/artifact processing belong in the project worker or a separately reviewed Microsoft Project companion; do not move Project processing into arbitrary API code.
+- For Project Operational Mapping, the worker returns Project source facts/metadata only. The API owns Tracker category/profile meaning, validation decisions, resolved membership orchestration, query-only Scope/Saved Views, explicit assignment orchestration, authorization, and audit.
 - Keep schema changes in versioned SQL files under `infra/migrations`. Do not rewrite an already applied migration.
 - Use only synthetic or explicitly approved sanitized fixtures. Do not commit real schedules, real Project files, customer data, secrets, generated candidate schedules, screenshots containing operational data, or unrelated binaries.
 
@@ -183,7 +193,7 @@ For export/candidate changes, prove separately that:
 3. Microsoft Project can open/import and recalculate the candidate;
 4. Project-calculated consequences are classified rather than rejected merely for changing protected schedule fields;
 5. unexplained differences, source overwrite, wrong-task application, or lost approved inputs fail safe;
-6. planner adoption/merge is a separate recorded outcome.
+6. Tier 1 adoption/merge is a separate recorded outcome.
 
 Before declaring completion, inspect the complete diff, confirm no temporary files remain, and verify unrelated worktrees are unchanged.
 
