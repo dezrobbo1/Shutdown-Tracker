@@ -3,7 +3,6 @@ import {
   shutdownTrackerReviewApiSurfaces
 } from "@shutdown-tracker/api-client";
 import type {
-  ExportPreviewDetail,
   ImportReviewSnapshotDetail,
   ImportReviewSnapshotSummary
 } from "@shutdown-tracker/api-client";
@@ -14,7 +13,6 @@ export type ConsoleReviewRuntimeConfig = {
   baseUrl: string;
   projectId: string;
   importSnapshotId: string;
-  exportBatchId: string;
   liveEnabled: boolean;
 };
 
@@ -24,8 +22,6 @@ export type ConsoleReviewData = {
   snapshots: ImportReviewSnapshotSummary[];
   selectedSnapshotId: string | null;
   snapshotDetail: ImportReviewSnapshotDetail | null;
-  exportBatchId: string | null;
-  exportPreview: ExportPreviewDetail | null;
   message: string;
 };
 
@@ -42,34 +38,28 @@ export const reviewApiClient = createShutdownTrackerApiClient({
   baseUrl: reviewApiRuntimeConfig.baseUrl
 });
 
+const importReadSurfaces = shutdownTrackerReviewApiSurfaces.filter((surface) =>
+  ["List import snapshots", "Read import snapshot"].includes(surface.label)
+);
+
 export const reviewApiConnection = {
   baseUrlLabel: reviewApiRuntimeConfig.baseUrl || "Relative API",
   projectIdLabel: reviewApiRuntimeConfig.projectId || "No project configured",
   modeLabel: reviewApiRuntimeConfig.liveEnabled ? "Live review data" : "Synthetic review data",
-  operationCount: shutdownTrackerReviewApiSurfaces.length,
-  highlightedSurfaces: shutdownTrackerReviewApiSurfaces.filter((surface) =>
-    [
-      "List import snapshots",
-      "Create lineage link",
-      "Create export preview",
-      "Approve export batch",
-      "Record generated artifact"
-    ].includes(surface.label)
-  ),
-  surfaces: shutdownTrackerReviewApiSurfaces
+  operationCount: importReadSurfaces.length,
+  highlightedSurfaces: importReadSurfaces,
+  surfaces: importReadSurfaces
 };
 
 export function buildConsoleReviewConfig(env: ConsoleReviewEnv): ConsoleReviewRuntimeConfig {
   const baseUrl = cleanEnvValue(env.VITE_SHUTDOWN_TRACKER_API_BASE_URL);
   const projectId = cleanEnvValue(env.VITE_SHUTDOWN_TRACKER_PROJECT_ID);
   const importSnapshotId = cleanEnvValue(env.VITE_SHUTDOWN_TRACKER_IMPORT_SNAPSHOT_ID);
-  const exportBatchId = cleanEnvValue(env.VITE_SHUTDOWN_TRACKER_EXPORT_BATCH_ID);
 
   return {
     baseUrl,
     projectId,
     importSnapshotId,
-    exportBatchId,
     liveEnabled: projectId.length > 0
   };
 }
@@ -78,7 +68,7 @@ export function initialConsoleReviewLoadState(config = reviewApiRuntimeConfig): 
   if (config.liveEnabled) {
     return {
       status: "loading",
-      message: "Fetching import/export review data."
+      message: "Fetching read-only import snapshot data."
     };
   }
 
@@ -99,8 +89,6 @@ export async function loadConsoleReviewData(
       snapshots: [],
       selectedSnapshotId: null,
       snapshotDetail: null,
-      exportBatchId: null,
-      exportPreview: null,
       message: "Synthetic review data. Set VITE_SHUTDOWN_TRACKER_PROJECT_ID to fetch live review data."
     };
   }
@@ -108,14 +96,9 @@ export async function loadConsoleReviewData(
   const snapshots = await client.importReview.listSnapshots(config.projectId);
   const selectedSnapshotId = selectSnapshotId(snapshots, config.importSnapshotId);
 
-  const [snapshotDetail, exportPreview] = await Promise.all([
-    selectedSnapshotId === null
-      ? Promise.resolve(null)
-      : client.importReview.getSnapshot(config.projectId, selectedSnapshotId),
-    config.exportBatchId.length === 0
-      ? Promise.resolve(null)
-      : client.exportPreview.get(config.projectId, config.exportBatchId)
-  ]);
+  const snapshotDetail = selectedSnapshotId === null
+    ? null
+    : await client.importReview.getSnapshot(config.projectId, selectedSnapshotId);
 
   return {
     mode: "live",
@@ -123,9 +106,7 @@ export async function loadConsoleReviewData(
     snapshots,
     selectedSnapshotId,
     snapshotDetail,
-    exportBatchId: config.exportBatchId || null,
-    exportPreview,
-    message: buildLoadedMessage(snapshots, exportPreview)
+    message: buildLoadedMessage(snapshots)
   };
 }
 
@@ -145,11 +126,9 @@ function selectSnapshotId(snapshots: ImportReviewSnapshotSummary[], configuredSn
   return [...snapshots].sort((left, right) => right.snapshotVersion - left.snapshotVersion)[0]?.id ?? null;
 }
 
-function buildLoadedMessage(snapshots: ImportReviewSnapshotSummary[], exportPreview: ExportPreviewDetail | null) {
+function buildLoadedMessage(snapshots: ImportReviewSnapshotSummary[]) {
   const snapshotLabel = snapshots.length === 1 ? "snapshot" : "snapshots";
-  const exportLabel = exportPreview === null ? "no export batch loaded" : "export batch loaded";
-
-  return `${snapshots.length} import ${snapshotLabel}; ${exportLabel}.`;
+  return `${snapshots.length} import ${snapshotLabel} loaded read-only.`;
 }
 
 function cleanEnvValue(value: unknown) {
