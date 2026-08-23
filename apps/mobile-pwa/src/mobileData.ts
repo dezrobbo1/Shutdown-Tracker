@@ -1,190 +1,218 @@
-import type { LucideIcon } from "lucide-react";
-import {
-  Camera,
-  ClipboardList,
-  Home,
-  Send,
-  ListChecks,
-  MessageSquareWarning,
-  RefreshCw,
-  Signal
-} from "lucide-react";
+export type ReviewPersona = "tier2" | "tier3";
 
-export type MobileNavItem = {
+export type StatusTone =
+  | "neutral"
+  | "info"
+  | "warning"
+  | "critical"
+  | "success"
+  | "restricted";
+
+export type StatusLabel = {
   label: string;
-  icon: LucideIcon;
-  active?: boolean;
+  tone: StatusTone;
 };
 
-export type MobileWorkItem = {
+export type SyncState = StatusLabel & {
+  detail: string;
+};
+
+export type CriticalReportObligation = {
+  source: string;
+  reportingOwner: string;
+  reportingMode: string;
+  latestReport: string;
+  nextReportDue: string;
+  dueState: StatusLabel;
+  operationalCondition: string;
+};
+
+export type MobileTask = {
+  id: string;
+  persona: ReviewPersona;
+  taskCode: string;
   title: string;
   workPackage: string;
-  state: string;
-  detail: string;
+  plannedWindow: string;
+  executionState: StatusLabel;
+  stateBasis: string;
+  attentionCondition?: StatusLabel;
   percentComplete: string;
-  primaryAction: string;
-  reviewBadge: string;
-  blockerBadge: string;
-  evidenceBadge: string;
-  syncBadge: string;
-};
-
-export type SyncSignal = {
-  label: string;
-  detail: string;
-};
-
-export type MobileProgressFlow = {
-  taskName: string;
-  currentState: string;
-  percentComplete: string;
+  assignmentRelationship: string;
+  assignmentDetail: string;
+  tier3Assignments?: string[];
+  taskIndicator: StatusLabel;
+  syncState: SyncState;
   actualStart: string;
   actualFinish: string;
-  comment: string;
-  visualStates: string[];
+  progressComment: string;
+  discussionSummary: string;
+  problemSummary: string;
+  actionSummary: string;
+  evidenceSummary: string;
+  history: string[];
+  criticalReport?: CriticalReportObligation;
+  criticalContext?: string;
 };
 
-export type MobileSyncQueueItem = {
-  label: string;
-  task: string;
-  detail: string;
-  state: string;
-};
-
-export const mobileNavItems: MobileNavItem[] = [
-  { label: "My Work", icon: Home, active: true },
-  { label: "Today", icon: ListChecks },
-  { label: "Problems", icon: MessageSquareWarning },
-  { label: "Evidence", icon: Camera },
-  { label: "Sync", icon: Signal }
-];
-
-export const mobileWorkItems: MobileWorkItem[] = [
+export const mobileTasks: MobileTask[] = [
   {
-    title: "C2 cyclone — remove access cover",
+    id: "c2-access-cover",
+    persona: "tier2",
+    taskCode: "C2-RF-014",
+    title: "C2 Cyclone — remove access cover",
     workPackage: "Calciner C2 refractory outage",
-    state: "In progress",
-    detail: "Imported Project 40%; proposed progress ready for review",
+    plannedWindow: "07:00–15:00",
+    executionState: { label: "In Progress", tone: "info" },
+    stateBasis: "Tracker Start event recorded at 07:12.",
     percentComplete: "75%",
-    primaryAction: "Submit progress",
-    reviewBadge: "Awaiting review",
-    blockerBadge: "No blocker",
-    evidenceBadge: "Evidence ready",
-    syncBadge: "Server received"
+    assignmentRelationship: "Tracking responsibility",
+    assignmentDetail: "Assigned by Tier 1. Tier 2 retains tracking responsibility.",
+    tier3Assignments: ["Tier 3 user B · WORKING_ON"],
+    taskIndicator: { label: "Evidence ready", tone: "success" },
+    syncState: {
+      label: "Server received",
+      detail: "Last synced at 13:15.",
+      tone: "success"
+    },
+    actualStart: "20 Jun 2026 · 07:12",
+    actualFinish: "Not set",
+    progressComment: "Access cover removed. Inspection handoff is ready.",
+    discussionSummary: "Tier 3 user B added a field handoff note at 12:48.",
+    problemSummary: "No active delay or problem.",
+    actionSummary: "Confirm inspection access before 14:00.",
+    evidenceSummary: "Two photo records are attached to this visual example.",
+    history: [
+      "13:15 · Progress example shown as server received.",
+      "12:48 · Field handoff comment added.",
+      "07:12 · Tracker Start event established In Progress."
+    ],
+    criticalReport: {
+      source: "Critical Work Pack · C2 refractory outage",
+      reportingOwner: "Tier 2 user A",
+      reportingMode: "Fixed times",
+      latestReport: "10:00 · On plan",
+      nextReportDue: "14:00",
+      dueState: { label: "Due in 45 min", tone: "warning" },
+      operationalCondition: "On plan"
+    }
   },
   {
-    title: "C2 cyclone — inspect refractory lining",
-    workPackage: "Calciner C2 refractory outage",
-    state: "Completed",
-    detail: "Completion update needs evidence before supervisor acceptance",
-    percentComplete: "100%",
-    primaryAction: "Request evidence",
-    reviewBadge: "Accepted by supervisor",
-    blockerBadge: "No blocker",
-    evidenceBadge: "Evidence missing",
-    syncBadge: "Server received"
+    id: "d2-scaffold-inspection",
+    persona: "tier2",
+    taskCode: "D2-SC-021",
+    title: "D2 Stack — scaffold inspection",
+    workPackage: "D2 stack access workfront",
+    plannedWindow: "11:00–13:00",
+    executionState: { label: "Not Started", tone: "neutral" },
+    stateBasis: "No Tracker Start/Resume event. Imported Actual Start is empty and imported progress is 0%.",
+    attentionCondition: { label: "Late to Start", tone: "warning" },
+    percentComplete: "0%",
+    assignmentRelationship: "Tracking responsibility",
+    assignmentDetail: "Assigned by Tier 1. No Tier 3 field assignment has been recorded.",
+    tier3Assignments: [],
+    taskIndicator: { label: "Access pending", tone: "warning" },
+    syncState: {
+      label: "Queued on device",
+      detail: "Queued on this device. Not yet sent.",
+      tone: "warning"
+    },
+    actualStart: "Not set",
+    actualFinish: "Not set",
+    progressComment: "Awaiting the scaffold release before execution can start.",
+    discussionSummary: "No discussion entries in this visual example.",
+    problemSummary: "Access release is late; no Tracker Start event exists.",
+    actionSummary: "Follow up scaffold inspection release at 13:30.",
+    evidenceSummary: "No evidence required before start.",
+    history: [
+      "13:15 · Late-to-start attention condition shown separately.",
+      "11:00 · Planned start passed without execution evidence."
+    ]
   },
   {
-    title: "Kiln feed chute — awaiting scaffold",
-    workPackage: "Calciner C2 access workfront",
-    state: "Blocked",
-    detail: "Scaffold not available; progress held from export",
-    percentComplete: "25%",
-    primaryAction: "Create blocker",
-    reviewBadge: "Needs planner review",
-    blockerBadge: "Blocked",
-    evidenceBadge: "Evidence not required",
-    syncBadge: "Server received"
-  },
-  {
-    title: "Valve isolation — field update draft",
-    workPackage: "Calciner C2 isolation workfront",
-    state: "In progress",
-    detail: "Saved locally for later send",
-    percentComplete: "15%",
-    primaryAction: "Review draft",
-    reviewBadge: "Awaiting review",
-    blockerBadge: "No blocker",
-    evidenceBadge: "Evidence draft",
-    syncBadge: "Queued on this device"
-  },
-  {
-    title: "Crane lift — evidence upload retry",
-    workPackage: "Calciner C2 lifting workfront",
-    state: "Blocked",
-    detail: "Could not send but remains saved",
+    id: "hv-inlet-cleanout",
+    persona: "tier3",
+    taskCode: "HV-CL-008",
+    title: "HV inlet — vacuum clean-out",
+    workPackage: "HV inlet access workfront",
+    plannedWindow: "12:00–16:00",
+    executionState: { label: "In Progress", tone: "info" },
+    stateBasis: "Tracker Start event recorded at 12:06.",
     percentComplete: "30%",
-    primaryAction: "Retry send",
-    reviewBadge: "Awaiting review",
-    blockerBadge: "Blocked",
-    evidenceBadge: "Evidence saved locally",
-    syncBadge: "Failed to send"
+    assignmentRelationship: "WORKING_ON",
+    assignmentDetail: "Assigned by Tier 2 user A, who retains tracking responsibility.",
+    taskIndicator: { label: "No blocker", tone: "neutral" },
+    syncState: {
+      label: "Local draft",
+      detail: "Saved locally.",
+      tone: "neutral"
+    },
+    actualStart: "20 Jun 2026 · 12:06",
+    actualFinish: "Not set",
+    progressComment: "Clean-out progress is saved as a visual local draft.",
+    discussionSummary: "Tier 2 user A requested an update before 15:00.",
+    problemSummary: "No active delay or problem.",
+    actionSummary: "Provide progress update before 15:00.",
+    evidenceSummary: "One photo record is saved locally in this visual example.",
+    history: [
+      "13:12 · Local progress draft shown.",
+      "12:06 · Tracker Start event established In Progress."
+    ]
+  },
+  {
+    id: "permit-isolation-release",
+    persona: "tier3",
+    taskCode: "ISO-044",
+    title: "Permit isolation — await operations release",
+    workPackage: "Calciner isolation workfront",
+    plannedWindow: "10:00–14:00",
+    executionState: { label: "Blocked", tone: "critical" },
+    stateBasis: "Tracker Block event recorded at 11:20 with an operations-release reason.",
+    attentionCondition: { label: "Running beyond planned finish", tone: "critical" },
+    percentComplete: "20%",
+    assignmentRelationship: "FIELD_CONTROL",
+    assignmentDetail: "Assigned by Tier 2 user A, who retains tracking responsibility.",
+    taskIndicator: { label: "Release blocked", tone: "critical" },
+    syncState: {
+      label: "Failed",
+      detail: "Could not send. Still saved on this device.",
+      tone: "critical"
+    },
+    actualStart: "20 Jun 2026 · 10:18",
+    actualFinish: "Not set",
+    progressComment: "Field control remains in place while the release is resolved.",
+    discussionSummary: "Tier 2 user A acknowledged the blocked-state example.",
+    problemSummary: "Operations release is outstanding.",
+    actionSummary: "Confirm isolation release owner and recovery time.",
+    evidenceSummary: "Permit reference is shown as context only.",
+    history: [
+      "14:05 · Failed sync example remains saved on this device.",
+      "11:20 · Tracker Block event recorded.",
+      "10:18 · Tracker Start event recorded."
+    ],
+    criticalContext: "Critical Work Pack context is visible. Reporting remains assigned to Tier 2."
   }
 ];
 
-export const syncSignals: SyncSignal[] = [
-  {
-    label: "Connection",
-    detail: "Review mode only"
-  },
-  {
-    label: "Local queue",
-    detail: "Visual state only"
-  },
-  {
-    label: "Last refresh",
-    detail: "Thread may be out of date. Last synced at [time]."
-  }
-];
-
-export const mobileProgressFlow: MobileProgressFlow = {
-  taskName: "C2 cyclone — remove access cover",
-  currentState: "In progress",
-  percentComplete: "75",
-  actualStart: "2026-06-20",
-  actualFinish: "",
-  comment: "Field progress ready for supervisor review.",
-  visualStates: [
-    "Saved locally.",
-    "Queued on this device. Not yet sent.",
-    "Server received.",
-    "Could not send. Still saved on this device."
-  ]
+export const syncSummary: SyncState = {
+  label: "Server received",
+  detail: "Last synced at 13:15.",
+  tone: "success"
 };
 
-export const mobileSyncQueueItems: MobileSyncQueueItem[] = [
+export const syncRecoveryExamples: SyncState[] = [
+  { label: "Local draft", detail: "Saved locally.", tone: "neutral" },
   {
-    label: "Queued progress update",
-    task: "Valve isolation — field update draft",
+    label: "Queued on device",
     detail: "Queued on this device. Not yet sent.",
-    state: "Queued on device"
+    tone: "warning"
   },
+  { label: "Sending", detail: "Sending.", tone: "info" },
+  { label: "Server received", detail: "Server received.", tone: "success" },
   {
-    label: "Failed progress update",
-    task: "Crane lift — evidence upload retry",
+    label: "Failed",
     detail: "Could not send. Still saved on this device.",
-    state: "Failed"
+    tone: "critical"
   },
-  {
-    label: "Queued evidence item",
-    task: "C2 cyclone — inspect refractory lining",
-    detail: "Completion photo metadata saved locally.",
-    state: "Local draft"
-  },
-  {
-    label: "Server received item",
-    task: "C2 cyclone — remove access cover",
-    detail: "Server received.",
-    state: "Server received"
-  },
-  {
-    label: "Conflict item",
-    task: "Permit isolation — re-import review",
-    detail: "Thread may be out of date. Last synced at [time].",
-    state: "Conflict"
-  }
+  { label: "Conflict", detail: "Conflict needs review.", tone: "critical" }
 ];
-
-export const primaryActionIcon = RefreshCw;
-export const evidenceActionIcon = ClipboardList;
-export const submitActionIcon = Send;

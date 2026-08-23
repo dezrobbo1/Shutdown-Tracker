@@ -1,7 +1,7 @@
 {
   "name": "Shutdown Tracker Mobile Field App",
   "short_name": "Shutdown Mobile",
-  "description": "Mobile-first field execution review shell for Shutdown Tracker.",
+  "description": "Assigned-task visual shell for Shutdown Tracker Tier 2 and Tier 3 users.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f6f7f2",
