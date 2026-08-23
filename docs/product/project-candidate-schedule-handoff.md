@@ -274,7 +274,7 @@ A merge/import workflow has an additional gate: it must be tested separately aga
 
 Do not fail a candidate merely because Microsoft Project legitimately recalculated dependent schedule fields. Fail when an approved input is lost/altered, the wrong task is affected, the source is overwritten, provenance is missing, or an unexplained change cannot be reviewed safely.
 
-## Current implementation implication
+## Historical implementation evidence
 
 The superseded PR #48 workstream reported guarded complete-source MSPDI/XML candidate generation from the accepted source plus approved inputs. That implementation and its real-human Microsoft Project gate are not present in, or required by, the active product foundation. Any minimal/patch-shaped writer retained from `main` remains experimental diagnostic compatibility only and must not be presented as the final product output.
 
