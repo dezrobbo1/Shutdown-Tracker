@@ -13,8 +13,8 @@ This index records the project research packets, their status, and where their c
 | Packet 05: Built-in Communications and Messaging Layer | Direction accepted; implementation deferred | Entity-linked Discussion and communications boundaries | Reflected in communications product doc |
 | Packet 06: Communications Layer Visual Review Brief | Visual-design input | Communications components/states/copy | Not a backend contract |
 | Packet 07: Shutdown Tracker Functionality, Possibilities, and Next Product Direction | Accepted direction source | Product capability prioritisation and boundary checks | Use current product docs for active scope |
-| Packet 08: Task Progress Review & Export Approval | Product brief accepted | Field progress, supervisor review, planner review, export candidates | Reflected in product doc |
-| Packet 09: Source Quality Register and Source Map | Active governance | Source tiering and decision-to-source mapping | Controls evidence quality |
+| Packet 08: Task Progress Review & Export Approval | Superseded product brief; retained research | Historical field-progress and candidate-workflow research | Candidate conclusions superseded by ADR-012 |
+| Packet 09: Source Quality Register and Source Map | Evidence governance | Source tiering and decision-to-source provenance | Source map includes explicitly superseded rows |
 | Packet 10: UX Anti-Slop and Frontend Visual Review Scope | Active product guardrail | IA, visual hierarchy, status semantics, anti-dashboard rules | Reflected in product/UX docs |
 | NotebookLM: Technical Implementation Blueprint | Working synthesis | Architecture framing and source discovery | Not authoritative without verification |
 | NotebookLM: Technical Development Report | Working synthesis | Architecture synthesis and roadmap comparison | Not authoritative without verification |
@@ -24,7 +24,13 @@ This index records the project research packets, their status, and where their c
 
 Research conclusions that remain active should be represented in current product or architecture documents, including:
 
-- [Task Progress Review and Export Approval](../product/task-progress-review-export-approval.md)
+- [Product Flow and Software Map](../product/product-flow-and-software-map.md)
+- [User Tier and Assignment Model](../product/user-tier-and-assignment-model.md)
+- [Task Operational Model](../product/task-operational-model.md)
+- [Critical Reporting Model](../product/critical-reporting-model.md)
+- [Project Lifecycle and Import / Export](../product/project-lifecycle-and-import-export.md)
+- [Implementation Status Map](../product/implementation-status-map.md)
+- [ADR-012: Product Trial Foundation and Project Export Deferral](../adr/ADR-012-product-trial-foundation-and-export-deferral.md)
 - [Communications Layer](../product/communications-layer.md)
 - [Frontend Visual Review Scope](../product/frontend-visual-review-scope.md)
 - [UX Anti-Slop Rules](../product/ux-anti-slop-rules.md)
@@ -34,8 +40,8 @@ Research conclusions that remain active should be represented in current product
 For source governance, use:
 
 - [Source Quality Register](source-quality-register.md)
-- [Research Decision Source Map](source-map.md)
-- [Research Decisions Summary](research-decisions-summary.md)
+- [Research Decision Source Map](source-map.md) — includes historical/superseded provenance
+- [Research Decisions Summary](research-decisions-summary.md) — historical synthesis
 
 ## Packet use rules
 

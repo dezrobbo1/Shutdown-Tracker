@@ -75,7 +75,7 @@ The register is intentionally conservative. Hard product and architecture rules 
 | Shutdown Live-Tracking Platform Research | Strong internal synthesis | Good baseline for architecture, Microsoft Project boundary, UX split, stack direction, import/export flow |
 | UX and Operational Interaction Design Research Packet | Strong internal synthesis | Good baseline for console/mobile IA, operational UX, offline honesty, accessibility, and MVP screen scope |
 | Configurable Critical Work Package Reporting research | Strong internal synthesis | Good baseline for Critical Watchlist/Critical WP reporting model and no-scheduling boundary |
-| Shutdown Tracker Functionality, Possibilities, and Next Product Direction | Strong internal synthesis | Current best source for Task Progress Review & Export Approval as the next major capability |
+| Shutdown Tracker Functionality, Possibilities, and Next Product Direction | Historical internal synthesis | Useful product research, but its Task Progress Review, named-role, and candidate-workflow conclusions are superseded by ADR-012 and the primary product documents |
 | Built-in Communications and Messaging Layer research | Supporting internal synthesis | Use to define entity-linked Discussion and defer generic chat, DMs, broad channels |
 | Communications Layer Visual Review Brief research | Supporting internal synthesis | Use for future visual shell, exact copy, component inventory, and static/read-only/future-build labelling |
 | Technical Implementation Blueprint: Shutdown Tracker | Working synthesis note | Useful, but correct over-strong claims before repo use: MPXJ/JAXB issue, Physical % Complete preference, queue assumptions, UID durability |
@@ -87,7 +87,7 @@ The register is intentionally conservative. Hard product and architecture rules 
 | NotebookLM wording or implication | Repo-grade wording |
 | --- | --- |
 | MPXJ/JAXB conflict is the decisive architecture reason for a worker | A Spring Boot / JAXB compatibility issue has been reported, but the primary reason for worker isolation is Project-file processing containment: dependency, CPU, memory, file IO, failure, and support risk |
-| Physical % Complete is the preferred STO metric | Physical % Complete may be supported where site practice is consistent; MVP export should default to leaf-task percent complete, actual start, and actual finish |
+| Physical % Complete is the preferred STO metric | Ordinary Mobile users provide a plain-language Tracker field progress observation. Mapping that observation to any Microsoft Project percentage or actual field is deferred until a replacement export contract is approved. |
 | API saves to temporary storage and queues a worker message | Current repo stores accepted files through storage abstractions, records metadata/hash, creates import batches, and uses explicit worker handoff; durable queue/background processing is future architecture |
 | Task UID is the durable join key across all revisions | Task UID is strong within an imported snapshot; re-import continuity needs snapshot ID, UID, WBS/name/custom-field signals, and accepted task-lineage links |
 | Audit trails use event sourcing | v1 should use relational domain records plus append-only audit events; full event sourcing is later/experimental |

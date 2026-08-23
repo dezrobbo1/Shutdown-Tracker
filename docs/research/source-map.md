@@ -6,7 +6,7 @@ This map records Shutdown Tracker decision-to-evidence relationships, including 
 
 Use this file when updating product docs, ADRs, implementation briefs, or Codex prompts. Hard claims should cite Tier A sources from the source quality register where possible.
 
-## Decision map
+## Decision map retained for provenance
 
 | Decision | Primary source evidence | Secondary support | Internal source of truth to update/use |
 | --- | --- | --- | --- |
@@ -60,9 +60,9 @@ Use this file when updating product docs, ADRs, implementation briefs, or Codex 
 | Project Online / Dataverse / Graph integrations are future only | Microsoft Project/Graph/Project Online docs, to be re-verified before implementation | Latest functionality research | Integration ADR backlog |
 | Direct Microsoft Project desktop automation/add-in/COM is not MVP | Microsoft Project handoff risk; governance and hidden-write risk | Latest functionality research | Integration ADR backlog |
 
-## Internal decision clusters
+## Historical decision clusters
 
-### Core boundary
+### Boundary recorded at the time
 
 The core boundary is stable:
 
@@ -70,7 +70,7 @@ The core boundary is stable:
 - Shutdown Tracker owns execution truth, task progress capture, blockers, actions, evidence metadata, handover, planner review, export preview, generated MSPDI/XML artifact metadata, verification metadata, and audit.
 - The product must not imply that any internal approval or discussion updates the master `.mpp`.
 
-### Next major product capability
+### Next capability recorded at the time
 
 The next major product capability is Task Progress Review & Export Approval:
 
