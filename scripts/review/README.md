@@ -1,6 +1,6 @@
 # Review Smoke Scripts
 
-This folder contains local reviewer scripts for narrow source/import/export smoke checks.
+This folder contains local reviewer scripts for narrow source/import/export smoke checks. Import validation remains useful to the trial foundation. Export switches exercise existing experimental compatibility code only and do not define or validate the final product export workflow; see [ADR-012](../../docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md).
 
 ## Source/Import/Export Smoke Script
 

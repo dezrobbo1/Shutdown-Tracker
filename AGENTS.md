@@ -10,20 +10,25 @@ Before changing code or product behaviour:
 2. Read the relevant ADRs in [docs/adr](docs/adr) and the relevant product documents in [docs/product](docs/product).
 3. Check [docs/research/source-quality-register.md](docs/research/source-quality-register.md) before relying on research material for a hard product or architecture decision.
 4. Inspect the current implementation and tests. Do not infer implemented behaviour from roadmap documents.
+5. Read [docs/goals/ACTIVE.md](docs/goals/ACTIVE.md) when it exists. It defines the current branch target and completion conditions.
 
 Do not assume access to earlier chats, uploaded PDFs, ZIP files, or external project folders. Durable decisions must be present in this repository. If required context is missing or sources conflict, stop rather than inventing a decision.
 
+## Active goal protocol
+
+When `docs/goals/ACTIVE.md` exists, treat its Outcome, Success criteria, Non-goals, Required validation, Safety constraints, and Completion conditions as the current branch task contract.
+
+Continue autonomously through repository inspection, implementation planning, focused implementation, testing, diff review, documentation, commit preparation, and draft pull-request updates when those actions are authorized by the active goal.
+
+Stop and report rather than guessing when authoritative requirements conflict, required external software prevents completion, proceeding would overwrite unrelated work, or an irreversible externally visible action lacks authorization.
+
+A pending manual or external gate does not justify claiming completion. Finish the automated scope and report the remaining gate precisely.
+
 ## Product authority and non-negotiable boundaries
 
-Microsoft Project remains the schedule calculation and master-file authority. Shutdown Tracker is the execution-input, review, evidence, handover, operational-mapping, candidate-preparation, verification-metadata, and audit system.
+Microsoft Project remains the schedule calculation and master-file authority. Shutdown Tracker owns operational execution truth, task assignments, task-owned records, Critical reporting, imported-snapshot provenance, and audit.
 
-The handoff is intended to produce a **complete updated Project candidate schedule**, not merely a sparse field patch.
-
-Use this three-part authority model:
-
-- **Execution/input authority — Shutdown Tracker.** Capture and approve field execution facts and authorised planner-entered inputs such as progress or actuals under the active handoff policy.
-- **Calculation authority — Microsoft Project.** A complete updated candidate schedule may be recalculated by Microsoft Project after approved inputs are applied. Project-calculated dates, durations, roll-ups, work, assignment values, timephased data, slack, criticality, and related consequences are not treated as Shutdown Tracker-authored inputs.
-- **Candidate/adoption authority — Planner.** A planner reviews the candidate and its source-versus-candidate delta and decides whether to reject it, retain it for review, use it as the next schedule/master, or use Microsoft Project to merge/import it into another existing schedule.
+The current product priority is deterministic frontend trial and validation of Today, Tasks, assignments, task execution, progress observations, Critical reporting, and task-centred workflows. The exact Project export, approval, candidate, adoption, and round-trip design is deferred until that trial produces evidence. PR #48 and candidate/export code already present on main are technical history or experimental infrastructure, not active product authority or delivery prerequisites.
 
 Shutdown Tracker must not:
 
@@ -32,61 +37,57 @@ Shutdown Tracker must not:
 - silently update, overwrite, or save the accepted master `.mpp`;
 - silently merge/import a candidate into the only master copy;
 - write native `.mpp` files server-side;
-- imply that input approval, candidate generation, Project open, candidate acceptance, or verification has already updated the master schedule.
+- imply that an experimental export, preview, candidate, or verification record has updated the master schedule.
 
 Shutdown Tracker may:
 
-- prepare exact, reviewed execution inputs against an immutable accepted Project snapshot;
-- accept permitted planner-entered inputs in the Master Console with full provenance and policy checks;
-- generate a sealed approved-input manifest;
-- generate a complete updated MSPDI/XML candidate from the accepted source plus approved inputs;
-- invoke or support a planner-controlled Microsoft Project process against a disposable copy, subject to an accepted implementation ADR and safety controls;
-- allow Microsoft Project to recalculate the disposable candidate;
-- present a read-only source-versus-candidate impact comparison, including Project-calculated schedule consequences;
-- allow the planner to reject, retain, adopt, or merge/import the candidate through Microsoft Project;
-- record candidate hashes, deltas, Project version, planner decision, destination-before/result-after merge provenance, and later master-adoption metadata.
-
-The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating or a planner deliberately using a reviewed candidate schedule.
+- import, hash, parse, inspect, and retain immutable Project source/snapshot facts;
+- use imported dates, hierarchy, assignments, progress, and Project Critical values as read-only source context;
+- capture audited Tracker execution events and field progress observations separately from imported state;
+- trial product workflows with synthetic/static frontend state; and
+- retain bounded export code as explicitly labelled experimental infrastructure while the final contract is reconsidered.
 
 Other non-negotiable rules:
 
-- Field progress must pass through supervisor review where required, planner input review, input eligibility, and preview before candidate generation.
-- Planner-originated Console inputs may skip supervisor review only when project policy explicitly allows it; they must not skip provenance, stale-data checks, policy checks, or planner input authority.
-- Approved input authority is limited to explicitly reviewed facts under the active handoff policy. Summary-task actual inputs, dependencies, constraints, calendars, baselines, WBS structure, and unreviewed planned-date changes remain prohibited direct inputs unless a later explicit product decision expands authority.
-- A Project-calculated consequence may differ from the source after Microsoft Project recalculates; label it as a Project-calculated consequence rather than an approved Shutdown Tracker input.
-- Planner edits made directly in Microsoft Project during candidate review must be distinguished from both approved Tracker inputs and Project-calculated consequences.
-- Candidate acceptance is not the same as `adopted_as_new_master` or `merged_into_existing`; record those outcomes separately.
-- Merge/import testing must be separate from standalone candidate testing and must use a disposable/backed-up destination schedule before production use.
-- Critical Work Packages and Critical Watchlists are configurable reporting constructs, not calculated critical-path features.
+- Critical items and Critical Work Packs are configurable reporting constructs, not calculated critical-path features.
 - Project Operational Mapping may interpret imported fields, hierarchy, and resource-assignment metadata operationally, but imported source values remain immutable.
-- Project-derived category membership is not application authorization. Visibility/relevance, responsibility, update permission, review permission, and export authority remain separate.
+- Project-derived category membership is not application authorization. Tier 1 whole-project authority and explicit Tier 2/Tier 3 task or reporting assignments determine access; categories remain filter, display, reporting, and bulk-selection context only.
 - Mapping revalidation must never silently remap an uncertain Project source after re-import.
 - Communications must start with structured domain records. Entity-linked Discussion may support those records later; generic chat, channels, and private messaging are not an operational source of truth by default.
-- Preserve append-only audit history and explicit approval, correction, rejection, supersession, candidate-disposition, adoption, and merge provenance.
+- Preserve append-only audit history and explicit correction, rejection, and supersession provenance.
 
 Relevant authority documents include:
 
-- [ADR-001: Microsoft Project Integration](docs/adr/ADR-001-microsoft-project-integration.md)
-- [ADR-007: Data Ownership and Schedule Authority](docs/adr/ADR-007-data-ownership-and-schedule-authority.md)
-- [ADR-008: MVP Scope Boundary](docs/adr/ADR-008-mvp-scope-boundary.md)
-- [Project Candidate Schedule Handoff](docs/product/project-candidate-schedule-handoff.md)
-- [Task Progress Review and Export Approval](docs/product/task-progress-review-export-approval.md)
-- [Approval and Export State Model](docs/product/approval-export-state-model.md)
+- [Product Flow and Software Map](docs/product/product-flow-and-software-map.md)
+- [User Tier and Assignment Model](docs/product/user-tier-and-assignment-model.md)
+- [Task Operational Model](docs/product/task-operational-model.md)
+- [Critical Reporting Model](docs/product/critical-reporting-model.md)
+- [Project Lifecycle and Import / Export](docs/product/project-lifecycle-and-import-export.md)
+- [Implementation Status Map](docs/product/implementation-status-map.md)
+- [ADR-012: Product Trial Foundation and Project Export Deferral](docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md)
+- [Trial Foundation Retention Map](docs/product/trial-foundation-retention-map.md)
 - [Project Operational Mapping](docs/product/project-operational-mapping.md)
 - [Communications Layer](docs/product/communications-layer.md)
 - [Offline Audit and Sync Rules](docs/product/offline-audit-sync-rules.md)
 
+The six product documents listed first are primary authority. No old named-role matrix or area/package/contract/watchlist permission-scope model is authoritative. The application user types are Tier 1, Tier 2, and Tier 3 only.
+
 ## Current implementation guardrails
 
 - Do not infer that a documented target workflow already exists in runtime code.
-- Do not describe the existing minimal/patch-shaped MSPDI writer as the final complete candidate-schedule implementation unless the code and manual evidence actually prove that.
+- Do not describe existing export preview, approval, MSPDI writer, or review-bootstrap code as the approved product workflow.
+- Do not reintroduce PR #48's exact candidate approval, sealed preview, browser acceptance workspace, or manual round-trip gate as a product prerequisite without a new product decision and ADR.
 - Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist.
-- Keep the console top-level navigation fixed to Today, Tasks, Problems, Evidence, and Exports.
-- Keep the mobile top-level navigation fixed to My Work, Today, Problems, Evidence, and Sync.
-- A read-only planner candidate-impact comparison is allowed; an editable Gantt, dependency editor, or replacement scheduling UI is not.
+- Keep the ordinary Mobile execution flow to Can't Start, Start, Pause, Resume, and Finish with system-captured action timestamps. Can't Start must leave execution Not Started; manual backdating/correction requires a separately reviewed audited workflow.
+- Keep Critical reporting policy versioned per item, configurable from supported timing/trigger mechanisms and a controlled content catalogue. Reuse known task facts and do not introduce a generic form builder or a second execution-state model.
+- Keep the Console top-level structure fixed to Today, Tasks, Critical, Import / Export, and Project Settings.
+- Keep the Mobile App top-level model fixed to Assigned Tasks only. Sync is a visible transport/recovery state, not a destination.
+- Keep Problems, Discussion, Actions, Evidence, and History inside the relevant Task Dashboard. Do not recreate them as top-level applications.
+- Console access is Tier 1 only. Mobile access is Tier 2/Tier 3 only and remains explicitly assignment-bounded.
+- A future read-only schedule comparison may be reviewed separately; an editable Gantt, dependency editor, or replacement scheduling UI is not part of the active trial foundation.
 - Follow [docs/product/ux-anti-slop-rules.md](docs/product/ux-anti-slop-rules.md) and [docs/product/design-language-and-status-semantics.md](docs/product/design-language-and-status-semantics.md).
-- The API owns request/response workflows and persistence orchestration. Project parsing and candidate/artifact processing belong in the project worker or a separately reviewed planner companion; do not move Project processing into arbitrary API code.
-- For Project Operational Mapping, the worker returns Project source facts/metadata only. The API owns Tracker category/profile meaning, validation decisions, resolved membership orchestration, Scope/Saved Views, authorization, and audit.
+- The API owns request/response workflows and persistence orchestration. Project parsing belongs in the project worker; any future candidate/artifact processing requires a separately reviewed design.
+- For Project Operational Mapping, the worker returns Project source facts/metadata only. The API owns Tracker category/profile meaning, validation decisions, resolved membership orchestration, query-only Scope/Saved Views, explicit assignment orchestration, authorization, and audit.
 - Keep schema changes in versioned SQL files under `infra/migrations`. Do not rewrite an already applied migration.
 - Use only synthetic or explicitly approved sanitized fixtures. Do not commit real schedules, real Project files, customer data, secrets, generated candidate schedules, screenshots containing operational data, or unrelated binaries.
 
@@ -100,17 +101,28 @@ Relevant authority documents include:
 - `packages/project-import-contract` and `packages/project-export-contract`: shared Java handoff contracts.
 - `infra/migrations`: PostgreSQL/Flyway-compatible migrations.
 - `fixtures`: synthetic test and review inputs only.
-- `docs`: product, ADR, architecture, security, testing, concept, research, and source catalogues.
+- `docs`: product, ADR, architecture, security, testing, concept, research, and active-goal authority.
 
 ## Working rules
 
 - Begin with `git status -sb` and preserve unrelated or pre-existing changes.
 - Keep each branch and PR focused on one reviewed outcome.
 - Prefer the smallest coherent change. Avoid broad rewrites, dependency upgrades, formatting churn, or speculative abstractions without explicit scope.
+- Follow nearby code patterns and update tests alongside behaviour.
 - Update the relevant product or architecture document when a change alters an approved boundary, workflow, state model, permission, or ownership rule.
 - Keep environment-specific secrets and generated files out of Git.
-- Never use `git reset --hard`, `git clean -fd`, force-push, or rewrite another worktree without explicit authorization.
-- Never merge a pull request or mark a draft ready unless explicitly instructed.
+- Report assumptions, unavailable checks, and any difference between scaffolding and production behaviour.
+
+## Repository safety
+
+- Never use `git reset --hard`, `git clean -fd`, blanket checkout, or another broad destructive cleanup command.
+- Never amend, rebase, squash, rewrite existing commits, or force-push unless the user explicitly authorizes that exact operation.
+- Never merge a pull request or mark a draft pull request ready unless explicitly instructed.
+- Never modify, reset, clean, or switch another Git worktree.
+- Never change machine or user execution policy.
+- Never install global tooling without explicit approval.
+- Never commit secrets, real Project files, generated MSPDI/XML artifacts, database files, customer/site data, screenshots with operational data, IDE state, or temporary validation output.
+- Inspect staged content before committing and preserve unrelated uncommitted work.
 
 ## Validation
 
@@ -130,10 +142,16 @@ Java/backend or shared Java contract changes:
 mvn test
 ```
 
-Migration changes:
+Migration changes require Docker Desktop or compatible Docker Compose:
 
 ```text
 ./scripts/db/validate-migrations.sh
+```
+
+On Windows PowerShell:
+
+```text
+.\scripts\db\validate-migrations.ps1
 ```
 
 For every change:
@@ -142,16 +160,14 @@ For every change:
 git diff --check
 ```
 
-For Project handoff changes, distinguish these claims:
+Use guarded scripts in `scripts/review` only when their prerequisites and explicit synthetic-data safety switches match the task. Historical candidate smoke scripts do not define the active product workflow.
 
-1. the approved input manifest is correct;
-2. a complete updated candidate schedule was generated from the intended accepted source;
-3. Microsoft Project opened/imported and recalculated the candidate correctly;
-4. the planner reviewed and accepted/rejected the candidate;
-5. the planner adopted it as the next schedule or merged/imported it into an existing schedule, if either occurred.
+For migration changes, prove both a clean installation and an upgrade from the previous populated baseline. Use PostgreSQL integration tests for constraints, triggers, foreign keys, row locks, concurrency, and rollback behaviour; fake repositories are not sufficient evidence for database invariants.
 
-Do not use evidence for one claim as proof of another. Standalone candidate testing and merge/import testing are separate evidence gates. Manual Microsoft Project testing remains required for handoff milestones.
+Any future export/candidate change must first establish an approved product contract and ADR, then prove the bounded safety properties claimed by that contract. Do not infer those requirements from superseded PR #48 documents.
+
+Before declaring completion, inspect the complete diff, confirm no temporary files remain, and verify unrelated worktrees are unchanged.
 
 ## Definition of done
 
-A change is complete only when its scope is clear, relevant checks pass, documentation and tests agree with the implementation, product boundaries remain explicit, temporary artifacts are absent, unrelated worktrees remain unchanged, and the final handoff states what changed, what was verified, and what remains deliberately unimplemented or pending manual validation.
+A change is complete only when its scope is clear, relevant checks pass, migration/integration evidence matches the claimed invariants, documentation and tests agree with the implementation, product boundaries remain explicit, `git diff --check` passes, temporary artifacts are absent, unrelated worktrees remain unchanged, and the final handoff states what changed, what was verified, and what remains deliberately unimplemented or pending manual validation.

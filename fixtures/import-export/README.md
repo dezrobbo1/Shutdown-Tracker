@@ -1,6 +1,6 @@
 # Import/Export
 
-This folder holds text-only import/export fixture metadata and expected outputs.
+This folder holds text-only import/export fixture metadata and expected outputs. Import fixtures support the active technical foundation. Export and round-trip material exercises retained experimental compatibility code only and does not define a product-trial gate or final workflow under [ADR-012](../../docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md).
 
 ## Expected Structure
 
@@ -44,7 +44,7 @@ Expected export artifact summaries should describe stable worker response and re
 
 ## Round-Trip Notes
 
-Manual Microsoft Project round-trip validation should use synthetic or fully sanitized data only. Record text-only notes for MSPDI/XML reopen checks using [Manual Microsoft Project Round-Trip Evidence](../../docs/testing/manual-microsoft-project-round-trip-evidence.md). Do not commit generated exports from real schedules, generated artifacts, or screenshots.
+If the experimental writer is investigated, use synthetic or fully sanitized data only and record text-only notes with [Historical Manual Microsoft Project Candidate-Schedule Evidence](../../docs/testing/manual-microsoft-project-round-trip-evidence.md). This is optional technical evidence, not an operational product-trial prerequisite. Do not commit generated exports from real schedules, generated artifacts, or screenshots.
 
 ## Approved Synthetic Fixtures
 

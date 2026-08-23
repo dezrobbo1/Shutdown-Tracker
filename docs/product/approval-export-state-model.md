@@ -1,13 +1,15 @@
 # Approval, Candidate Schedule, and Adoption State Model
 
+> **Superseded technical research.** [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md) defers the exact approval/candidate workflow. The execution-state discussion remains useful, but the candidate pipeline below is not current product authority.
+
 Shutdown Tracker separates execution state, review state, Project-input authority, candidate-schedule calculation, candidate disposition, and later schedule adoption/merge.
 
 ## Why the separation matters
 
-A field user can report a task complete while:
+A Tier 2 or Tier 3 user can report an assigned task complete while:
 
-- the update is still awaiting supervisor review;
-- no planner has approved Project input;
+- Tier 2 tracking validation is still pending where required;
+- no Tier 1 user has approved Project input;
 - no updated candidate schedule exists;
 - Microsoft Project has not recalculated anything;
 - the current master remains unchanged.
@@ -18,23 +20,23 @@ Likewise, a complete candidate schedule may be successfully produced and still b
 
 ### Execution state
 
-`not_started -> ready -> in_progress -> paused/blocked -> completed`
+Initial activation derives `not_started`, `in_progress`, or `completed` from accepted Project facts. After Tracker execution begins, audited Can't Start, Start, Pause, Resume, Finish, Correction, and Reversal events drive the current projection. Can't Start leaves execution `not_started`; adverse blocked/delayed context is linked operational state rather than an alternate start event. A retained technical `Block` term is compatibility vocabulary, not another ordinary Mobile action.
 
-Corrections use explicit events/supersession rather than destructive history edits.
+Readiness and schedule variance remain separate attention conditions; passing a planned start never establishes `in_progress`. Corrections use explicit events/supersession rather than destructive history edits. See [Task Operational Model](task-operational-model.md).
 
 ### Progress review state
 
-`draft -> submitted -> supervisor_accepted | correction_requested | rejected | superseded`
+`draft -> submitted -> tier2_validated | correction_requested | rejected | superseded`
 
-Supervisor acceptance means operationally credible only.
+Tier 2 validation, where required, means operationally credible only.
 
-### Planner input state
+### Tier 1 input state
 
-`needs_planner_review -> input_approved | input_rejected | clarification_requested | superseded`
+`needs_tier1_review -> input_approved | input_rejected | clarification_requested | superseded`
 
 Input approval authorises one exact input candidate for the approved-input manifest.
 
-An authorised planner may also originate or correct a permitted input in the Master Console. That origin does not remove attribution, stale-data checks, policy checks, or planner input authority.
+Tier 1 may also originate or correct a permitted input in the Master Console. That origin does not remove attribution, stale-data checks, policy checks, or Tier 1 input authority.
 
 ### Approved-input manifest state
 
@@ -58,7 +60,7 @@ After candidate review:
 
 `none -> retained_for_review | adopted_as_new_master | merged_into_existing | rejected | superseded`
 
-Candidate acceptance and candidate disposition are separate concepts. `accepted` means the candidate is considered valid for planner use; it does not itself mean the master has changed.
+Candidate acceptance and candidate disposition are separate concepts. `accepted` means the candidate is considered valid for Tier 1 disposition review; it does not itself mean the master has changed.
 
 ### Merge/import state
 
@@ -78,18 +80,18 @@ Queued is not submitted.
 
 Current export-integrity implementations may use states such as draft preview, approved, generated, opened in Microsoft Project, verified, rejected, failed, and superseded.
 
-Those states remain useful for input authority and artifact provenance. Future candidate-schedule work should either extend them carefully or introduce a separate candidate-schedule run entity rather than overloading `verified` to mean that a planner accepted, adopted, or merged the recalculated schedule.
+Those states remain useful for input authority and artifact provenance. Future candidate-schedule work should either extend them carefully or introduce a separate candidate-schedule run entity rather than overloading `verified` to mean that Tier 1 accepted, adopted, or merged the recalculated schedule.
 
 ## Authority rules
 
-- Field users and contractors do not approve Project input or candidate disposition.
-- Supervisors validate execution truth.
-- Planners may originate permitted Console inputs, approve exact Project inputs, review complete recalculated candidates, and choose candidate disposition by default.
+- Tier 3 does not approve Project input or candidate disposition.
+- Tier 2 retains tracking responsibility and may validate assigned execution truth where project policy requires it.
+- Tier 1 may originate permitted Console inputs, approve exact Project inputs, review complete recalculated candidates, and choose candidate disposition.
 - An approved input is bound to one exact project/snapshot/task/field/value/source/version/candidate/approval identity.
 - A candidate schedule is bound to one immutable source schedule and one immutable approved-input manifest.
-- A planner candidate decision is bound to one candidate hash and semantic delta.
+- A Tier 1 candidate decision is bound to one candidate hash and semantic delta.
 - Adoption as next schedule is a separate audit fact.
-- Merge/import into another existing schedule is a separate planner-controlled Project operation with its own destination-before and result-after provenance.
+- Merge/import into another existing schedule is a separate Tier 1-controlled Microsoft Project operation with its own destination-before and result-after provenance.
 
 ## Candidate review requirements
 
@@ -101,10 +103,10 @@ A candidate review should show:
 - Project version/build used for calculation;
 - approved inputs and input origin;
 - Project-calculated consequences;
-- planner edits made in Microsoft Project, if any;
+- manual schedule-owner or Microsoft Project operator edits made in Microsoft Project, if any;
 - unexplained changes;
 - project finish movement;
-- planner decision and notes.
+- Tier 1 decision and notes.
 
 ## Provenance classification
 
@@ -115,7 +117,7 @@ Every material source-versus-candidate difference should be classified as:
 - `planner_project_edit`;
 - `unexpected_difference`.
 
-Unchanged values need not be stored as delta rows but remain traceable to the source hash.
+`planner_project_edit` is a retained PR #48 evidence-field name for compatibility. It means an explicit manual Microsoft Project edit by the recorded schedule-handling actor; it does not define Planner as an application role. Unchanged values need not be stored as delta rows but remain traceable to the source hash.
 
 ## Direct-input restrictions
 
@@ -131,11 +133,11 @@ Without an explicit policy change, Shutdown Tracker must not directly author:
 - Project critical/slack values;
 - resource levelling or schedule optimisation outputs.
 
-Those values may change inside a Microsoft Project-calculated candidate and be shown to the planner.
+Those values may change inside a Microsoft Project-calculated candidate and be shown to Tier 1.
 
 ## Adoption as next schedule
 
-If the planner chooses to use the candidate as the next controlled schedule, record:
+If Tier 1 records that the candidate should be used as the next controlled schedule, record:
 
 - accepted source identity/hash;
 - candidate identity/hash;
@@ -149,15 +151,15 @@ Shutdown Tracker must not claim adoption merely because the candidate opened suc
 
 ## Merge/import into existing schedule
 
-If the planner chooses to merge/import the candidate into another Project schedule, record:
+If Tier 1 records that the candidate should be merged/imported into another Project schedule, record:
 
 - candidate identity/hash;
 - destination schedule identity/hash before merge;
 - Microsoft Project version/build;
 - merge/import mode;
-- warnings/conflicts and planner choices;
+- warnings/conflicts and Tier 1 choices;
 - merged result identity/hash;
-- planner decision;
+- Tier 1 decision;
 - merged by/at.
 
 The first supported merge/import process must operate against a disposable/backed-up destination copy. Shutdown Tracker must not silently overwrite the only master copy.
@@ -190,17 +192,17 @@ Updated candidate schedule produced. Open in Microsoft Project and review calcul
 After candidate acceptance:
 
 ```text
-Candidate accepted for planner use. The master schedule has not changed yet.
+Candidate accepted for Tier 1 disposition review. The master schedule has not changed yet.
 ```
 
 After adoption as next schedule:
 
 ```text
-Planner recorded this candidate as the next controlled schedule.
+Tier 1 recorded this candidate as the next controlled schedule.
 ```
 
 After merge/import:
 
 ```text
-Planner recorded a Microsoft Project merge/import result. Review the recorded destination and result hashes for provenance.
+Tier 1 recorded a Microsoft Project merge/import result. Review the recorded destination and result hashes for provenance.
 ```

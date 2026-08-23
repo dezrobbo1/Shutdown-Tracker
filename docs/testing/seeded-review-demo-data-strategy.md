@@ -2,13 +2,13 @@
 
 ## Purpose
 
-Seeded review/demo data should make local and review-environment workflows easier to inspect without using real shutdown schedules, real Project files, customer data, or production-like seed data. This document defines the strategy only. It does not add seed data, migrations, app code, source files, generated artifacts, or runtime seeding behavior.
+Seeded review/demo data should make local and review-environment workflows easier to inspect without using real shutdown schedules, real Project files, customer data, or production-like seed data. The active priority is deterministic operational frontend trials and import review. Export-oriented examples below describe existing experimental compatibility infrastructure, not the current product contract. This document defines the strategy only. It does not add seed data, migrations, app code, source files, generated artifacts, or runtime seeding behavior.
 
-Microsoft Project remains the schedule authority. Seeded data must support review of Shutdown Tracker import/export surfaces; it must not introduce scheduler logic, CPM, critical path, float calculation, resource levelling, recovery scheduling, automatic date movement, a live Project feed, or uncontrolled Project write-back.
+Microsoft Project remains the schedule authority. Seeded data may support import review and operational product trials; it must not introduce scheduler logic, CPM, critical path, float calculation, resource levelling, recovery scheduling, automatic date movement, a live Project feed, or uncontrolled Project write-back.
 
 ## Current Baseline
 
-The API already has a guarded review project bootstrap that can create or reuse one synthetic project when explicitly enabled:
+The API already has a guarded review project bootstrap that can create or reuse one synthetic project when explicitly enabled. It is existing experimental review infrastructure and is not the product project-creation workflow:
 
 ```text
 SHUTDOWN_TRACKER_REVIEW_PROJECT_BOOTSTRAP_ENABLED=true
@@ -27,7 +27,7 @@ Allowed future review/demo data:
 - Synthetic import batches and parse summaries that match approved expected-output JSON.
 - Synthetic imported snapshot rows derived from approved synthetic fixtures.
 - Synthetic task lineage review rows for re-import review scenarios.
-- Synthetic export preview batches and lines that exercise approved leaf-task progress/actual fields.
+- Synthetic export preview batches and lines only when testing existing experimental compatibility code.
 - Synthetic audit events for the review/demo actions the seeder performs.
 - Text-only manifests describing the seeded dataset.
 
@@ -93,13 +93,13 @@ Dataset manifests should be text-only and include:
    - Concrete task lineage links with existing review-state values.
    - No automatic lineage matching.
 
-3. `synthetic-review-export-preview`
+3. `synthetic-review-export-preview` *(experimental compatibility only)*
    - One accepted synthetic snapshot.
    - Draft export preview lines covering eligible leaf-task progress/actual fields and ineligible summary-task lines.
    - Approval/export states using existing enum values only.
    - No generated artifact unless the worker handoff is explicitly run in a local review flow.
 
-4. `synthetic-review-round-trip-metadata`
+4. `synthetic-review-round-trip-metadata` *(historical technical research only)*
    - Text-only manual Microsoft Project reopen/verification metadata for a synthetic export artifact.
    - No committed generated MSPDI/XML artifact or screenshot.
 
@@ -129,14 +129,14 @@ The first preferred source fixture for future seeded import/review data is `synt
 
 ## Implementation Sequence
 
-1. Keep the existing review project bootstrap as project-metadata-only.
-2. Add a guarded source/import/export review smoke script that can run validation-only checks now and richer ID-driven checks later.
+1. Keep the existing review project bootstrap isolated as project-metadata-only experimental infrastructure.
+2. Prefer an import-review smoke path that can run validation-only checks now and richer ID-driven checks later.
 3. Add a text-only review/demo dataset manifest format.
 4. Add a local-only seeded-data command or runner guarded by explicit configuration.
 5. Seed synthetic import metadata and parsed snapshot rows from approved expected-output data.
 6. Seed synthetic import review and lineage scenarios using existing status/review-state values.
-7. Seed synthetic export preview scenarios using existing export batch status values.
-8. Run the source/import/export review smoke script against the seeded dataset.
+7. Add export-preview scenarios only if a bounded technical test of existing compatibility code requires them; do not present them as the final product workflow.
+8. Run the relevant import or operational-trial review path against the seeded dataset.
 
 Each implementation step should include tests proving no real data, generated artifacts, scheduler logic, Project write-back, or seed-only product statuses were added.
 

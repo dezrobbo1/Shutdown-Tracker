@@ -6,6 +6,8 @@ Import/export fixtures exist to make Microsoft Project import and controlled exp
 
 Fixtures must protect the product boundary: Shutdown Tracker is live execution and reporting software. Microsoft Project remains the schedule authority. Fixtures must not be used to introduce scheduler logic, CPM, critical-path calculation, float calculation, resource levelling, recovery scheduling, automatic date movement, live Project feeds, or uncontrolled Project write-back.
 
+Import fixtures remain part of the active technical foundation. Export-preview, artifact, and round-trip fixtures exercise retained experimental code only. Under [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md), they do not define the final export contract or create a manual acceptance gate for product trials.
+
 ## Allowed Fixtures
 
 - Synthetic Project files created only for testing.
@@ -55,9 +57,9 @@ Expected outputs should be deterministic text files derived from safe fixtures:
 
 - Import summaries should include source format, fixture ID, safe project name, count totals, warning counts, error counts, summary-only scope, and notes.
 - Where the worker parse contract is available, expected import summaries should include a `worker_response` block that mirrors stable response fields such as source filename, detected format, project name, counts, warning/error counts, and expected notes.
-- Where the worker export artifact contract is available, expected export artifact summaries should include stable project/task identity, allowed field values, count metadata, notes, and structural size/hash expectations. Generated MSPDI/XML artifacts must remain temporary and must not be committed.
+- Where the retained experimental worker export contract is tested, expected artifact summaries should include stable project/task identity, bounded field values, count metadata, notes, and structural size/hash expectations. Generated MSPDI/XML artifacts must remain temporary and must not be committed.
 - Parser expectations should focus on task, summary-task, resource, assignment, custom-field, calendar, lineage, and warning counts.
-- Export preview expectations should describe eligible leaf-task progress/actual updates, excluded summary tasks, approval state, and warning counts.
+- Existing export-preview expectations may describe the legacy leaf-task/progress/approval contract for regression testing only; they are not current product-policy expectations.
 - Expected outputs must not include real names, work orders, sites, assets, costs, people, vendors, locations, or commercial data.
 - `fixtures/import-export/synthetic-basic-wbs/expected-import-summary.json` is the first approved expected summary for a synthetic MSPDI import test.
 - `fixtures/import-export/synthetic-basic-wbs/expected-export-artifact-summary.json` is the first approved expected summary for a synthetic MSPDI/XML export artifact test.
@@ -67,18 +69,18 @@ Expected outputs should be deterministic text files derived from safe fixtures:
 1. Manifest validation: verify every fixture declares whether it contains real project data and whether it is allowed to commit.
 2. Parser summary tests: compare MPXJ parser counts, warnings, errors, and stable worker response fields against expected JSON.
 3. Snapshot persistence tests: verify imported task/resource/assignment lineage after parsing is implemented.
-4. Export preview tests: verify only approved, export-eligible leaf-task actual/progress fields are selected.
-5. Export artifact tests: generate MSPDI/XML from safe data only and compare stable summary/readback fields against expected-output JSON.
-6. Manual Microsoft Project round-trip tests: reopen generated MSPDI/XML in Microsoft Project and record text-only review notes using [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md).
+4. Experimental export-preview regression tests: verify the retained code still enforces its bounded legacy contract without treating that contract as product authority.
+5. Experimental export-artifact regression tests: generate MSPDI/XML from safe data only and compare stable summary/readback fields against expected-output JSON.
+6. Optional historical Microsoft Project diagnostics: when deliberately investigating the old mechanism, use [Historical Manual Microsoft Project Candidate-Schedule Evidence](manual-microsoft-project-round-trip-evidence.md). This is not required for the active product trial.
 
-## Microsoft Project Round-Trip Rules
+## Optional Historical Microsoft Project Diagnostic Rules
 
-- Round-trip validation must use synthetic or fully sanitized data only.
-- Native MPP writing is out of scope; export artifacts should use MSPDI/XML.
-- Export tests must remain controlled, reviewed, approved, batch-oriented, and leaf-task-only for progress/actual fields.
+- Any diagnostic must use synthetic or fully sanitized data only.
+- Native MPP writing remains outside the server boundary; the retained experimental artifacts use MSPDI/XML.
+- Tests reproducing the legacy approved/batch/leaf-task contract must label it as experimental compatibility, not a current product requirement.
 - Manual reopen notes should be text-only and should not include screenshots of real schedules.
 - Any mismatch should be recorded as expected-output text or issue notes, not by committing generated exports from real schedules.
-- Evidence notes must not claim a pass until a human has opened the generated MSPDI/XML artifact in Microsoft Project.
+- A diagnostic note must not claim that Microsoft Project opened an artifact unless a human actually performed that check. Such a diagnostic result does not make the deferred export workflow product-ready.
 
 ## Local-Only Fixture Handling
 

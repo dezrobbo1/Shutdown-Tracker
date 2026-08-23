@@ -2,6 +2,8 @@
 
 Purpose: hand-maintained TypeScript API client for the console and future mobile PWA API wiring.
 
+Import snapshot reads remain useful to the active trial foundation. Export-preview and export-lifecycle methods describe existing experimental compatibility endpoints; they are not current product authority under [ADR-012](../../docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md).
+
 ## Current Scope
 
 - Typed import review methods for listing snapshots, reading snapshot detail, and accepting or rejecting parsed snapshots.

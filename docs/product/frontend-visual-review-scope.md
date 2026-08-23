@@ -1,159 +1,188 @@
 # Frontend Visual Review Scope
 
-This document defines how to treat current and future frontend visual-review work.
+This document defines how frontend visual-review work relates to the approved two-application product model on `product/trial-foundation`.
 
-It exists because the current Task Progress Review visual shell is useful for review, but it must not become the final product information architecture or a source of implied backend/API contracts.
+## Current implementation boundary
 
-## Current visual shell status
+The Master Console and Mobile App are separate React clients. Their approved product shells are present for deterministic visual review, but most operational data and every write-like product control remain static, synthetic, or disabled.
 
-The current console and mobile apps contain a static/synthetic Task Progress Review visual shell.
+The Console can read configured import snapshot list/detail data through `apps/console/src/apiReviewClient.ts`. `apps/console/src/projectXmlPreview.ts` also provides standalone local browser inspection of valid Microsoft Project MSPDI/XML. Neither capability authenticates a user, activates a project, changes a snapshot, or updates a Microsoft Project file.
 
-It shows the intended workflow:
+The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, complete-source generation, Project-open verification controls, or manual Microsoft Project acceptance gate. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until after operational frontend trials.
 
-```text
-field progress update
--> supervisor review
--> planner review
--> export eligibility
--> export preview
--> MSPDI/XML artifact boundary
--> manual Microsoft Project verification metadata
-```
+The current visual shells do not implement:
 
-The visual shell is not production workflow.
+- OIDC/login sessions or tier authorization;
+- production Projects Home data, project creation, or project lifecycle writes;
+- Tier membership or Tier 2-to-Tier 3 direct-report persistence;
+- Tracker task assignments;
+- task execution APIs, event storage, or event-derived task state;
+- production Task Dashboard records or writes;
+- discussion, delay/problem, action, or evidence persistence;
+- IndexedDB offline queue/background replay;
+- Critical configuration, obligation, submission, or history APIs;
+- Operational Mapping APIs;
+- complete production import mapping/reconciliation/activation;
+- a final approved export, comparison, adoption, or Microsoft Project round-trip workflow.
 
-It does not implement:
+See [Implementation Status Map](implementation-status-map.md) for the evidence-based classification.
 
-- production task execution APIs;
-- supervisor review APIs;
-- planner review APIs;
-- frontend write workflows;
-- IndexedDB offline queue;
-- production evidence upload;
-- production handover workflow;
-- production messaging;
-- generated artifact writes from the frontend;
-- automated Microsoft Project verification;
-- Project write-back.
+## Required status labels
 
-## Build status labels
-
-Every future visual surface must be labelled with one of these statuses in the brief or code comments, and the UI should avoid implying more capability than exists.
+Every visual brief and surface must use one of these labels:
 
 | Label | Meaning |
 | --- | --- |
-| Verified in repo | Already implemented or scaffolded in current code/docs |
-| Static visual only | Mocked for product/UX review; no live data or writes |
-| Read-only API-wired | Can fetch existing backend data but cannot mutate it |
-| Future write workflow | Product concept only; not implemented |
-| Future production | Requires backend, permissions, audit, tests, and review before shipping |
+| Verified in repository | Bounded runtime or independently useful technical capability is present |
+| Read-only API-wired | Surface reads backend data but does not provide production writes |
+| Static visual only | Synthetic or hard-coded UI for product review |
+| Designed, not built | Approved product behaviour without end-to-end runtime implementation |
+| Explicitly excluded | Outside the active product boundary |
 
-## Verified current frontend capability
+Do not infer implementation from a visual shell, disabled control, enum, migration table, compatibility service, or document.
 
-| Area | Current status |
-| --- | --- |
-| Console shell | React/Vite app exists |
-| Mobile shell | React/Vite PWA shell exists |
-| Console API client | Shared API client is imported and can fetch read-only import/export review data when explicitly configured |
-| Import/export review display | Synthetic by default, optional read-only live import/export review data |
-| Task Progress Review surfaces | Static/synthetic visual shell only |
-| Mobile progress/sync examples | Static/synthetic visual shell only |
+## Approved application targets
 
-## Visual-only areas
-
-Current visual-only areas include:
-
-- Today Progress Review widget;
-- Task Detail Progress panel;
-- Supervisor Review Queue;
-- Planner Progress Review Queue;
-- Export Preview progress-candidates section;
-- Project Verification visual;
-- Problems/blockers link examples;
-- Handover Summary progress section;
-- Mobile My Work progress states;
-- Mobile Task Progress flow;
-- Mobile Sync Queue progress examples.
-
-These are review artifacts. They must not be used as evidence that the product has live task-progress workflow.
-
-## Information architecture guardrail
-
-The intended Master Console top-level zones remain:
+### Master Console
 
 ```text
-Today
-Tasks
-Problems
-Evidence
-Exports
+Login
+Projects Home
+  Create Project
+  Active
+  Draft
+  Closed
+  Archived
+  Search
+  Project switching
+Project Console
+  Today
+  Tasks
+    Task Dashboard
+  Critical
+  Import / Export
+  Project Settings
 ```
 
-The intended Mobile Field App top-level zones remain:
+The Console is Tier 1 only. Tier 1 has whole-project operational authority. Filters, categories, mappings, groups, and saved views change classification or presentation, not authority.
+
+### Mobile App
 
 ```text
-My Work
-Today
-Problems
-Evidence
-Sync
+Assigned Tasks
+  Task Detail
 ```
 
-Do not add top-level console areas such as `Supervisor Review`, `Planner Review`, `Verification`, `Messages`, `Chat`, `Reports`, or `Dashboard` without a product decision and ADR or source-doc update.
+The Mobile App is Tier 2/Tier 3 only and is limited to explicit assignments. It is a satellite assigned-work client, not a responsive Console.
 
-Recommended placement:
+There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / Export, or Project Settings destination. Discussion, delays/problems, actions, evidence, and contextual Critical obligations belong inside the relevant assigned Task Detail. Sync remains a compact transport/recovery state.
 
-| Surface | Placement |
+## Task-centred placement
+
+| Surface | Approved placement |
 | --- | --- |
-| Supervisor Review Queue | Today attention queue or Tasks saved view |
-| Planner Progress Review Queue | Exports, with Today summary/count |
-| Project Verification | Exports |
-| Critical Watch | Today, with drill-down under Tasks/Problems as needed |
-| Needs Response | Today/top chrome/user menu; not top-level Chat |
-| Announcements | Controlled banner, not open channel |
+| Can't Start / Start / Pause / Resume / Finish | Task Dashboard or assigned Task Detail |
+| End-of-shift unfinished progress | Assigned Task Detail |
+| People and assignment history | Task Dashboard |
+| Discussion | Task Dashboard |
+| Delays / Problems | Task Dashboard |
+| Actions | Task Dashboard |
+| Evidence | Task Dashboard |
+| History | Task Dashboard |
+| Tier 2 tracking responsibility | Assigned Task Detail and Tier 1 task context |
+| Tier 1 Critical configuration and oversight | Console Critical |
+| Tier 2 Critical reporting obligation | Assigned Task or Work Pack detail |
+| Import source inspection and snapshot review | Import / Export -> Import |
+| Export direction | Import / Export -> Export, labelled not finalised |
+| Needs response | Today attention queue and task context; not a chat inbox |
+| Announcements | Controlled Today banner |
 
-## Initial anti-slop cleanup pass
+## Current visual and wired areas
 
-The initial frontend cleanup pass addresses the visual-shell debt without adding production behaviour:
+| Frontend area | Current label | Limit |
+| --- | --- | --- |
+| Login and Projects Home | Static visual only | Review-only transitions with synthetic projects; no identity or project API. |
+| Today, Tasks, Task Dashboard | Static visual only | Approved structure and state semantics over synthetic task data. |
+| Critical | Static visual only | Disabled per-item policy/template configuration and contextual reporting examples; no Critical API. |
+| Project Settings | Static visual only | General, Users, Operational Mapping, Project History, and Lifecycle are review shells with disabled writes. |
+| Mobile Assigned Tasks and Task Detail | Static visual only | Tier 2/Tier 3 examples and disabled execution, assignment, progress, and reporting controls. |
+| Import snapshot list/detail | Read-only API-wired | GET-only ordinary Console wiring when an API project is explicitly configured. |
+| Local MSPDI/XML inspection | Verified in repository | Browser-only XML namespace/content inspection; no `.mpp`, persistence, or activation. |
+| Export | Static visual only | Direction is deliberately not finalised; experimental main compatibility code is not presented as product authority. |
 
-- Supervisor Review, Planner Review, and Verification are review sections within the approved zones, not permanent top-level navigation.
-- Reviewer-facing examples use sanitised operational shutdown language rather than `Synthetic Task A1` labels.
-- The mobile three-card sync strip is a compact sync/status banner.
-- Mobile task cards show only the minimum operational fields and status indicators.
-- Console card/chip density is reduced.
-- All write-like controls remain disabled until APIs exist.
-- Project-boundary warnings and explicit offline wording remain visible.
+## Execution visual rules
 
-Remaining visual review scope includes Critical Watch, Critical Updates, and entity-linked Discussion. These remain static visual-only surfaces until the related product/API contracts are approved.
+- Show exactly Can't Start, Start, Pause, Resume, and Finish for ordinary Mobile execution.
+- State that action timestamps are system captured. Do not request ordinary manual start/finish dates or times.
+- Can't Start leaves execution Not Started and captures reason, what must happen, and optional linked action/problem context.
+- Ask for late-start cause/action context only when Start is late.
+- Keep a Pause interval distinct from an adverse structured delay/problem while allowing an explicit link.
+- Resume must not silently close a linked structured problem.
+- Finish uses concise confirmation and requires evidence only when configured policy requires it.
+- Ask unfinished end-of-shift work in plain operational language: `How much of the task is complete?`
+- Keep execution state separate from schedule attention. A passed planned start can produce `Not Started` plus `Late to Start`; planned dates alone never create `In Progress`.
 
-## Visual review copy
+## Critical reporting visual rules
 
-Use one global visual-shell statement rather than repeating prototype language on every panel:
+- Routine Critical reporting applies only to explicitly selected Critical items, not every task.
+- Show a versioned per-item policy with Tier 2 reporting owner, timing/triggers, supported content, template/item override, next due, overdue state, latest report, condition, and history.
+- Supported timing examples may include no routine reporting, request/ad hoc, interval, fixed time, shift, event/exception, and supported combinations.
+- Use a controlled content catalogue and pre-populate known execution facts. Do not introduce a generic report/form builder or a second execution-state model.
+- Tier 3 may see Critical context but does not configure it or own the formal Tier 2 obligation by default.
+- Keep all Critical configuration/submission controls disabled until production APIs, authorization, audit, and offline behaviour exist.
+
+## Import / Export visual rules
+
+The ordinary structure is:
+
+```text
+Import / Export
+  Current Schedule
+  Import
+  Export
+  History
+```
+
+Import should lead with source selection, browser inspection, admission validation, parse summary, task/snapshot review, mapping validation, comparison/reconciliation, and activation as each capability becomes available. Clearly distinguish the verified local XML inspector, read-only snapshot GET wiring, and unimplemented write steps.
+
+Export must say that the final product workflow is not finalised. Do not present candidate-bound approval, sealed previews, batch approval, a required browser acceptance harness, or a real-human Microsoft Project gate as settled product architecture. Do not imply that main's patch-shaped compatibility writer updates or represents the master Project schedule.
+
+Use this current high-risk copy:
+
+```text
+Export design is not finalised. Existing compatibility code is experimental and does not update the master Microsoft Project schedule.
+```
+
+## General visual-review copy
+
+Use one global visual-shell statement:
 
 ```text
 Visual review shell. Static/synthetic data. No production write workflow.
 ```
 
-Keep high-risk boundary copy visible where users could misunderstand Project handoff:
+Required offline copy:
 
 ```text
-Planner approval marks this progress as eligible for export preview. The master .mpp is not updated.
-MSPDI/XML artifact generated — master .mpp not updated.
-Shutdown Tracker records verification metadata only.
+Saved locally.
+Queued on this device. Not yet sent.
+Could not send. Still saved on this device.
+Server received.
+Last synced at [time].
 ```
 
 ## Synthetic data rules
 
-Synthetic data should be obviously fake to developers but realistic enough for reviewers.
+Synthetic data should be clearly non-operational to developers but realistic enough for visual review.
 
-Avoid reviewer-facing names such as:
+Avoid:
 
 - `Synthetic Task A1`;
 - `Synthetic Summary B`;
 - `Sample Row 1`;
 - `Demo User A`.
 
-Prefer sanitized operational examples:
+Prefer sanitized examples:
 
 - `C2 Cyclone — remove access cover`;
 - `D2 Stack — scaffold inspection`;
@@ -162,112 +191,50 @@ Prefer sanitized operational examples:
 - `Permit isolation — await operations release`;
 - `Crane lift — wait for lift plan sign-off`.
 
-Synthetic metadata can keep fixture IDs internally.
+Synthetic metadata may keep fixture IDs internally.
 
 ## Console visual rules
 
 - One job per screen.
-- Today should show attention queues and exceptions, not every workflow surface.
-- Use tables/lists for planner review and export diff surfaces.
-- Use cards sparingly for attention summaries or mobile.
-- Avoid horizontal overflow in default desktop view.
-- Avoid displaying all state dimensions at once unless the screen is explicitly a state-model reference.
-- Push detailed state/history into drawers or detail pages.
-- Do not create a universal dashboard that displays tasks, evidence, handover, export, communication, audit, and analytics all at once.
+- Today is a high-signal configurable 24-hour project view over task records.
+- Tasks provides hierarchy, browsing, filtering, grouping, columns, saved views, and Task Dashboard entry.
+- Critical is reporting configuration and oversight, not critical-path calculation.
+- Import / Export separates verified import-review capability from deferred export direction.
+- Project Settings contains General, Users, Operational Mapping, Project History, and Lifecycle.
+- Use tables/lists for operational content and cards sparingly for attention summaries.
+- Avoid horizontal overflow at normal desktop widths.
+- Keep operational records in the Task Dashboard rather than top-level competing applications.
+- Do not create an editable Gantt, dependency editor, or replacement scheduler.
 
 ## Mobile visual rules
 
-- My Work should show actual work before sync diagnostics.
-- Use a compact sync banner, not large status cards, at the top of My Work.
-- Each task card should show only:
-  - task name;
-  - area/work package;
-  - current state;
-  - percent complete where relevant;
-  - one blocker/evidence indicator;
-  - one sync indicator;
-  - one primary action.
-- Everything else belongs in Task Detail or Sync.
-- Keep primary actions thumb-friendly.
-- Do not place planner/export concepts in field-user flows.
+- Assigned Tasks shows assigned work before diagnostics.
+- Use a compact sync banner with embedded recovery detail, never a Sync destination.
+- Each task card should show only task name, useful mapped context, execution state, progress where relevant, one attention/evidence indicator, one sync indicator, and one primary action.
+- Everything else belongs in Task Detail.
+- Keep actions thumb-friendly and failure/retry states explicit.
+- Do not place whole-project browsing, Project export mechanics, or Critical configuration in Mobile.
 
-## Visual route/component expectations
+## Acceptance criteria for visual PRs
 
-Future frontend work should move toward this structure:
+Revise a visual PR if it:
 
-```text
-Today
-  ProgressReviewSummary
-  NeedsAttentionQueue
-  SyncHealthSummary
-  CriticalWatchSummary
+- uses any Console navigation other than Today, Tasks, Critical, Import / Export, and Project Settings;
+- adds a permanent top-level Problems, Evidence, Discussion, Actions, History, review, reports, or dashboard destination;
+- adds a separate Mobile Today, Problems, Evidence, Sync, Critical, Import / Export, or Project Settings destination;
+- permits Mobile whole-project browsing;
+- requests ordinary Mobile users to enter execution dates/times;
+- makes planned dates establish `In Progress`;
+- makes routine Critical reporting mandatory for every task;
+- introduces a generic form builder;
+- creates a generic card wall;
+- separates operational records from their Task Dashboard without a clear linked workflow;
+- hides queued, failed, or server-received sync state;
+- implies a disabled control is live;
+- presents PR #48 or main's compatibility exporter as current product authority;
+- implies Project write-back or a completed round trip;
+- introduces scheduler-like editing;
+- uses colour as the only state signal;
+- infers authority from category, discipline, contractor, work group, area, WBS, Resource `Group`, saved view, or Critical membership.
 
-Tasks
-  TaskExplorer
-  TaskDetailProgressPanel
-  SupervisorReviewSavedView
-
-Problems
-  ProblemsBoard
-  ProblemDetail
-  ActionRegister
-
-Evidence
-  EvidenceReviewList
-  EvidenceDetail
-
-Exports
-  PlannerProgressReview
-  ExportPreviewCandidates
-  ProjectVerification
-```
-
-Mobile structure:
-
-```text
-My Work
-  AssignedTaskCards
-  CompactSyncBanner
-
-Task Detail
-  TaskSummary
-  ProgressUpdateFlow
-  BlockerShortcut
-  EvidenceShortcut
-
-Problems
-  ProblemCapture
-  OwnedProblems
-
-Evidence
-  EvidenceCapture
-  EvidenceQueue
-
-Sync
-  QueuedItems
-  FailedItems
-  ServerReceivedItems
-  ConflictItems
-```
-
-## Acceptance criteria for future visual PRs
-
-A future frontend PR should be rejected or revised if:
-
-- it adds new top-level nav without updating product docs;
-- it adds more panels to the single console overview instead of scoped surfaces;
-- it creates a generic dashboard/card wall;
-- it uses synthetic labels in reviewer-facing screens;
-- it hides offline/sync failure states;
-- it implies a disabled button is a live workflow;
-- it implies Project write-back;
-- it adds scheduler-like visuals;
-- it introduces chat-style messaging;
-- it uses color as the only state signal;
-- it increases mobile field-card density beyond the minimum viable task card.
-
-## Next coding implication
-
-After the cleanup pass, the next visual PR should add the static Critical Watch, Critical Update, and entity-linked Discussion review surfaces without creating a generic dashboard, chat inbox, or production write workflow.
-
-This cleanup is not a redesign. It is a guardrail pass to keep the visual review shell from becoming an AI-generated dashboard wall.
+The next product step is a deterministic frontend operational trial/simulation on this foundation. Production task-execution backend work requires a separate reviewed implementation PR.
