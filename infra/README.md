@@ -36,4 +36,4 @@ The API owns request workflows and persistence orchestration. Microsoft Project 
 
 ## Product boundary
 
-Microsoft Project remains the schedule authority. This infrastructure supports imported snapshots, execution review, audit, controlled export preparation, and verification metadata. It does not provide scheduling calculations, automatic date movement, native `.mpp` writing, or uncontrolled Project write-back.
+Microsoft Project remains the schedule authority. This infrastructure supports imported snapshots and audit. Existing export preparation and verification tables support experimental compatibility code only; they do not define the active product contract under [ADR-012](../docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md). The infrastructure does not provide scheduling calculations, automatic date movement, native `.mpp` writing, or uncontrolled Project write-back.

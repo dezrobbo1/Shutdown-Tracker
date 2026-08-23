@@ -1,8 +1,10 @@
 # Research Decisions Summary
 
-This file is a decision-oriented index. Accepted ADRs and current product documents take precedence over research summaries when wording conflicts.
+> **Historical research synthesis.** The planner/supervisor roles, candidate pipeline, and navigation described below predate [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md) and the approved Tier 1/Tier 2/Tier 3 two-client model. They are retained as research provenance and are not current product authority or an implementation roadmap.
 
-## Executive decision
+This file is a decision-oriented historical index. Accepted ADRs and current product documents take precedence over research summaries when wording conflicts.
+
+## Historical executive decision
 
 Shutdown Tracker is a live execution-control system. Microsoft Project remains the schedule calculation and master-file authority.
 
@@ -24,7 +26,7 @@ The supporting research explicitly allows approved actual/progress inputs while 
 
 The intended product output is not merely a sparse patch. It is a complete updated Project candidate that a planner can review and deliberately use.
 
-## Core product decisions
+## Historical product decisions
 
 | Area | Decision |
 | --- | --- |
@@ -142,7 +144,7 @@ A read-only source-versus-candidate schedule impact view is allowed for planner 
 
 Build structured execution records first. Entity-linked Discussion may support tasks, Problems, Actions, Evidence, Handover, and Project review. Generic chat must not become the operational source of truth.
 
-## Next architecture questions
+## Historical follow-on architecture questions
 
 The most important unresolved implementation question is **how to apply the exact approved input manifest through Microsoft Project reliably while producing a complete updated candidate schedule**.
 

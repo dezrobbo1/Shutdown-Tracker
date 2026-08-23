@@ -1,6 +1,8 @@
 # Project Worker
 
-Purpose: Spring Boot worker service shell for future Microsoft Project import/export processing through MPXJ and MSPDI/XML artifacts.
+Purpose: Spring Boot worker service shell for future Microsoft Project import processing and experimental MSPDI/XML interchange through MPXJ.
+
+The export artifact spike and handoff described below are existing experimental compatibility infrastructure. They do not define the active product export contract; the final Project export/round-trip design is deferred under [ADR-012](../../docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md).
 
 ## Current Scope
 

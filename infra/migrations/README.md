@@ -15,6 +15,8 @@ The baseline is `V001` through `V006` and creates 20 application tables:
 
 Critical Watchlists and Critical Work Packages are reporting constructs. They do not calculate critical path, float, or recovery schedules.
 
+V005's export model is retained schema compatibility, not the active product export contract. Do not rewrite the applied migration; any future replacement follows an independently approved decision and additive migration.
+
 ## Runtime use
 
 The API and project worker `local` profiles enable Flyway with:
@@ -51,4 +53,4 @@ Both scripts reset the named validation volume before applying `infra/migrations
 - Keep migrations reviewable and use explicit keys, constraints, indexes, and comments.
 - Do not place seed data, secrets, real Project files, generated export artifacts, or other operational data in schema migrations.
 - Treat imported Microsoft Project rows as immutable snapshot facts. Microsoft Project remains the schedule authority.
-- Preserve reviewed, approved, batch-oriented export handling; do not introduce scheduler ownership or uncontrolled Project write-back.
+- Preserve existing export-schema compatibility until a replacement is approved; do not treat it as product authority, introduce scheduler ownership, or permit uncontrolled Project write-back.

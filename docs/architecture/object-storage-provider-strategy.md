@@ -2,9 +2,9 @@
 
 ## Purpose
 
-Shutdown Tracker needs production object storage for immutable Microsoft Project source files, generated MSPDI/XML export artifacts, and future evidence files. This note defines provider selection and configuration guidance only. It does not choose a provider, add an SDK, add migrations, create buckets or containers, or change runtime behavior.
+Shutdown Tracker needs production object storage for immutable Microsoft Project source files and future evidence files. Existing generated-artifact storage is experimental compatibility pending the deferred export decision. This note defines provider selection and configuration guidance only. It does not choose a provider, add an SDK, add migrations, create buckets or containers, or change runtime behavior.
 
-Microsoft Project remains the schedule authority. Object storage supports reviewed import/export workflows; it must not become a live Project feed, scheduler, or uncontrolled write-back path.
+Microsoft Project remains the schedule authority. Object storage supports immutable import sources and future evidence; retained export-artifact storage is technical compatibility under [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md). Storage must not become a live Project feed, scheduler, or uncontrolled write-back path.
 
 ## Current Baseline
 
@@ -22,7 +22,7 @@ The local implementations are for development and review wiring only. They are n
 | Class | Examples | Required behavior |
 | --- | --- | --- |
 | Source files | Imported `.mpp`, `.xml`, `.mspdi.xml` files | Immutable after upload, private by default, hash recorded, linked to project/source-file metadata, never parsed in the API. |
-| Export artifacts | Worker-generated MSPDI/XML files for approved export batches | Immutable after generation, linked to the export batch, hash recorded, opened and verified manually in Microsoft Project. |
+| Experimental export artifacts | Existing worker-generated MSPDI/XML compatibility output | Not current product authority; any future production retention/access rules require the replacement export contract. |
 | Evidence files | Future photos, documents, or field attachments | Private by default, project-scoped access, metadata and audit trail in PostgreSQL, binary bytes outside PostgreSQL. |
 
 PostgreSQL should store metadata, ownership, lifecycle state, content hashes, and storage URIs. Object storage should hold the bytes.
@@ -35,7 +35,7 @@ A production provider should be selected using these criteria:
 - Encryption at rest by default, with customer-managed keys considered later if pilot requirements demand it.
 - Workload identity, managed identity, or OIDC-based credentials preferred over long-lived access keys.
 - Short-lived signed URL support for controlled upload/download paths where direct object-store access is needed.
-- Object versioning, retention, or immutability controls for source files and export artifacts where practical.
+- Object versioning, retention, or immutability controls for source files, evidence, and any retained experimental artifacts where practical.
 - Lifecycle policy support for retention, archive, and deletion rules.
 - Regional data residency that matches customer and project requirements.
 - Access logging or audit integration.
@@ -80,15 +80,17 @@ projects/{projectId}/export-artifacts/{exportBatchId}/{exportBatchId}.mspdi.xml
 projects/{projectId}/evidence/{evidenceId}/{safeFilename}
 ```
 
-Storage URIs should be treated as internal references. User-facing access should go through the API or short-lived signed URLs issued after project/role checks.
+The export-artifact key documents the retained compatibility path only. A future approved export contract may replace it.
+
+Storage URIs should be treated as internal references. User-facing access should go through the API or short-lived signed URLs issued after project-membership, tier, and explicit-assignment checks.
 
 ## Access Model
 
 Production object storage should follow these rules:
 
 - Buckets or containers are private.
-- The API mediates access decisions using project membership, role permissions, and audit policy.
-- Workers receive only the object references required for their specific import/export job.
+- The API mediates access decisions using active project membership, Tier 1 whole-project authority or Tier 2/Tier 3 task assignments, and audit policy.
+- Workers receive only the object references required for their specific import job or retained experimental export operation.
 - Signed URLs, when used, are short lived and scoped to one object operation.
 - Source-file and export-artifact bytes are never stored in PostgreSQL.
 - Generated export artifacts are not committed to Git and are not treated as automated Project verification.
@@ -110,7 +112,7 @@ Future object-store tests should use synthetic byte arrays and generated identif
 - Object-key normalization and rejection of path traversal.
 - Content hash recording.
 - Source-file immutability expectations.
-- Export-artifact URI/hash recording.
+- Experimental export-artifact URI/hash recording where the compatibility path is retained.
 - Private access assumptions and signed URL expiry where supported.
 
 Tests must not commit real Project files, generated export artifacts, customer files, screenshots, secrets, or provider credentials.

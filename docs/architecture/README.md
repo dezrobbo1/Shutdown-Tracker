@@ -1,6 +1,6 @@
 # Architecture
 
-Shutdown Tracker is a live shutdown execution-control system. Microsoft Project remains the schedule authority and final master-file control point; Shutdown Tracker owns execution truth, review, evidence, handover, reporting, operational mapping, controlled export preparation, verification metadata, and audit.
+Shutdown Tracker is a live shutdown execution-control system. Microsoft Project remains the schedule authority and final master-file control point; Shutdown Tracker owns execution truth, assignments, task-owned operational records, reporting, operational mapping, immutable imports, and audit.
 
 This document describes durable architecture boundaries. Exact endpoint/test inventories belong in source code and service/app READMEs rather than here.
 
@@ -9,7 +9,7 @@ This document describes durable architecture boundaries. Exact endpoint/test inv
 The repository is a monorepo with:
 
 - `apps/console`: Master Console frontend.
-- `apps/mobile-pwa`: current Mobile Field App PWA implementation.
+- `apps/mobile-pwa`: current assigned-task Mobile App PWA implementation.
 - `services/api`: Spring Boot API and persistence/orchestration boundary.
 - `services/project-worker`: Spring Boot worker for Microsoft Project file processing through MPXJ.
 - `packages/api-client`: shared TypeScript API client.
@@ -24,20 +24,19 @@ The backend follows a modular-monolith-first approach. Explicit module and worke
 
 The architecture is expected to support:
 
-- identity and project-scoped authorization;
+- OIDC identity, project-scoped three-tier membership, direct-report relationships, and explicit task/reporting assignment authorization;
 - projects, source files, import batches, and immutable Project snapshots;
 - imported tasks, resources, assignments, and extended attributes;
-- Project Operational Mapping: Source Catalogue, versioned Import Profiles, Operational Categories, mapping health, resolved task-category membership, provenance, Scope, and Saved Views;
+- Project Operational Mapping: Source Catalogue, versioned Import Profiles, Operational Categories, mapping health, resolved task-category membership, provenance, query-only Scope, Saved Views, and bulk Tier 2 assignment aids;
 - task lineage across snapshots;
 - execution state and structured task progress;
-- supervisor and planner review;
-- problems and actions;
+- Tier 2 tracking responsibility and Tier 1 whole-project operational review;
+- task-owned delays/problems and actions;
 - evidence metadata;
 - handover;
-- Critical Watchlists, Critical Work Packages, reporting policies, and Critical Updates;
+- Critical items, Critical Work Packages, reporting assignments/policies, and immutable submitted reports;
 - entity-linked communications/discussion;
-- approval and export batches;
-- manual Microsoft Project verification metadata;
+- experimental export-preview/approval records already present on `main`;
 - audit events;
 - mobile offline/sync workflows.
 
@@ -45,9 +44,9 @@ Project Operational Mapping architecture is defined in [Project Operational Mapp
 
 ## API and worker ownership
 
-The API owns application workflows, authorization decisions, operational state, persistence orchestration, review/approval decisions, audit, Operational Mapping configuration/resolution orchestration, and user-facing API contracts.
+The API owns application workflows, authorization decisions, operational state, persistence orchestration, audit, Operational Mapping configuration/resolution orchestration, and user-facing API contracts.
 
-The project worker owns Microsoft Project file processing. MPXJ parsing and MSPDI/XML artifact generation belong in the worker rather than the API. For Operational Mapping, the worker returns source facts and normalized source metadata; it does not decide Tracker category meaning.
+The project worker owns Microsoft Project file processing. MPXJ parsing belongs in the worker rather than the API. Existing MSPDI/XML writer code is experimental; any future artifact-generation workflow requires a new approved contract. For Operational Mapping, the worker returns source facts and normalized source metadata; it does not decide Tracker category meaning.
 
 Current API-to-worker handoffs are explicit and opt-in. The future asynchronous direction is documented in [Worker Handoff Queue Strategy](worker-handoff-queue-strategy.md). Product workflow statuses must not be replaced with transport/job statuses merely because a queue is introduced.
 
@@ -59,7 +58,7 @@ The v1 model uses relational domain records plus append-only audit events rather
 
 Versioned migrations live in [`infra/migrations`](../../infra/migrations). See the migration README and validation scripts under [`scripts/db`](../../scripts/db).
 
-Source files, generated export artifacts, and evidence should use storage abstractions with metadata held in PostgreSQL. Local filesystem implementations are development/review facilities only. Production provider guidance is in [Object Storage Provider Strategy](object-storage-provider-strategy.md).
+Source files and evidence should use storage abstractions with metadata held in PostgreSQL. Any future export artifact uses the same provenance principle only after its product contract is approved. Local filesystem implementations are development/review facilities only. Production provider guidance is in [Object Storage Provider Strategy](object-storage-provider-strategy.md).
 
 ## Import and operational-mapping lifecycle
 
@@ -71,10 +70,10 @@ The durable import/mapping handoff is:
 4. Persist parse metadata and immutable snapshot entities.
 5. Build/query the Source Catalogue from imported facts.
 6. Validate the selected Import Profile version against the snapshot.
-7. Planner resolves confirmation-required or broken mappings where policy requires it.
+7. Tier 1 resolves confirmation-required or broken mappings where policy requires it.
 8. Activate an explicit profile version for the snapshot.
 9. Resolve and persist snapshot-specific task-category memberships with provenance.
-10. Make mapped Scope/Saved Views and downstream execution context available.
+10. Make mapped query-only Scope/Saved Views, display/reporting context, and bulk Tier 2 assignment aids available.
 11. Review/accept imported task lineage where required.
 12. Track execution in Shutdown Tracker.
 
@@ -82,21 +81,13 @@ A Project snapshot may exist before Operational Mapping activation. Mapping acti
 
 For a new snapshot, prior memberships remain unchanged; the selected profile version is revalidated and a new snapshot-specific membership set is generated only after the mapping-health gate passes.
 
-## Export lifecycle
+## Deferred export architecture
 
-The durable export handoff is:
+There is no active durable export lifecycle on the product-trial foundation. Exact Project-bound fields, review/approval states, artifact generation, Microsoft Project recalculation, adoption/merge, and re-import semantics require a new ADR after operational trials.
 
-1. Capture structured task progress.
-2. Supervisor reviews operational validity.
-3. Planner reviews export eligibility.
-4. Materialise an export preview from approved leaf-task candidates.
-5. Approve the export batch.
-6. Generate an MSPDI/XML artifact through the worker.
-7. Planner manually opens/checks the artifact in Microsoft Project.
-8. Planner controls whether the master `.mpp` is saved.
-9. Shutdown Tracker records verification metadata and audit.
+The older export-preview, approval-batch, review-bootstrap, and minimal MSPDI writer modules already present on `main` are experimental compatibility code. New product work must not couple execution APIs or frontend trials to those modules by default.
 
-No step authorises hidden Project write-back or native `.mpp` generation.
+Any replacement export architecture must preserve Microsoft Project schedule authority, immutable source identity, explicit human control, provenance, and no silent master overwrite. It must not assume PR #48's candidate-bound approval or sealed-preview model without a new decision.
 
 ## Project Operational Mapping implementation sequence
 
@@ -107,7 +98,7 @@ Implementation should proceed as narrow vertical slices rather than creating all
 3. **Hierarchy mapping** — explicit structural anchors/ancestry plus re-import validation.
 4. **Resource Group mapping** — assignment-derived multi-value membership and provenance.
 5. **Scope and Saved Views** — operational query reuse over resolved memberships without widening authorization.
-6. **Responsibility context and operational-record inheritance** — only as corresponding production domains are ready.
+6. **Bulk Tier 2 assignment aid and operational-record context** — only as corresponding production domains are ready; committing the preview creates explicit assignment records.
 
 See [Project Operational Mapping — Implementation Architecture](project-operational-mapping-implementation.md) for the proposed logical data model, API surface, migration strategy, consistency requirements, and test plan.
 
@@ -115,33 +106,34 @@ See [Project Operational Mapping — Implementation Architecture](project-operat
 
 Audit events are append-only application records for material workflow and authority changes. See [Audit Event Schema](audit-event-schema.md) for the baseline schema and event requirements.
 
-Operational Mapping must audit category/profile/mapping activation, remap confirmation, validation overrides, value configuration, shared-view changes, and responsibility/delegation changes as they are implemented.
+Operational Mapping must audit category/profile/mapping activation, remap confirmation, validation overrides, value configuration, shared-view changes, and mapped/filter-assisted bulk assignment commits as they are implemented. Membership, direct-report, and task/reporting assignments have their own audit history.
 
 Product documents may define additional event families as capabilities are implemented; those product rules do not imply that the corresponding backend functionality already exists.
 
 ## Mobile and offline model
 
-The field application must make queued/submitted/synced state explicit. Offline direction includes IndexedDB, service workers, Cache API, idempotency keys, replay-safe mutations, and recoverable conflict states. Background Sync is progressive enhancement only.
+The Mobile App must make queued/submitted/synced state explicit inside Assigned Tasks and Task Detail. Offline direction includes IndexedDB, service workers, Cache API, idempotency keys, replay-safe mutations, and recoverable conflict states. Background Sync is progressive enhancement only.
 
 See [Offline Audit and Sync Rules](../product/offline-audit-sync-rules.md). Key rule: queued is not submitted.
 
 ## Communications
 
-Communications are entity-linked operational context, not a generic chat system of record. Discussion may attach to tasks, problems, actions, evidence, handover, export review, verification, or Critical Watch objects.
+Communications are entity-linked operational context, not a generic chat system of record. Discussion is centred on Task Dashboard records; any future export-review discussion remains subject to the deferred export contract.
 
 A comment is not progress, a blocker, an action, evidence, or handover unless it is promoted or linked into the corresponding structured record. See [Communications Layer](../product/communications-layer.md).
 
 ## Frontend and UX guardrails
 
-- Master Console top-level zones remain Today, Tasks, Problems, Evidence, Exports unless current product/ADR sources explicitly change them.
-- Mobile Field App top-level zones remain My Work, Today, Problems, Evidence, Sync unless current product/ADR sources explicitly change them.
-- Project Operational Mapping is planner/project setup functionality; it does not require a new permanent top-level operational zone.
+- Master Console top-level sections are Today, Tasks, Critical, Import / Export, and Project Settings.
+- The Mobile App has Assigned Tasks as its only top-level operational destination. Sync remains visible transport/recovery state.
+- Problems, Discussion, Actions, Evidence, and History live inside the relevant Task Dashboard.
+- Project Operational Mapping is Tier 1 project setup functionality under Project Settings and Import / Export; it is not a separate operational destination.
 - Do not introduce scheduler/Gantt/critical-path ownership through the frontend.
-- Review, verification, mapping setup, and communications should remain scoped operational/configuration surfaces rather than uncontrolled top-level navigation growth.
+- Review, verification, mapping setup, and communications should remain task-centred or bounded configuration surfaces rather than uncontrolled top-level navigation growth.
 - Use [Frontend Visual Review Scope](../product/frontend-visual-review-scope.md), [UX Anti-Slop Rules](../product/ux-anti-slop-rules.md), and [Design Language and Status Semantics](../product/design-language-and-status-semantics.md) for current UI guidance.
 
 ## Non-negotiable Microsoft Project boundary
 
 Shutdown Tracker must not calculate CPM, critical path, or float; resource-level; optimise schedules; evaluate Project formulas; automatically move dates; silently alter dependencies, constraints, calendars, or baselines; or imply that an internal approval/mapping changes the master Project file.
 
-Critical Watch is an execution-reporting construct, not a critical-path calculation. Project-derived category membership is classification/context, not application authorization.
+Critical is an execution-reporting construct, not a critical-path calculation. Project-derived category membership is filter/display/bulk-selection context, not application authorization.

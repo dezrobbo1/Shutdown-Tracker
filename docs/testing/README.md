@@ -1,6 +1,6 @@
 # Testing
 
-Testing should protect the Microsoft Project authority boundary, immutable imported snapshots, execution/review integrity, auditability, permissions, offline safety, and controlled export correctness.
+Testing should protect the Microsoft Project authority boundary, immutable imported snapshots, execution integrity, auditability, permissions, and offline safety. Existing export tests protect experimental compatibility code; they do not define the active product contract.
 
 This document describes durable test policy. Exact test-class inventories belong in the source tree and CI results rather than being copied here.
 
@@ -14,7 +14,9 @@ Run from the repository root when Java 21 and Maven are available:
 mvn test
 ```
 
-Backend tests should cover service/domain validation, persistence boundaries, API contracts, audit events, import/export handoffs, review/approval state transitions, and rejection of scheduler-like or uncontrolled write-back behavior.
+Backend tests should cover service/domain validation, persistence boundaries, API contracts, audit events, import handoffs, and rejection of scheduler-like or uncontrolled write-back behavior.
+
+Persistence and transaction claims that depend on PostgreSQL must use real PostgreSQL, the real Spring transaction proxy, and the JDBC implementation rather than H2 or fake repositories. Fake-repository tests remain useful unit evidence but are not PostgreSQL or transaction-boundary evidence.
 
 ### Frontend
 
@@ -52,14 +54,14 @@ Use [Import/Export Fixture Strategy](import-export-fixture-strategy.md).
 - Do not commit real customer/site schedules or operational data.
 - Prefer synthetic text/XML fixtures and text expected-output files.
 - Keep generated export artifacts temporary and uncommitted.
-- Validate MPXJ parsing, stable task/resource/assignment identity fields, relevant extended attributes, warnings, and export allowlisting.
+- Validate MPXJ parsing, stable task/resource/assignment identity fields, relevant extended attributes, and warnings. Existing export fixtures are experimental compatibility tests only.
 - The approved synthetic MSPDI fixture lives under `fixtures/import-export/synthetic-basic-wbs/`.
 
-## Microsoft Project round-trip validation
+## Historical Microsoft Project round-trip procedure
 
-Automated MSPDI/XML generation tests do not replace human Microsoft Project verification.
+The previous manual procedure remains available as technical research. It is not an active product-trial gate under [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md).
 
-Use [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md) for text-only evidence of representative reopen checks. The planner remains responsible for deciding whether a verified artifact is applied/saved into the master `.mpp`.
+If the experimental writer is investigated, use [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md) for text-only evidence and do not represent that evidence as approval of the final export design.
 
 Never commit real Project files, generated artifacts, screenshots, or confidential schedule data as round-trip evidence.
 
@@ -75,21 +77,23 @@ Tests should verify:
 - no API-side Project parsing when the worker owns that responsibility;
 - no automatic uncertain lineage remapping.
 
-## Progress/review/export tests
+## Execution and progress tests
 
 As the corresponding features are implemented, tests should verify:
 
-- field progress does not bypass supervisor/planner review;
-- export eligibility remains limited to explicitly approved candidates;
-- summary-task and unsupported-field export attempts are rejected;
-- candidate/task/source/approval identities cannot be substituted or become stale before artifact generation;
-- export generation remains request-specific and allowlisted;
-- artifact metadata and verification state are auditable;
+- Can't Start, Start, Pause, Resume, and Finish use server-authoritative event time and valid transitions;
+- Can't Start remains Not Started;
+- Pause intervals and adverse delay/problem records remain distinct but linkable;
+- Resume does not silently close an unresolved problem;
+- end-of-shift progress is a Tracker field observation rather than an implicit Project-field write;
+- ordinary progress and Critical reporting remain separate; and
 - no endpoint or worker operation silently updates Microsoft Project.
+
+Any replacement export design must define its own focused test plan before implementation. Do not inherit exact-candidate, sealed-preview, field-allowlist, or manual-gate requirements merely from historical tests.
 
 ## Permission and audit tests
 
-Verify project-scoped authorization, least-privilege behavior, review/export authority, evidence access, delegation boundaries, and immutable audit records for material actions.
+Verify project-scoped Tier 1/Tier 2/Tier 3 membership, Tier 2-to-Tier 3 direct-report checks, explicit task/reporting assignments, Tier 1 whole-project authority, evidence access, and immutable audit records for material actions.
 
 Imported category/classification membership must never become an implicit permission grant.
 
@@ -126,4 +130,4 @@ CI results and source code are the authority for the exact current test inventor
 
 ## Manual/E2E expansion
 
-As workflows become production-capable, add end-to-end coverage for representative import, execution, problem/action, evidence, handover, review, export, verification, and offline-sync paths. Keep schedule calculation, automatic Project movement, and uncontrolled write-back out of those workflows.
+As workflows become production-capable, add end-to-end coverage for representative import, execution, problem/action, evidence, handover, Critical reporting, and offline-sync paths. Add export/verification coverage only after the replacement export contract is approved. Keep schedule calculation, automatic Project movement, and uncontrolled write-back out of those workflows.

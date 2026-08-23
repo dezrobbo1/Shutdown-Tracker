@@ -1,6 +1,8 @@
 # API Service
 
-Purpose: Spring Boot API service shell for future operational workflows, permissions, audit events, task updates, problems, actions, evidence metadata, handover, and export approvals.
+Purpose: Spring Boot API service shell for future operational workflows, permissions, audit events, task updates, problems, actions, evidence metadata, handover, and Project interchange.
+
+The export-preview, approval, artifact, review-bootstrap, and verification endpoints described below are existing experimental compatibility infrastructure. They are not the active product contract or a prerequisite for the operational product trial; see [ADR-012](../../docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md).
 
 ## Current Scope
 

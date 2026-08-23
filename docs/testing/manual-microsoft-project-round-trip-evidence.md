@@ -1,8 +1,10 @@
-# Manual Microsoft Project Candidate-Schedule Evidence
+# Historical Manual Microsoft Project Candidate-Schedule Evidence
 
-Manual Microsoft Project evidence exists to prove that reviewed Shutdown Tracker inputs can produce a separate, reviewable **complete updated Project candidate schedule** without overwriting the accepted source/master.
+Status: superseded technical test procedure; not current product authority, a delivery prerequisite, or an active acceptance gate.
 
-Inputs may originate from reviewed field execution information and/or authorised planner entry in the Master Console.
+This document preserves the manual diagnostic procedure developed for the earlier candidate-schedule design. [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md) defers the final Project export, candidate, recalculation, adoption, merge, and re-import contract until after operational frontend trials.
+
+The procedure may still inform a future separately approved design, but running or passing it does not approve that design. Historic `planner` wording and fields such as `planner_project_edit` describe the earlier test vocabulary; they do not define an application role. Current application authority uses Tier 1, Tier 2, and Tier 3 only.
 
 ## Important distinction
 
@@ -47,6 +49,8 @@ Every material source-versus-candidate difference should be classified as:
 - `unexpected_difference` — unexplained change requiring investigation.
 
 Do not treat a Project-calculated planned-date/duration/summary/work/slack change as an automatic failure merely because Shutdown Tracker was not allowed to directly author that field.
+
+The following test modes are preserved as the earlier technical procedure. They are not current product requirements.
 
 ## Test mode A — standalone updated candidate
 
@@ -98,7 +102,7 @@ Run this mode only when merge/import is intended to be supported.
 
 The first production-capable merge/import workflow must be proven against disposable/backed-up schedules before it is used with an operational master.
 
-## Planner outcomes after review
+## Historical reviewer outcomes
 
 The manual evidence may support these product outcomes:
 
@@ -168,8 +172,8 @@ generated_artifacts_committed: false
 notes:
 ```
 
-## Current status
+## Historical result and current status
 
-The manual diagnostics performed during export-handoff investigation showed that minimal field-isolated MSPDI patches do not reliably reproduce the same tracking transaction as entering the fact through Microsoft Project. Those diagnostics are useful evidence against the sparse patch mechanism. They are not a permanent prohibition on the execution facts themselves and they do not test the full intended product workflow described above.
+The manual diagnostics performed during export-handoff investigation showed that minimal field-isolated MSPDI patches do not reliably reproduce the same tracking transaction as entering the fact through Microsoft Project. Those diagnostics are useful evidence against the sparse patch mechanism. They are not a permanent prohibition on the execution facts themselves and they do not test the full earlier candidate concept described above.
 
-No handoff mechanism should be marked production-ready until a synthetic **complete updated candidate** passes standalone Project review. Merge/import must receive its own separate synthetic acceptance evidence before that mode is claimed production-ready.
+If a future approved export design reuses this mechanism, its own ADR and validation plan must decide which synthetic Microsoft Project checks are required. This historical manual procedure is not a current product gate and does not block the deterministic frontend operational trial.

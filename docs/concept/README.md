@@ -4,64 +4,47 @@ Shutdown Tracker is a live execution-control platform for shutdown, turnaround, 
 
 ## Product authority model
 
-The platform separates three responsibilities:
-
-- **Shutdown Tracker** captures and approves execution inputs.
-- **Microsoft Project** recalculates a disposable candidate schedule.
-- **The planner** accepts, rejects, supersedes, or manually adopts the candidate.
+- **Shutdown Tracker** captures operational execution truth, assignments, Critical reporting, task-owned records, immutable imported snapshots, and audit.
+- **Microsoft Project** remains schedule calculation and master-file authority.
+- **Tier 1** has whole-project operational authority in the Console; Tier 2 and Tier 3 remain explicitly assignment-bounded in Mobile.
 
 Shutdown Tracker does not calculate CPM, critical path, float, recovery schedules, resource levelling, or dependency consequences itself. It does not silently overwrite the accepted master and does not provide server-side native `.mpp` writing.
 
-Microsoft Project may change planned dates, durations, summary roll-ups, work, slack, criticality, and related values when approved execution inputs are applied. Those are candidate-schedule consequences to review, not hidden Shutdown Tracker-authored schedule values.
+The final Project-bound input, export, recalculation, adoption, and re-import contract is deferred until operational frontend trials establish the facts that need to cross that boundary.
 
-## Application experiences
+## Application clients
 
 ### Master Console
 
-Desktop-optimised for shutdown control, planners, coordinators, supervisors, package owners, and managers.
+Tier 1-only project-control application with unrestricted project visibility and operational update authority.
 
-Baseline zones:
+Approved top-level sections:
 
 - Today
 - Tasks
-- Problems
-- Evidence
-- Exports
+- Critical
+- Import / Export
+- Project Settings
 
-### Field App
+### Mobile App
 
-Mobile-optimised for supervisors, leading hands, contractors, inspectors, and execution crews.
+Tier 2/Tier 3 satellite application limited to explicitly assigned tasks.
 
-Baseline zones:
+Approved top-level model:
 
-- My Work
-- Today
-- Problems
-- Evidence
-- Sync
+- Assigned Tasks only
 
-Offline-capable field workflows are core direction. Delivery technology must not create a separate authority or data model.
+Problems, discussion, actions, evidence, and history live inside the relevant Task Dashboard/Task Detail. Sync is a visible transport/recovery state, not navigation. Offline-capable field workflows are core direction. Delivery technology must not create a separate authority or data model.
 
-## Candidate schedule handoff
+## Project import and deferred export
 
-The target handoff is:
+The active foundation imports and inspects immutable Project source/snapshot facts. Console Import review may parse MSPDI/XML in the browser and may show configured read-only snapshot API data.
 
-```text
-immutable accepted Project source
--> reviewed execution facts
--> planner-approved input manifest
--> disposable Project candidate
--> Microsoft Project recalculation
--> source-versus-candidate delta
--> planner candidate decision
--> optional manual master adoption
-```
-
-A read-only schedule-impact comparison is allowed in the Master Console. Editable schedule planning remains in Microsoft Project.
+Export remains visibly not finalised. Existing preview/writer code is experimental technical infrastructure, not the required product flow. Editable schedule planning remains in Microsoft Project.
 
 ## Project Operational Mapping
 
-Microsoft Project supplies source facts, structure, and classifications. Shutdown Tracker adds planner-configured operational interpretation without rewriting those source facts.
+Microsoft Project supplies source facts, structure, and classifications. Shutdown Tracker adds Tier 1-configured operational interpretation without rewriting those source facts.
 
 Initial source modes:
 
@@ -69,7 +52,7 @@ Initial source modes:
 2. task hierarchy/WBS/selected summary ancestry;
 3. task assignments resolved through Resource `Group`.
 
-Operational Categories may support filtering, grouping, Scope, Saved Views, Critical Watch, Problems, Actions, Evidence, Handover, reporting, and mobile relevance.
+Operational Categories may support filtering, grouping, query-only Scope, Saved Views, Today, Critical selection/reporting, Task Dashboard context, and bulk Tier 2 assignment.
 
 Resource-derived categories must support multiple values where a task has assignments from more than one Resource Group.
 
@@ -79,26 +62,27 @@ Classification never grants application authority by itself.
 
 ## Critical Work Package reporting
 
-A Critical Watchlist is an operational reporting list. A Critical Work Package is a reporting object, not a scheduling object.
+A Critical item is an operational reporting object, not a scheduling object.
 
-Default source is a selected Project summary task plus descendants; multi-summary sources are also valid when reporting crosses WBS boundaries.
+The first approved Critical Work Pack UX selects one Project summary task plus descendants. Existing V006 multi-summary compatibility is retained but not exposed unless separately approved.
 
-Project Critical/slack fields may be displayed as read-only Project context but do not automatically define Critical Watch membership.
+Project Critical/slack fields may be displayed as read-only Project context but do not automatically define Critical reporting membership.
 
 ## Execution model
 
 The platform should support:
 
-- Start, Pause, Resume, Block, Complete;
+- system-timestamped Can't Start, Start, Pause, Resume, and Finish actions;
 - structured progress;
-- supervisor review;
-- planner input review;
-- Problems and Actions;
-- Evidence and Handover;
-- Critical Updates and reporting;
-- candidate schedule review and audit.
+- Tier 2 tracking responsibility and Tier 3 field assignment;
+- task-owned Delays / Problems and Actions;
+- task-owned Evidence and History;
+- Critical reports and reporting obligations;
+- append-only execution, correction, and reporting audit.
 
 Execution actions are not automatic aliases for Project fields.
+
+Can't Start leaves execution Not Started. Pause intervals may link to adverse delays/problems without making every pause adverse. Unfinished end-of-shift work uses a plain-language Tracker field progress observation. Ordinary Mobile users are not asked to enter execution times or shown Project-specific progress-field terminology.
 
 ## Progress methods
 
@@ -109,7 +93,9 @@ Projects may configure the business-appropriate progress method:
 - `% Work Complete` only when resource/assignment Work is intentionally maintained;
 - state-only tracking where a percentage is not meaningful.
 
-Field recognition, reviewability, handoff support, and project enablement remain separate decisions.
+Tracker progress recognition and Project-field interpretation remain separate decisions. The active trial does not lock a one-to-one Project-field mapping.
+
+Critical reporting uses a versioned per-item policy with supported timing/triggers and a controlled content catalogue. Routine reporting is not mandatory for every task, known execution facts should be reused, and the product does not provide a generic report/form builder.
 
 ## MVP direction
 
@@ -118,11 +104,11 @@ The MVP focuses on:
 - immutable Project snapshot import;
 - Project source discovery and Operational Mapping;
 - execution state and structured progress;
-- supervisor/planner review;
-- Problems, Actions, Evidence, and Handover;
-- Critical Watch reporting;
-- approved-input/candidate-schedule handoff;
-- users, roles, permissions, delegation, and offline foundations;
+- Tier 2 tracking responsibility and Tier 1 whole-project operational review;
+- Task Dashboard-owned Discussion, Delays / Problems, Actions, Evidence, and History;
+- Critical reporting;
+- import review and an explicitly deferred Project export surface;
+- three-tier membership, direct reports, explicit assignments, and offline foundations;
 - browser/installable delivery for both application experiences.
 
 Explicitly excluded:
@@ -137,4 +123,4 @@ Explicitly excluded:
 - automatic permissions from Project categories;
 - generic chat clone behaviour.
 
-A read-only candidate-impact Gantt/timeline is not considered a scheduling UI and is permitted when it helps planner review.
+Any future schedule-impact comparison requires a separately approved product and architecture decision.

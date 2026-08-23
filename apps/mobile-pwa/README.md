@@ -1,28 +1,65 @@
-# Mobile Field App
+# Mobile App
 
-Purpose: mobile-first PWA for field supervisors, leading hands, contractors, inspectors, and execution crews.
+Purpose: React/Vite mobile-first PWA satellite for Tier 2 and Tier 3 assigned work.
 
-Current status: scaffolded React/Vite mobile shell with static Task Progress Review states for product review. The initial visual cleanup pass keeps My Work focused on assigned work, uses sanitised operational examples, and presents sync state in a compact banner.
+Current status: static/synthetic `Assigned Tasks -> Task Detail` visual shell. It contains hard-coded Tier 2 and Tier 3 assignment examples, task-owned execution and operational sections, a contextual Tier 2 Critical reporting obligation, and compact sync/recovery states. It has no production assignment, execution, offline queue, discussion, evidence, Critical reporting, or review writes.
 
-The app includes a web app manifest and static synthetic field-work state for mobile layout review. It shows progress cards, a short submit-progress visual flow, and sync queue examples for queued, failed, server-received, and conflict states.
+## Approved application target
 
-The mobile progress surfaces are visual-only. They do not implement IndexedDB, production offline queues, background sync, evidence upload, task execution writes, supervisor/planner review writes, import/restore flows, export generation, or Project write-back.
+```text
+Assigned Tasks
+  Task Detail
+```
 
-## Visual shell limitations
+Assigned Tasks is the only top-level operational destination.
 
-The current mobile Task Progress Review surfaces are static/synthetic visual review surfaces. They are not production offline sync or production task progress submission.
+- Tier 2 sees tasks explicitly assigned by Tier 1 for tracking.
+- Tier 2 may assign those tasks to direct-report Tier 3 while retaining tracking responsibility.
+- Tier 3 sees tasks explicitly assigned by Tier 2 as `WORKING_ON` or `FIELD_CONTROL`.
+- Neither tier may browse the whole project.
 
-The initial cleanup pass now:
+Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical reporting obligations belong inside Task Detail. There is no separate Mobile Today, Problems, Evidence, Sync, or Critical destination.
 
-- keeps mobile top-level navigation to My Work, Today, Problems, Evidence, Sync;
-- keeps My Work focused on assigned work before diagnostics;
-- replaces the three large sync/status tiles with a compact sync banner;
-- reduces task cards to the minimum operational fields and two status indicators;
-- uses sanitised operational examples;
-- keeps all write-like controls disabled until APIs exist;
-- keeps queued/failed/server-received copy explicit.
+Sync is a compact, persistent transport/recovery state. Queued, sending, server-received, failed, and conflict states must remain visible without becoming an operational page.
 
-Required offline copy:
+## Implemented visual shell
+
+- `Assigned Tasks` is the only top-level operational destination.
+- A local visual-review persona selector distinguishes Tier 2 tracking responsibility from Tier 3 `WORKING_ON` and `FIELD_CONTROL` assignments.
+- Opening a synthetic assigned task uses local React view state and reveals its Task Detail. This transition is not routing, authentication, project membership, or assignment persistence.
+- Task Detail keeps Execution, People, Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical context attached to the task.
+- Execution state and schedule attention are presented separately. The visual `Not Started` / `Late to Start` example has no Tracker Start/Resume event, no imported Actual Start, and imported progress of zero.
+- Execution represents Can't Start, Start, Pause, Resume, and Finish with system-recorded timestamps. It does not provide ordinary editable execution date/time fields or manual backdating.
+- Can't Start remains Not Started; Pause is shown separately from any linked adverse delay/problem; Resume does not silently close that problem; Finish uses confirmation/configured-evidence semantics.
+- End-of-shift unfinished work is represented as a Tracker field observation asking how much is complete, what remains, what may affect the next shift, and for optional note/evidence.
+- Ordinary progress is separate from formal Critical reporting. The Tier 2 example shows a contextual policy version/template, due state, controlled required content, pre-populated task facts, judgement inputs, and history. Tier 3 sees context only.
+- Sync is a compact status with embedded recovery examples, not a navigation destination.
+- All write-like controls are disabled. Only visual persona selection and local list/detail navigation are interactive.
+
+## Implementation boundary
+
+The current Mobile App does not implement:
+
+- OIDC/login;
+- Tier 2/Tier 3 project membership;
+- direct-report relationships;
+- explicit Tracker task assignments;
+- task execution-event persistence or APIs;
+- audited manual execution-time correction/backdating;
+- event-derived task state;
+- production comments/discussion;
+- production delays/problems, actions, or evidence;
+- IndexedDB/offline queue;
+- service-worker/background sync correctness;
+- Tier 2 tracking validation writes;
+- Tier 1 Project-input review;
+- production Critical reporting;
+- Critical policy/template configuration or arbitrary report schemas;
+- import/export or Microsoft Project write-back.
+
+There is no service worker, IndexedDB store, replay client, background sync implementation, or Mobile API wiring. The web manifest supplies install/display metadata only. All displayed task and sync data is synthetic and must not be treated as operational state.
+
+## Required offline copy
 
 ```text
 Saved locally.
@@ -33,14 +70,19 @@ This progress update is not submitted until the server receives it.
 Last synced at [time].
 ```
 
-Use `Thread may be out of date. Last synced at [time].` only for future discussion/comment threads, not for task progress screens.
+Use `Thread may be out of date. Last synced at [time].` only for future Task Detail discussion, not for task progress.
 
-Relevant product source docs:
+## Product authority
 
+- `docs/product/product-flow-and-software-map.md`
+- `docs/product/user-tier-and-assignment-model.md`
+- `docs/product/task-operational-model.md`
+- `docs/product/critical-reporting-model.md`
+- `docs/product/implementation-status-map.md`
 - `docs/product/frontend-visual-review-scope.md`
+- `docs/product/offline-audit-sync-rules.md`
 - `docs/product/ux-anti-slop-rules.md`
 - `docs/product/design-language-and-status-semantics.md`
-- `docs/product/task-progress-review-export-approval.md`
 
 ## Local commands
 

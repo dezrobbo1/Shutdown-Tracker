@@ -4,6 +4,8 @@ This directory is reserved for **Design C UX/UI review artifacts** for Shutdown 
 
 These files are design references only. They are **not production application code**, are not an approved implementation specification, and should not be copied directly into the production frontend without review.
 
+They also predate the approved three-tier information architecture. Named-role, Control/Work/Resolve/Evidence, separate Mobile Sync, and candidate-verification concepts below are historical visual research only. Current authority is [Product Flow and Software Map](../../../product/product-flow-and-software-map.md), and the implemented trial shell lives in the two app workspaces.
+
 ## Application surfaces
 
 Design C deliberately treats the product as two separate application surfaces that share the same backend/domain and selected design-system primitives:

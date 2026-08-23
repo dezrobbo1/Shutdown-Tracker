@@ -1,59 +1,72 @@
 # Master Console
 
-Purpose: React and Vite application for shutdown control, planners, coordinators, supervisors, package owners, and managers.
+Purpose: React/Vite Tier 1 client for whole-project operational control and product-trial review.
 
-Current status: scaffolded React/Vite shell with shared API client wiring, opt-in live import/export review data fetching, and a static Task Progress Review visual shell. The initial visual cleanup pass locks the approved top-level IA and uses sanitised operational examples.
+## Current information architecture
 
-The console renders synthetic review state by default for:
+```text
+Login
+Projects Home
+Project Console
+  Today
+  Tasks
+    Task Dashboard
+  Critical
+  Import / Export
+  Project Settings
+```
 
-- source-file validation status
-- parsed snapshot review
-- task lineage review
-- export preview candidates
-- import/export review API client operations
-- task progress review and export approval workflow
-- supervisor review queue
-- planner progress review queue
-- progress candidates in export preview
-- Microsoft Project verification metadata
-- structured blockers and handover summary examples
+The Login transition, Projects Home/project switcher, Today, Tasks explorer, Task Dashboard, Critical, and Project Settings use sanitized synthetic data and local React view state. OIDC, production project APIs, lifecycle persistence, task execution, assignment, Critical, mapping, and operational-record writes are not implemented. Write-like controls are disabled.
 
-To fetch live review data from the API, configure:
+Problems, Discussion, Actions, Evidence, and History belong to the relevant Task Dashboard rather than project-level navigation.
+
+## Task execution and Critical reporting
+
+The Task Dashboard represents the approved Can't Start / Start / Pause / Resume / Finish action vocabulary and system-captured timestamp boundary. It does not persist events or provide ordinary manual correction/backdating.
+
+Execution state and schedule attention are separate. A passed planned start never establishes `In Progress` without a Tracker Start/Resume event or accepted imported Actual Start/progress evidence.
+
+The Critical shell represents selected leaf/work-pack items, Tier 2 ownership, reusable templates, effective policy versions, supported timing/trigger combinations, controlled required content, due state, condition, and history. Configuration controls are disabled. It does not implement a Critical API, arbitrary field schemas, or a second execution-state model.
+
+## Import review
+
+Import / Export includes a functional browser-only Project XML/MSPDI inspector. It:
+
+- checks for XML content with the Microsoft Project MSPDI namespace;
+- reads project identity and status date where supplied;
+- counts summary and leaf tasks;
+- presents searchable task, WBS, UID/ID, planned date, and imported progress context;
+- keeps the selected source in the browser and does not upload or mutate it.
+
+This is lightweight technical inspection, not complete semantic validation or production import acceptance. Native `.mpp` cannot be inspected in the browser.
+
+The Console may also perform configured import snapshot list/detail GETs:
 
 ```text
 VITE_SHUTDOWN_TRACKER_API_BASE_URL=http://localhost:8080
 VITE_SHUTDOWN_TRACKER_PROJECT_ID=<review-project-id>
 VITE_SHUTDOWN_TRACKER_IMPORT_SNAPSHOT_ID=<optional-snapshot-id>
-VITE_SHUTDOWN_TRACKER_EXPORT_BATCH_ID=<optional-export-batch-id>
 ```
 
-When `VITE_SHUTDOWN_TRACKER_PROJECT_ID` is absent, the console stays in synthetic review mode and does not call the backend. When it is present, the console reads import snapshot summaries, the selected or latest snapshot detail, and the optional export preview batch. The refresh button repeats those read-only calls.
+Without `VITE_SHUTDOWN_TRACKER_PROJECT_ID`, no backend request is made. Persistence, Operational Mapping validation, comparison/reconciliation, activation, and production project switching remain disabled or unimplemented.
 
-The task-progress review surfaces are visual/product-review only and use synthetic data. They do not add production task execution APIs, supervisor review APIs, planner review APIs, production offline sync, evidence upload, handover workflow, generated artifacts, or Microsoft Project write-back.
+## Export boundary
 
-The console imports `@shutdown-tracker/api-client` and can be configured with `VITE_SHUTDOWN_TRACKER_API_BASE_URL`. It does not upload source files, store uploaded files, parse Project files, create import batches, create live execution records, generate MSPDI/XML, approve exports, calculate schedules, or write back to Microsoft Project.
+The final Microsoft Project export and round-trip contract is intentionally deferred until after operational trials validate execution, progress, assignments, Today, Task Dashboard behaviour, and Critical reporting.
 
-## Visual shell limitations
+Earlier candidate, approval, sealed-preview, generation, Project-open, and verification work remains technical research in repository history or the superseded workstream. It is not exposed as the required workflow in this product foundation.
 
-The current Task Progress Review surfaces are static/synthetic visual review surfaces. They should not be treated as production route structure or backend API contracts.
+## Product authority
 
-The initial cleanup pass now:
-
-- locks the console top-level IA to Today, Tasks, Problems, Evidence, Exports;
-- treats Supervisor Review and Planner Review as Today/Exports sections rather than permanent navigation;
-- treats Project Verification as part of Exports;
-- reduces card/chip density and uses sanitised operational examples;
-- keeps write-like controls disabled until APIs exist;
-- keeps Project-boundary warnings visible.
-
-Remaining visual-only scope includes Critical Watch, Critical Updates, and entity-linked Discussion surfaces. These must remain clearly labelled and non-functional until their product/API contracts are approved.
-
-Relevant product source docs:
-
+- `docs/product/product-flow-and-software-map.md`
+- `docs/product/user-tier-and-assignment-model.md`
+- `docs/product/task-operational-model.md`
+- `docs/product/critical-reporting-model.md`
+- `docs/product/project-lifecycle-and-import-export.md`
+- `docs/product/implementation-status-map.md`
 - `docs/product/frontend-visual-review-scope.md`
 - `docs/product/ux-anti-slop-rules.md`
 - `docs/product/design-language-and-status-semantics.md`
-- `docs/product/task-progress-review-export-approval.md`
 
 ## Local commands
 

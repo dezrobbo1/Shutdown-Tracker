@@ -2,12 +2,14 @@
 
 Application workspace.
 
-Implemented scaffolds:
+Implemented frontend surfaces:
 
-- `console`: React/Vite Master Console shell for desktop-oriented review workflows.
-- `mobile-pwa`: React/Vite Mobile Field App shell with a web app manifest.
+- `console`: React/Vite Tier 1 Master Console product-trial shell.
+- `mobile-pwa`: React/Vite Tier 2/Tier 3 Assigned Tasks product-trial shell with a web app manifest.
 
-The console now imports the shared API client for import/export review operation wiring while still rendering synthetic scaffold data by default. The mobile PWA currently uses static synthetic scaffold data only. Neither app stores files, parses Project files, creates execution records, generates export artifacts, or writes back to Microsoft Project.
+The Console and Mobile clients remain separate applications. Their ordinary project, assignment, execution, Critical, lifecycle, mapping, and offline data is static and synthetic. Write-like controls are disabled.
+
+Console Import / Export retains a bounded browser-only Microsoft Project XML/MSPDI inspector and optional configured import snapshot GETs. The final export and Project round-trip workflow is not finalised and is not presented as active product authority.
 
 Run from the repository root after installing npm dependencies:
 
