@@ -4,7 +4,7 @@ Shutdown Tracker is a shutdown, turnaround, outage, and major-overhaul execution
 
 ## Product boundary
 
-Shutdown Tracker owns execution truth and reviewed Project inputs. Microsoft Project owns schedule recalculation. The Tier 1 schedule owner controls what happens to the resulting updated candidate schedule.
+Shutdown Tracker owns execution truth and reviewed Project inputs. Microsoft Project owns schedule recalculation. Tier 1 controls the in-application candidate decision; the relevant schedule owner or Microsoft Project operator performs any external Project action required by that decision.
 
 The core product handoff is:
 
@@ -32,7 +32,7 @@ Shutdown Tracker must not independently calculate CPM, critical path, float, res
 
 Microsoft Project is expected to recalculate a disposable candidate after approved inputs are applied. Changes to planned dates, durations, summary roll-ups, work, assignment values, slack, criticality, and related fields may therefore appear in the candidate. Those values are **Project-calculated consequences**, not hidden Shutdown Tracker-authored inputs, and must be visible to Tier 1 in candidate review.
 
-A Tier 1 schedule owner may ultimately use the candidate as the next controlled schedule or use Microsoft Project to merge/import it into an existing schedule. Those are explicit Tier 1-controlled outcomes and are recorded separately from candidate generation.
+After Tier 1 records the disposition, the relevant schedule owner or Microsoft Project operator may use the candidate as the next controlled schedule or merge/import it into an existing schedule through Microsoft Project. Those outcomes are recorded separately from candidate generation.
 
 See [Project Candidate Schedule Handoff](docs/product/project-candidate-schedule-handoff.md) for the durable handoff contract.
 
@@ -67,7 +67,7 @@ Do not infer runtime completeness from this overview. App/service READMEs, sourc
 - Database: PostgreSQL.
 - Microsoft Project processing: MPXJ plus Microsoft Project itself where Project-native recalculation is required.
 - Interchange: MSPDI/XML remains the primary open format; native `.mpp` writing by the server is out of scope.
-- Candidate schedule: always separate from the accepted source/master until the Tier 1 schedule owner explicitly adopts or merges it.
+- Candidate schedule: always separate from the accepted source/master until Tier 1 records an adopt/merge disposition and the authorised external Project action occurs.
 - Merge/import: Tier 1-controlled Microsoft Project operation, proven first against disposable/backed-up schedules.
 - File/evidence architecture: provider-neutral storage abstractions and immutable artifact provenance.
 - Offline field direction: IndexedDB queue, service worker, explicit sync state, idempotency keys.

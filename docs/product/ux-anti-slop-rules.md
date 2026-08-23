@@ -81,9 +81,14 @@ Today is a high-signal 24-hour project attention surface, not a full workflow du
 
 Today should show by default:
 
-- needs attention now;
-- blocked work;
-- overdue actions;
+- planned work in the configured 24-hour period;
+- actual execution position: Not Started, In Progress, Paused, Blocked, and Completed;
+- late starts and work running beyond planned finish;
+- tasks with no recent update;
+- Critical reports due or overdue;
+- actions due or overdue;
+- current Delays / Problems;
+- recent activity;
 - failed syncs/uploads;
 - awaiting Tier 2 validation where required;
 - awaiting Tier 1 approval;

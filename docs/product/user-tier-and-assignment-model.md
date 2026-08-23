@@ -49,6 +49,12 @@ Tier 3:
 
 `WORKING_ON` records that the Tier 3 user is performing the work. `FIELD_CONTROL` records that the Tier 3 user controls or coordinates the work at the field task level. Both are explicit task-assignment relationships, not application tiers or permissions derived from schedule data.
 
+## Application tiers and external schedule responsibilities
+
+Tier 1, Tier 2, and Tier 3 are application-authority types. **Schedule owner** and **Microsoft Project operator** are neutral business descriptions used only when the external Microsoft Project process needs a human actor.
+
+Those business descriptions do not create another application role, and the product must not assume that every Tier 1 user personally maintains the Microsoft Project schedule. Tier 1 controls the in-application input review and recorded candidate disposition. The relevant schedule owner or Microsoft Project operator performs any external Project open, save, adoption, or merge/import activity required by project governance.
+
 ## Project membership
 
 Membership is project-scoped. A person may have a different tier or no membership in another project.

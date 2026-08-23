@@ -233,7 +233,7 @@ Tier 2/Tier 3 access remains determined by active project membership, the Tier 2
 
 ## Operational-record category context
 
-Problems, Actions, Evidence, Handover, Critical Updates, and similar records linked to a task/WP should be discoverable through the relevant mapped operational categories without requiring repeated manual tagging.
+Problems, Actions, Evidence, Handover, Critical reports, and similar records linked to a task/WP should be discoverable through the relevant mapped operational categories without requiring repeated manual tagging.
 
 For auditability, retain historical category context at the time the operational record is created or materially linked, while also allowing the UI to resolve current classification from the active Project snapshot.
 

@@ -88,15 +88,17 @@ The durable export handoff is:
 
 1. Capture structured task progress.
 2. Tier 2 validates assigned operational facts where policy requires it.
-3. Tier 1 reviews exact Project-input eligibility.
-4. Materialise an export preview from approved leaf-task candidates.
-5. Approve the export batch.
-6. Generate an MSPDI/XML artifact through the worker.
-7. The Tier 1 schedule owner manually opens/checks the artifact in Microsoft Project.
-8. The Tier 1 schedule owner controls whether the master `.mpp` is saved.
-9. Shutdown Tracker records verification metadata and audit.
+3. Tier 1 reviews exact Project-input eligibility and approves exact candidate-bound inputs.
+4. Materialise and seal an export preview from approved leaf-task candidates.
+5. Approve the exact preview/batch.
+6. Generate a separate complete-source MSPDI/XML candidate through the worker.
+7. The relevant schedule owner or Microsoft Project operator opens the candidate in Microsoft Project and Project recalculates it.
+8. Tier 1 reviews the source-versus-candidate result and records reject, retain, adopt, or merge disposition.
+9. The relevant schedule owner or Microsoft Project operator performs any authorised external adoption or merge/import action against a controlled copy.
+10. Any adopted or merged result returns through import as a new immutable snapshot.
+11. Shutdown Tracker records verification, disposition, provenance, and audit metadata.
 
-No step authorises hidden Project write-back or native `.mpp` generation.
+No step authorises hidden Project write-back or native `.mpp` generation. Schedule owner and Microsoft Project operator are external business descriptions, not application roles, and not every Tier 1 user is assumed to perform those actions.
 
 ## Project Operational Mapping implementation sequence
 

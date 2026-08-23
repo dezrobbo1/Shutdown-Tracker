@@ -22,11 +22,11 @@ Closed stops routine Mobile execution. Tier 1 may continue final review, reporti
 
 ### Archived
 
-Archived is read-only and hidden from the default project list. Archive is the normal retention path. Archive is reversible through Restore; restoration preserves the project's full identity and history.
+Archived is read-only except for the Tier 1 **Restore** action and is hidden from the default project list. Archive is the normal retention path. Restore returns the project to Closed while preserving its full identity and history.
 
 ## Project deletion and reset boundaries
 
-Permanent deletion is limited to an eligible empty draft/test project with no accepted snapshot and no operational or audit history.
+Permanent deletion is limited to an eligible empty draft/test project with no accepted snapshot, no operational history, and no audit history beyond the permitted creation/setup and deletion-eligibility events needed to prove that boundary.
 
 There is no generic production **Clear Project** command. Use specific operations:
 
@@ -74,12 +74,13 @@ select source
 -> validate Operational Mapping
 -> compare to current snapshot
 -> reconcile important lineage
--> accept and activate new immutable snapshot
+-> accept new immutable snapshot
+-> activate
 ```
 
 Every accepted source and snapshot is immutable. A new import creates a new snapshot identity. Re-import must not silently overwrite active Tracker execution history, silently remap uncertain source fields, or silently rebind old input candidates.
 
-The Microsoft Project operator may reject an import before acceptance. Rejection preserves required audit/provenance without activating the proposed snapshot.
+Tier 1 may reject an import before acceptance. Rejection preserves required audit/provenance without activating the proposed snapshot.
 
 ## Export and Microsoft Project handoff
 
@@ -90,12 +91,12 @@ execution facts
 -> approved exact inputs
 -> complete candidate MSPDI/XML
 -> Microsoft Project opens and recalculates
--> Tier 1 reviews result
--> reject / retain / adopt / merge
+-> human Microsoft Project review
+-> Tier 1 records reject / retain / adopt / merge disposition
 -> adopted or merged result re-imported as a new snapshot
 ```
 
-The Tier 1 schedule owner or Microsoft Project operator performs the external Microsoft Project activity. This does not create another application role.
+Tier 1 controls the in-application input review, candidate review, and recorded disposition. The relevant schedule owner or Microsoft Project operator performs external Microsoft Project activity under project governance. Those are business responsibilities, not application roles, and not every Tier 1 user is assumed to maintain the schedule personally.
 
 Tier 1 approval binds exact source snapshot, task, field, value, candidate identity, and approval evidence. It does not approve guessed consequences and does not update the accepted master.
 

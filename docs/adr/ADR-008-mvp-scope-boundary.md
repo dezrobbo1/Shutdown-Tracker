@@ -6,7 +6,7 @@ Status: Accepted
 
 The product must remain focused on execution control without accidentally forbidding the Tier 1 review workflow that gives Project handoff its value.
 
-The handoff goal is not merely to emit a sparse patch. Shutdown Tracker should be able to produce a complete updated Project candidate from approved Tier 2/Tier 3 execution facts and Tier 1 inputs, let Microsoft Project recalculate it, and let the Tier 1 schedule owner decide whether to reject it, retain it, use it as the next schedule, or merge/import it into another schedule.
+The handoff goal is not merely to emit a sparse patch. Shutdown Tracker should be able to produce a complete updated Project candidate from approved Tier 2/Tier 3 execution facts and Tier 1 inputs, let Microsoft Project recalculate it, and let Tier 1 record whether to reject it, retain it, adopt it as the next schedule, or have the relevant schedule owner or Microsoft Project operator merge/import it into another schedule.
 
 ## Decision
 

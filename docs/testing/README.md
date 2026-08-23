@@ -61,7 +61,7 @@ Use [Import/Export Fixture Strategy](import-export-fixture-strategy.md).
 
 Automated MSPDI/XML generation tests do not replace human Microsoft Project verification.
 
-Use [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md) for text-only evidence of representative reopen checks. The Tier 1 schedule owner remains responsible for deciding whether a verified artifact is applied/saved into the master `.mpp`.
+Use [Manual Microsoft Project Round-Trip Evidence](manual-microsoft-project-round-trip-evidence.md) for text-only evidence of representative reopen checks. Tier 1 records the candidate disposition; the relevant schedule owner or Microsoft Project operator remains responsible for any external apply/save action in Microsoft Project.
 
 Never commit real Project files, generated artifacts, screenshots, or confidential schedule data as round-trip evidence.
 

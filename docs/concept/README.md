@@ -8,7 +8,7 @@ The platform separates three responsibilities:
 
 - **Shutdown Tracker** captures and approves execution inputs.
 - **Microsoft Project** recalculates a disposable candidate schedule.
-- **The Tier 1 schedule owner** accepts, rejects, supersedes, or manually adopts the candidate.
+- **Tier 1** controls candidate review and the recorded disposition; the relevant schedule owner or Microsoft Project operator performs any external adoption or merge/import action.
 
 Shutdown Tracker does not calculate CPM, critical path, float, recovery schedules, resource levelling, or dependency consequences itself. It does not silently overwrite the accepted master and does not provide server-side native `.mpp` writing.
 
@@ -91,7 +91,7 @@ The platform should support:
 - Tier 1 input review;
 - task-owned Delays / Problems and Actions;
 - task-owned Evidence and History;
-- Critical Updates and reporting;
+- Critical reports and reporting obligations;
 - candidate schedule review and audit.
 
 Execution actions are not automatic aliases for Project fields.

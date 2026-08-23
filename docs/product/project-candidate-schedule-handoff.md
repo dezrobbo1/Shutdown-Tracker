@@ -4,20 +4,20 @@
 
 This document defines the product contract between reviewed Shutdown Tracker execution inputs and Microsoft Project schedule recalculation.
 
-The product objective is to turn approved information gathered from assigned field work and/or entered by Tier 1 in the Master Console into a **complete updated Microsoft Project candidate schedule**. The candidate is opened in Microsoft Project, Project performs its own recalculation, and the Tier 1 schedule owner reviews the result before deciding what to do with it.
+The product objective is to turn approved information gathered from assigned field work and/or entered by Tier 1 in the Master Console into a **complete updated Microsoft Project candidate schedule**. The relevant schedule owner or Microsoft Project operator opens the candidate in Microsoft Project, Project performs its own recalculation, and Tier 1 reviews the result before recording what should happen to it.
 
 The candidate may then be:
 
 - rejected;
 - retained for further review;
 - used as the next schedule/master under Tier 1 control; or
-- imported/merged by the Tier 1 schedule owner into another existing Microsoft Project schedule.
+- imported/merged by the relevant schedule owner or Microsoft Project operator into another existing Microsoft Project schedule after the Tier 1 disposition.
 
 The goal is not to prevent the schedule from changing. The goal is to make every input and resulting change attributable, reviewable, reversible, and Tier 1-controlled.
 
 ## Core rule
 
-> Shutdown Tracker controls and audits the approved inputs. Microsoft Project calculates the updated candidate schedule. The Tier 1 schedule owner controls what happens to that candidate.
+> Shutdown Tracker controls and audits the approved inputs. Microsoft Project calculates the updated candidate schedule. Tier 1 controls the recorded candidate disposition, and the relevant schedule owner or Microsoft Project operator performs any external Project action.
 
 ## Inputs may come from assigned field execution or Tier 1 Console entry
 
@@ -66,7 +66,7 @@ Every material difference should be classified as one of:
 
 - **Approved Shutdown Tracker input** — the exact fact approved before calculation.
 - **Microsoft Project-calculated consequence** — a dependent value Project recalculated.
-- **Tier 1 schedule-owner edit in Microsoft Project** — an explicit manual change made during candidate review, if any.
+- **Manual Project-operator edit** — an explicit change made by the schedule owner or Microsoft Project operator during candidate review, if any.
 - **Unexpected/unexplained difference** — a change that requires investigation before acceptance.
 
 Unchanged source facts remain traceable through the source identity/hash.
@@ -77,7 +77,7 @@ Unchanged source facts remain traceable through the source identity/hash.
 | --- | --- | --- |
 | Execution/input authority | Shutdown Tracker review workflow | Capture, enter, review, approve and audit exact inputs |
 | Calculation authority | Microsoft Project | Recalculate the complete updated candidate schedule |
-| Candidate/adoption authority | Tier 1 schedule owner | Reject, retain, use as next schedule, or merge/import the candidate |
+| Candidate/adoption authority | Tier 1-controlled decision | Reject, retain, or record adopt/merge disposition; external Project activity is performed by the relevant schedule owner or Microsoft Project operator |
 
 ## Target workflow
 
@@ -182,9 +182,9 @@ A future Windows companion may:
 
 This mechanism requires a dedicated implementation review before production use.
 
-### Manual Tier 1 input package
+### Manual Project-operator input package
 
-A fallback mode may present the approved inputs as a signed/reviewable package for the Tier 1 schedule owner to enter manually in Project. It is slower but preserves the same authority model.
+A fallback mode may present the approved inputs as a signed/reviewable package for the relevant schedule owner or Microsoft Project operator to enter manually in Project. It is slower but preserves the same Tier 1 input-review and disposition authority model.
 
 ## Candidate review
 
@@ -200,7 +200,7 @@ The Tier 1 review surface should show:
 - summary roll-up changes;
 - assignment/work changes;
 - critical/slack changes reported by Project;
-- Tier 1 schedule-owner edits made during review, if any;
+- manual schedule-owner or Microsoft Project operator edits made during review, if any;
 - unexplained differences;
 - final candidate decision.
 
@@ -208,7 +208,7 @@ A read-only Gantt or timeline comparison is permitted here if it helps Tier 1 un
 
 ## Tier 1 outcomes
 
-The Tier 1 schedule owner may choose one of these outcomes after review.
+Tier 1 may record one of these outcomes after review. Any external Project action is then performed by the relevant schedule owner or Microsoft Project operator.
 
 ### Reject candidate
 
@@ -220,11 +220,11 @@ The candidate remains separate from the master and can be reviewed again or supe
 
 ### Use as the next schedule/master
 
-The Tier 1 schedule owner may adopt the reviewed candidate as the next controlled schedule. Adoption is a separate event and must record the adopted file/hash and lineage.
+Tier 1 may record the reviewed candidate for adoption as the next controlled schedule. The relevant schedule owner or Microsoft Project operator performs the external adoption action. Adoption is a separate event and must record the adopted file/hash and lineage.
 
 ### Merge/import into an existing Project schedule
 
-The Tier 1 schedule owner may use Microsoft Project's own import/merge workflow to apply the candidate to another schedule. This is a **Tier 1-controlled Microsoft Project operation**, not an unattended Shutdown Tracker write-back.
+After Tier 1 records the merge/import disposition, the relevant schedule owner or Microsoft Project operator may use Microsoft Project's own import/merge workflow to apply the candidate to another schedule. This is a **Tier 1-controlled Microsoft Project operation**, not an unattended Shutdown Tracker write-back.
 
 Because merge/import can affect matching tasks and schedule state, the first supported workflow must operate on a disposable/backed-up destination copy and record:
 
@@ -274,6 +274,6 @@ Do not fail a candidate merely because Microsoft Project legitimately recalculat
 
 ## Current implementation implication
 
-Existing minimal MSPDI/XML patch generation should be treated as an authority-boundary and diagnostic mechanism, not as the final product output. The target product output is a complete updated Project candidate suitable for Microsoft Project review and subsequent Tier 1-controlled adoption or merge/import.
+The repository verifies guarded complete-source MSPDI/XML candidate generation from the accepted source plus approved inputs. That automated evidence does not satisfy the pending real-human Microsoft Project open/recalculation/review gate. Any retained minimal/patch-shaped writer remains diagnostic only and must not be presented as the final product output.
 
 Security controls around authoritative candidates, exact approvals, stale-data rejection, immutable audit, and batch provenance remain valuable and should be preserved regardless of which candidate-calculation mechanism is selected.

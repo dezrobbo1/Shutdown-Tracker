@@ -31,7 +31,7 @@ The complete authority contract is [User Tier and Assignment Model](user-tier-an
 
 ## Initial state from an accepted Project snapshot
 
-When an accepted Microsoft Project snapshot is activated, derive the initial operational projection in this order.
+When an accepted Microsoft Project snapshot is activated, derive the initial operational projection in this order. Completed is evaluated first and takes precedence over In Progress.
 
 ### Completed
 
@@ -59,7 +59,7 @@ The accepted Project snapshot is the source of this initial imported state. Its 
 
 ## State after Tracker execution begins
 
-After Shutdown Tracker execution begins, the current operational projection is driven by audited Tracker events such as:
+After Shutdown Tracker execution begins, the current operational projection is driven by valid audited Tracker events such as:
 
 - Start;
 - Pause;
@@ -70,6 +70,8 @@ After Shutdown Tracker execution begins, the current operational projection is d
 - Reversal.
 
 The projection must retain visible provenance as **Established by Shutdown Tracker event** and identify the governing event/history.
+
+Only a valid Start or Resume event can establish Tracker-originated In Progress. Pause, Block, Complete, Correction, and Reversal change the projection only through their valid event transitions; none may infer a start from planned dates.
 
 Corrections and reversals preserve the earlier event; they do not erase it. Re-import must not silently overwrite active Tracker execution history or rebind it to a different task. A new snapshot requires lineage and conflict review where imported facts differ from the active Tracker projection.
 

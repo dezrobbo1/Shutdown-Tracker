@@ -55,6 +55,45 @@ The Console top-level sections are:
 
 Problems, discussion, delays, actions, evidence, history, and import/export context belong within the relevant Task Dashboard. They are not permanent top-level Console applications.
 
+### Today
+
+Today is Console-only. It is a configurable 24-hour operational projection over the shared project task and operational records, normally anchored to the project's timezone and operational-day start. It is not another data model and does not change task authority or execution state.
+
+Today should show:
+
+- planned work that overlaps the period;
+- actual execution position, including Not Started, In Progress, Paused, Blocked, and Completed work;
+- late starts and work running beyond planned finish;
+- tasks with no recent update;
+- Critical reports due or overdue;
+- actions due or overdue;
+- current Delays / Problems; and
+- recent project activity.
+
+### Tasks
+
+Tasks is the full Project-like explorer for the accepted project task set. It supports:
+
+- WBS hierarchy with expand/collapse;
+- configurable columns, including mapping-derived context;
+- search, filter, group, and sort;
+- Saved Views; and
+- entry to the Task Dashboard for leaf and summary tasks.
+
+Summary tasks remain aggregate work-pack views. Normal Start, Pause, Resume, Block, and Complete actions apply to executable leaf tasks.
+
+### Project Settings
+
+Project Settings contains:
+
+- **General** — project name, timezone, operational-day settings, and other bounded project configuration;
+- **Users** — Tier 1/Tier 2/Tier 3 membership and Tier 2-to-Tier 3 direct-report relationships;
+- **Operational Mapping** — source interpretation for columns, filters, grouping, Saved Views, Today, Critical selection/reporting, and bulk Tier 2 selection context;
+- **Project History** — project-level lifecycle, membership, configuration, import/export, and audit context; and
+- **Lifecycle** — activation, closure/reopen, archive/restore, and eligible empty-draft/test deletion controls.
+
+Operational Mapping never grants authority. A bulk selection creates explicit assignment records before Mobile access changes.
+
 ## Approved Mobile structure
 
 The Mobile App has one top-level operational destination:

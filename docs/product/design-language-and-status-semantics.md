@@ -153,8 +153,8 @@ Tier 1 approval authorises this exact input for an updated Project candidate. Th
 Draft export preview — master .mpp not updated.
 Export batch approved — master .mpp not updated.
 MSPDI/XML artifact generated — master .mpp not updated.
-The Tier 1 schedule owner must manually open/check the artifact in Microsoft Project.
-Verified in Microsoft Project — master .mpp update remains Tier 1-controlled.
+The relevant schedule owner or Microsoft Project operator must manually open/check the artifact in Microsoft Project.
+Verified in Microsoft Project — master .mpp disposition remains Tier 1-controlled.
 Shutdown Tracker records verification metadata only.
 ```
 

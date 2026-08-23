@@ -74,7 +74,7 @@ The API and worker share the proposed-value normalizer.
 
 The Master Console round-trip mode can now drive source upload, task-snapshot parsing, snapshot acceptance, candidate creation/approval, sealed preview, batch approval, candidate generation and candidate download without manually assembling backend API calls.
 
-Microsoft Project is still opened manually for the external acceptance gate. The Tier 1 schedule owner then records Project-open and verification metadata through the Console.
+Microsoft Project is still opened manually for the external acceptance gate by the relevant schedule owner or Microsoft Project operator. Tier 1 then reviews the result and records Project-open, verification, and disposition metadata through the Console.
 
 ## Runtime and local development
 

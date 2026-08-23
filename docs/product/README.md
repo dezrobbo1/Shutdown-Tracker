@@ -58,7 +58,7 @@ The product deliberately separates three authorities:
 
 1. **Execution/input authority** — Shutdown Tracker captures and approves exact field and authorised Tier 1 inputs.
 2. **Microsoft Project calculation authority** — Microsoft Project recalculates the complete updated candidate schedule.
-3. **Candidate/adoption authority** — the Tier 1 schedule owner decides how the recalculated candidate is used.
+3. **Candidate/adoption authority** — Tier 1 controls the in-application decision; the relevant schedule owner or Microsoft Project operator performs any external Project action.
 
 The workflow is:
 
@@ -81,7 +81,7 @@ field execution information
 
 The accepted source/master remains immutable throughout candidate preparation and review.
 
-The product handoff is therefore not merely a patch export. Its useful outcome is a **complete updated Project schedule candidate** that can be reviewed and then deliberately adopted or merged by the Tier 1 schedule owner through Microsoft Project.
+The product handoff is therefore not merely a patch export. Its useful outcome is a **complete updated Project schedule candidate** that Tier 1 can review and deliberately disposition before an authorised schedule owner or Microsoft Project operator adopts or merges it through Microsoft Project.
 
 ## Input origins
 
@@ -113,7 +113,7 @@ A Tier 1 review should distinguish:
 
 - approved Shutdown Tracker input;
 - Microsoft Project-calculated consequence;
-- Tier 1 schedule-owner edit made in Microsoft Project;
+- manual schedule-owner or Microsoft Project operator edit made in Microsoft Project;
 - unchanged source fact;
 - unexpected/unexplained difference.
 
@@ -121,7 +121,7 @@ A read-only schedule-impact view is allowed. It may show planned-date movement, 
 
 ## Candidate disposition
 
-After review the Tier 1 schedule owner may:
+After review Tier 1 may record one of these dispositions:
 
 - reject the candidate;
 - retain it for further review;

@@ -34,7 +34,7 @@ Use this three-part authority model:
 
 - **Execution/input authority — Shutdown Tracker.** Capture and approve field execution facts and authorised Tier 1-entered inputs such as progress or actuals under the active handoff policy.
 - **Calculation authority — Microsoft Project.** A complete updated candidate schedule may be recalculated by Microsoft Project after approved inputs are applied. Project-calculated dates, durations, roll-ups, work, assignment values, timephased data, slack, criticality, and related consequences are not treated as Shutdown Tracker-authored inputs.
-- **Candidate/adoption authority — Tier 1 schedule owner.** Tier 1 reviews the candidate and its source-versus-candidate delta and decides whether to reject it, retain it for review, use it as the next schedule/master, or use Microsoft Project to merge/import it into another existing schedule.
+- **Candidate/adoption authority — Tier 1-controlled decision.** Tier 1 reviews the candidate and its source-versus-candidate delta and records whether to reject it, retain it for review, adopt it as the next schedule/master, or have it merged/imported into another existing schedule. The relevant schedule owner or Microsoft Project operator performs any external Project operation required by that decision.
 
 Shutdown Tracker must not:
 
@@ -54,10 +54,10 @@ Shutdown Tracker may:
 - invoke or support a Tier 1-controlled Microsoft Project process against a disposable copy, subject to an accepted implementation ADR and safety controls;
 - allow Microsoft Project to recalculate the disposable candidate;
 - present a read-only source-versus-candidate impact comparison, including Project-calculated schedule consequences;
-- allow the Tier 1 schedule owner to reject, retain, adopt, or merge/import the candidate through Microsoft Project;
+- allow Tier 1 to reject, retain, or record an adopt/merge disposition and allow the relevant schedule owner or Microsoft Project operator to carry out the external Project action;
 - record candidate hashes, deltas, Project version, Tier 1 decision, destination-before/result-after merge provenance, and later master-adoption metadata.
 
-The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating or a Tier 1 schedule owner deliberately using a reviewed candidate schedule.
+The important prohibition is **hidden or independent scheduling by Shutdown Tracker**, not Microsoft Project recalculating or an authorised schedule owner or Microsoft Project operator deliberately using a reviewed candidate schedule after Tier 1 review.
 
 Other non-negotiable rules:
 
@@ -65,7 +65,7 @@ Other non-negotiable rules:
 - Tier 1-originated Console inputs may skip Tier 2 tracking validation only when project policy explicitly allows it; they must not skip provenance, stale-data checks, policy checks, exact approval binding, or Tier 1 input authority.
 - Approved input authority is limited to explicitly reviewed facts under the active handoff policy. Summary-task actual inputs, dependencies, constraints, calendars, baselines, WBS structure, and unreviewed planned-date changes remain prohibited direct inputs unless a later explicit product decision expands authority.
 - A Project-calculated consequence may differ from the source after Microsoft Project recalculates; label it as a Project-calculated consequence rather than an approved Shutdown Tracker input.
-- Tier 1 schedule-owner edits made directly in Microsoft Project during candidate review must be distinguished from both approved Tracker inputs and Project-calculated consequences.
+- Manual edits made by a schedule owner or Microsoft Project operator during candidate review must be distinguished from both approved Tracker inputs and Project-calculated consequences.
 - Candidate acceptance is not the same as `adopted_as_new_master` or `merged_into_existing`; record those outcomes separately.
 - Merge/import testing must be separate from standalone candidate testing and must use a disposable/backed-up destination schedule before production use.
 - Critical items and Critical Work Packs are configurable reporting constructs, not calculated critical-path features.

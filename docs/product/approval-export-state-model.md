@@ -58,7 +58,7 @@ After candidate review:
 
 `none -> retained_for_review | adopted_as_new_master | merged_into_existing | rejected | superseded`
 
-Candidate acceptance and candidate disposition are separate concepts. `accepted` means the candidate is considered valid for Tier 1 schedule-owner use; it does not itself mean the master has changed.
+Candidate acceptance and candidate disposition are separate concepts. `accepted` means the candidate is considered valid for Tier 1 disposition review; it does not itself mean the master has changed.
 
 ### Merge/import state
 
@@ -101,7 +101,7 @@ A candidate review should show:
 - Project version/build used for calculation;
 - approved inputs and input origin;
 - Project-calculated consequences;
-- Tier 1 schedule-owner edits made in Microsoft Project, if any;
+- manual schedule-owner or Microsoft Project operator edits made in Microsoft Project, if any;
 - unexplained changes;
 - project finish movement;
 - Tier 1 decision and notes.
@@ -112,10 +112,10 @@ Every material source-versus-candidate difference should be classified as:
 
 - `approved_input`;
 - `project_calculated_consequence`;
-- `tier1_project_edit`;
+- `planner_project_edit`;
 - `unexpected_difference`.
 
-Unchanged values need not be stored as delta rows but remain traceable to the source hash.
+`planner_project_edit` is a retained PR #48 evidence-field name for compatibility. It means an explicit manual Microsoft Project edit by the recorded schedule-handling actor; it does not define Planner as an application role. Unchanged values need not be stored as delta rows but remain traceable to the source hash.
 
 ## Direct-input restrictions
 
@@ -135,7 +135,7 @@ Those values may change inside a Microsoft Project-calculated candidate and be s
 
 ## Adoption as next schedule
 
-If the Tier 1 schedule owner chooses to use the candidate as the next controlled schedule, record:
+If Tier 1 records that the candidate should be used as the next controlled schedule, record:
 
 - accepted source identity/hash;
 - candidate identity/hash;
@@ -149,7 +149,7 @@ Shutdown Tracker must not claim adoption merely because the candidate opened suc
 
 ## Merge/import into existing schedule
 
-If the Tier 1 schedule owner chooses to merge/import the candidate into another Project schedule, record:
+If Tier 1 records that the candidate should be merged/imported into another Project schedule, record:
 
 - candidate identity/hash;
 - destination schedule identity/hash before merge;
@@ -190,7 +190,7 @@ Updated candidate schedule produced. Open in Microsoft Project and review calcul
 After candidate acceptance:
 
 ```text
-Candidate accepted for Tier 1 schedule-owner use. The master schedule has not changed yet.
+Candidate accepted for Tier 1 disposition review. The master schedule has not changed yet.
 ```
 
 After adoption as next schedule:

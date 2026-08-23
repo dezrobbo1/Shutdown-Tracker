@@ -127,7 +127,7 @@ Items that may appear:
 - direct mention on a task/problem/action/export line;
 - response requested by Tier 1 or the responsible Tier 2;
 - assigned action comment requiring update;
-- export review clarification assigned to the Tier 1 schedule owner;
+- export review clarification assigned to the relevant Tier 1 reviewer;
 - handover acknowledgement required;
 - failed offline comment/progress submission.
 

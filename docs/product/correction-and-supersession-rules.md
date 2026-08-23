@@ -15,11 +15,11 @@ Submitted operational records should generally be corrected by superseding recor
 - The correction must capture actor, timestamp, reason, old value summary, and new value summary.
 - Reviewers may request correction instead of editing a user's submitted update directly.
 
-## Critical Update Correction
+## Critical Report Correction
 
-- Critical Updates are immutable submitted reports.
+- Critical reports are immutable after submission.
 - Corrections create `critical_update_corrected` or `critical_update_superseded` audit events.
-- Corrected Critical Updates must preserve the original report and show which report is current.
+- Corrected Critical reports must preserve the original report and show which report is current.
 - The assigned Tier 2 reporter may submit a correction where policy allows.
 - Tier 1 may review or create a correcting/superseding report without rewriting the original.
 
@@ -71,7 +71,7 @@ Submitted operational records should generally be corrected by superseding recor
 ## Must Never Be Silently Overwritten
 
 - Submitted field updates.
-- Critical Updates.
+- Critical reports.
 - Approved task completions.
 - Export batch contents.
 - Generated export artifacts.

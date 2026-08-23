@@ -6,7 +6,7 @@ Task Progress Review connects assigned field execution truth and authorised Tier
 
 Shutdown Tracker captures structured execution facts, allows Tier 2 to maintain tracking responsibility for assigned work, allows Tier 1 to enter or correct permitted inputs in the Master Console, and then creates an exactly approved input set for a complete updated Project candidate.
 
-The candidate is opened/imported in Microsoft Project, Microsoft Project recalculates it, and the Tier 1 schedule owner reviews the resulting schedule before deciding whether to reject it, retain it, use it as the next schedule/master, or merge/import it into another existing schedule.
+The relevant schedule owner or Microsoft Project operator opens/imports the candidate in Microsoft Project, Microsoft Project recalculates it, and Tier 1 reviews the resulting schedule before recording whether to reject it, retain it, adopt it as the next schedule/master, or have it merged/imported into another existing schedule.
 
 Tier 1 input approval does **not** mean the resulting Project-calculated schedule has already been accepted or adopted.
 
@@ -212,7 +212,7 @@ Tier 1 should see:
 
 - approved inputs;
 - Project-calculated schedule consequences;
-- Tier 1 schedule-owner edits made in Microsoft Project, if any;
+- manual schedule-owner or Microsoft Project operator edits made in Microsoft Project, if any;
 - unchanged source facts;
 - unexpected/unexplained changes;
 - project finish movement;
@@ -224,18 +224,18 @@ Tier 1 should see:
 
 ## Candidate disposition
 
-After review the Tier 1 schedule owner may:
+After review Tier 1 may record:
 
 - **Reject** — candidate remains evidence only.
 - **Retain for further review** — candidate remains separate from the master.
-- **Use as next schedule/master** — the Tier 1 schedule owner adopts the reviewed candidate as the next controlled schedule.
-- **Merge/import into existing schedule** — the Tier 1 schedule owner uses Microsoft Project to merge/import the candidate into a disposable/backed-up existing schedule and reviews the merged result.
+- **Use as next schedule/master** — Tier 1 records the adopt disposition and the relevant schedule owner or Microsoft Project operator performs the controlled external adoption.
+- **Merge/import into existing schedule** — Tier 1 records the merge disposition and the relevant schedule owner or Microsoft Project operator uses Microsoft Project against a disposable/backed-up existing schedule; Tier 1 then reviews the merged result.
 
 Candidate acceptance does not itself perform adoption or merge.
 
 ## Merge/import control
 
-Merge/import is a Microsoft Project operation controlled by the Tier 1 schedule owner.
+Merge/import is an external Microsoft Project operation under Tier 1-controlled disposition. It is performed by the relevant schedule owner or Microsoft Project operator; that business description is not an application role.
 
 Shutdown Tracker should record:
 

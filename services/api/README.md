@@ -278,7 +278,7 @@ The audit rows target the export batch, include previous/new batch status, refer
 5. MSPDI/XML artifact generated — master `.mpp` not updated.
 6. Artifact opened in Microsoft Project — master `.mpp` not updated.
 7. Artifact verified in Microsoft Project — master `.mpp` not updated.
-8. The Tier 1 schedule owner manually updates or saves the master `.mpp` through Microsoft Project — outside Shutdown Tracker automation.
+8. After Tier 1 records the disposition, the relevant schedule owner or Microsoft Project operator manually updates or saves the controlled Project schedule through Microsoft Project — outside Shutdown Tracker automation.
 
 The API records steps one through seven as domain and audit metadata where implemented. It never performs step eight. The first human Microsoft Project round-trip remains pending.
 

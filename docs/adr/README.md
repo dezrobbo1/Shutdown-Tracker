@@ -37,7 +37,7 @@ ADR-007 defines the three-part authority model:
 
 1. Shutdown Tracker captures field execution facts and authorised Tier 1 inputs and controls which exact inputs may proceed.
 2. Microsoft Project calculates the complete updated candidate.
-3. The Tier 1 schedule owner decides whether to reject, retain, use as the next schedule/master, or merge/import the candidate into another existing Project schedule.
+3. Tier 1 controls the candidate decision; the relevant schedule owner or Microsoft Project operator performs any external adoption or merge/import action.
 
 ADR-008 defines the MVP boundary and explicitly allows complete updated candidates, read-only candidate-impact review, and Tier 1-controlled merge/import while continuing to prohibit a Shutdown Tracker scheduling engine or silent master-file update.
 
@@ -72,7 +72,7 @@ Product sources:
 - Shutdown Tracker may generate a complete updated candidate from approved inputs but does not independently calculate the schedule consequences.
 - Project-calculated changes inside a disposable candidate are expected and must be reviewed, not automatically treated as prohibited writes.
 - Candidate generation, acceptance, adoption as next schedule, and merge/import into another schedule are separate auditable facts.
-- The accepted source/master remains unchanged until explicit action by the Tier 1 schedule owner or Microsoft Project operator.
+- The accepted source/master remains unchanged until Tier 1 records the disposition and the relevant schedule owner or Microsoft Project operator performs the authorised external action.
 - Imported Project source values remain immutable.
 - Tier 1 has whole-project Console authority. Tier 2 and Tier 3 Mobile authority is bounded by explicit assignments.
 - Project-derived classification supports filters, display, saved views, reporting, and bulk Tier 2 assignment aids; it is not application authorisation.

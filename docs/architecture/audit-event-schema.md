@@ -221,19 +221,20 @@ Operational review and a Tier 1 Project-input decision are separate events. Each
 - `evidence_linked`
 - `evidence_unlinked`
 - `evidence_superseded`
-- `critical_item_created`
-- `critical_item_archived`
-- `critical_source_changed`
-- `critical_reporting_mode_changed`
-- `critical_reporting_period_generated`
-- `critical_report_submitted`
-- `critical_report_corrected`
-- `critical_report_superseded`
+- `critical_watchlist_created`
+- `critical_watchlist_archived`
+- `critical_wp_source_added`
+- `critical_wp_source_removed`
+- `reporting_policy_changed`
+- `reporting_period_generated`
+- `critical_update_submitted`
+- `critical_update_corrected`
+- `critical_update_superseded`
 - `handover_submitted`
 - `handover_item_carried_over`
 - `handover_signed_off`
 
-Submitted Critical reports are immutable. Corrections and supersessions preserve the earlier report and its reporting-assignment context.
+These retained names are V006/event-vocabulary compatibility terms. In product language, `critical_watchlist_*` concerns Critical configuration, `critical_wp_source_*` records source-selection changes, `reporting_policy_changed` records reporting-mode or cadence changes, `reporting_period_generated` records a due reporting period, and `critical_update_*` concerns submitted Critical reports. The compatibility names do not create separate product surfaces or limit the approved source types to work packs: a source event must also identify whether the selected source is a Project-critical leaf task or one summary task plus descendants. Submitted reports are immutable, and corrections and supersessions preserve the earlier report and its reporting-assignment context.
 
 ### Communications
 

@@ -8,7 +8,7 @@ Shutdown Tracker must connect field execution truth and authorised Tier 1 input 
 
 The previous shorthand — “Shutdown Tracker must not move dates” — was ambiguous. It did not distinguish a date invented by Shutdown Tracker from a date recalculated by Microsoft Project after reviewed inputs are applied.
 
-The intended product outcome is a complete updated Project candidate that the Tier 1 schedule owner can review, reject, keep, adopt as the next schedule, or merge/import into another existing schedule through Microsoft Project.
+The intended product outcome is a complete updated Project candidate that Tier 1 can review and disposition before the relevant schedule owner or Microsoft Project operator performs any external adoption or merge/import through Microsoft Project.
 
 ## Decision
 
@@ -37,20 +37,20 @@ Shutdown Tracker may create a complete updated schedule candidate from the accep
 
 Shutdown Tracker must not independently calculate or invent those consequences. It may read, store, compare, and display them as **Microsoft Project-calculated consequences**.
 
-### 3. Candidate/adoption authority — Tier 1 schedule owner
+### 3. Candidate/adoption authority — Tier 1-controlled decision
 
-The Tier 1 schedule owner reviews the complete candidate schedule and source-versus-candidate delta.
+Tier 1 reviews the complete candidate schedule and source-versus-candidate delta in Shutdown Tracker.
 
-The Tier 1 schedule owner decides whether to:
+Tier 1 records whether to:
 
 - reject the candidate;
 - retain it for further review;
 - use the candidate as the next controlled schedule/master; or
 - use Microsoft Project to merge/import the candidate into another existing schedule.
 
-Shutdown Tracker must not automatically replace the accepted master schedule or silently perform a merge into a live master.
+The relevant schedule owner or Microsoft Project operator performs any external use, save, adoption, or merge/import required by that disposition. Shutdown Tracker must not automatically replace the accepted master schedule or silently perform a merge into a live master.
 
-“Tier 1 schedule owner” and “Microsoft Project operator” describe external Microsoft Project activity and do not create additional application roles beyond Tier 1, Tier 2, and Tier 3.
+“Schedule owner” and “Microsoft Project operator” describe external Microsoft Project activity and do not create additional application roles beyond Tier 1, Tier 2, and Tier 3. Not every Tier 1 user is assumed to maintain the schedule personally.
 
 ## Direct-input boundary
 
@@ -85,5 +85,5 @@ A later product decision may expand Tier 1-entered direct input authority, but i
 - Candidate schedules are complete updated Project artifacts with their own hashes and provenance.
 - Tier 1 review may include a read-only schedule-impact view or Gantt-like comparison, provided it does not edit or calculate the schedule.
 - A failed or rejected candidate must leave the accepted source/master unchanged.
-- The Tier 1 schedule owner may use a reviewed candidate as the next schedule or merge/import it into an existing Project schedule, but those are explicit Tier 1-controlled outcomes.
+- A schedule owner or Microsoft Project operator may use a reviewed candidate as the next schedule or merge/import it into an existing Project schedule only after the explicit Tier 1-controlled review/disposition.
 - Any future Project automation must be explicit, Tier 1-controlled, copy-based, auditable, and incapable of silent master overwrite.

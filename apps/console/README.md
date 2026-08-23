@@ -72,7 +72,8 @@ choose and review Project XML
 -> download complete-source candidate XML
 -> open in Microsoft Project
 -> Project recalculates
--> Tier 1 schedule owner reviews the result
+-> relevant schedule owner or Microsoft Project operator completes the external check
+-> Tier 1 reviews the result and records disposition
 -> record Project-open and verification metadata
 ```
 
