@@ -39,7 +39,7 @@ Rules:
 - A comment is not evidence unless linked to an evidence record.
 - A comment is not handover unless flagged or promoted into handover.
 - Export review comments do not update Microsoft Project.
-- Planner approval after a comment thread does not update the master `.mpp`.
+- Tier 1 approval after a comment thread does not update the master `.mpp`.
 - Project verification notes do not save or update the master `.mpp`.
 - Important shutdown information must not disappear into unstructured chat.
 
@@ -51,8 +51,8 @@ Rules:
 | Duplicate WhatsApp plus app communication | Conflicting sources of truth | App records must be structured and auditable |
 | Private side channels | Safety, handover, and accountability gaps | Do not build private DMs in MVP |
 | Notification overload | Users stop noticing real issues | Use Needs Response and visual queues before push |
-| Contractor visibility errors | Restricted information leaks | Role/scope-based visibility |
-| Export misunderstanding | Planner comments mistaken for Project update | Persistent Project-boundary copy |
+| Assignment visibility errors | Restricted information leaks | Tier plus explicit task/reporting assignment |
+| Export misunderstanding | Tier 1 comments mistaken for Project update | Persistent Project-boundary copy |
 | Offline message confusion | Local-only note mistaken as submitted | Explicit sync states |
 
 ## Entity-linked Discussion model
@@ -66,7 +66,7 @@ Discussion should attach to an operational object.
 | Action | Status update, close-out clarification | Later | Audit-visible; action state remains structured |
 | Evidence item | Review note or rejection reason | Later | Linked to evidence metadata/audit |
 | Handover item | Shift-transfer clarification | Later | Included only if handover item remains open/flagged |
-| Export preview line | Planner clarification about old/new value | Later | Export-review audit trail; does not update Project |
+| Export preview line | Tier 1 clarification about old/new value | Later | Export-review audit trail; does not update Project |
 | Export batch | Approval/rejection rationale | Later | Export audit trail |
 | Project verification step | Manual Project check notes | Later | Verification audit trail; no `.mpp` save implied |
 | Critical WP / watchlist | Reporting clarification | Later | Reporting context; no scheduling effect |
@@ -86,30 +86,27 @@ The app should make the structured path easier than dumping important informatio
 | John to follow up by 14:00 | Action | Needs owner and due time |
 | Completion photo uploaded | Evidence record/link | Evidence must be metadata-controlled |
 | Night shift to watch permit expiry | Handover item | Incoming shift needs explicit record |
-| Why was this excluded from export? | Export Review Comment | Planner clarification attached to line/batch |
+| Why was this excluded from export? | Export Review Comment | Tier 1 clarification attached to line/batch |
 | Opened XML in Project and checked line 142 | Project Verification Note | Manual verification metadata |
 
 ## Communication surfaces
 
 ### Console
 
-Entity-linked communication should appear inside existing surfaces:
+Entity-linked communication should appear inside the approved surfaces:
 
 | Surface | Communication placement |
 | --- | --- |
 | Today | Needs Response queue and controlled announcements |
-| Tasks | Task Discussion inside Task Detail |
-| Problems | Problem Discussion inside Problem Detail |
-| Actions | Action Update Log inside Action Detail |
-| Evidence | Evidence review notes inside Evidence Detail |
-| Handover | Handover Notes and flagged items |
-| Exports | Export Review Comments and Project Verification Notes |
+| Tasks | Discussion and related Problem, Action, Evidence, and History sections inside Task Dashboard |
+| Critical | Reporting context linked to the selected task or summary-work-pack dashboard |
+| Import / Export | Tier 1 Export Review Comments and Project Verification Notes |
 
 Do not create a top-level `Chat` area.
 
 ### Mobile
 
-Mobile communication should be low-typing and entity-first:
+Mobile communication should be low-typing, assignment-bounded, and entity-first inside Assigned Tasks / Task Detail:
 
 - task comment from Task Detail;
 - quick reply to a mention/request;
@@ -128,9 +125,9 @@ Needs Response is a work queue, not a mail inbox.
 Items that may appear:
 
 - direct mention on a task/problem/action/export line;
-- response requested by supervisor/planner;
+- response requested by Tier 1 or the responsible Tier 2;
 - assigned action comment requiring update;
-- export review clarification assigned to planner/scheduler;
+- export review clarification assigned to the Tier 1 schedule owner;
 - handover acknowledgement required;
 - failed offline comment/progress submission.
 
@@ -149,9 +146,9 @@ Mentions should be constrained:
 | Mention type | Decision |
 | --- | --- |
 | Named user mention | Allowed when user can see the entity |
-| Role mention such as `@planner` | Allowed only where role-scope resolution is clear |
+| Tier-wide mention | Not exposed in the initial product; use a named user or assigned-task audience |
 | Broad `@everyone` | Do not build for MVP |
-| Contractor mention | Scope-restricted and auditable |
+| Named Tier 2/Tier 3 mention | Allowed only when both users have access through the same task assignment context |
 | External user mention | Defer until auth/tenant model supports it |
 
 Mentions should create an attention record, not a hidden approval or status change.
@@ -162,14 +159,14 @@ Announcements are controlled broadcast records.
 
 Allowed uses:
 
-- shutdown control notice;
+- project-control notice;
 - shift-wide safety notice;
 - export/report availability notice;
 - sync/deployment maintenance notice.
 
 Rules:
 
-- Only authorized roles create announcements.
+- Only Tier 1 creates announcements.
 - Announcements are not open discussion channels.
 - Acknowledgement may be requested for critical notices.
 - Announcements should not replace handover, blockers, or actions.
@@ -193,22 +190,19 @@ Use `Thread may be out of date` for discussion threads. Use progress-specific wo
 
 | Capability | Default authority |
 | --- | --- |
-| View task discussion | Same visibility as task |
-| Create task discussion comment | Scoped users who can update/participate in task |
-| Create problem/action discussion | Users with problem/action visibility |
-| Mention user | Users who can see the entity and target user scope |
-| Mention role | Supervisor, Coordinator, Shutdown Control, Planner by policy |
-| Mark needs response | Supervisor, Coordinator, Shutdown Control, Planner; scoped Field User where assigned |
-| Promote comment to blocker | Supervisor, Coordinator, Shutdown Control; Field/Contractor for assigned scope |
-| Promote comment to action | Supervisor, Coordinator, Shutdown Control; others request only |
-| Flag for handover | Supervisor, Coordinator, Shutdown Control; assigned Field User by policy |
-| Comment on export review | Planner and Shutdown Control; others read/request by policy |
-| Add Project verification note | Planner only by default |
-| Create announcement | Shutdown Control/Admin by default |
-| Delete/redact from view | Admin or controlled moderator role; audit retained |
-| View audit history | Role/scoped permission only |
+| View task discussion | Tier 1 for every project task; Tier 2/Tier 3 for explicitly assigned tasks |
+| Create task discussion comment | Tier 1 on any task; Tier 2/Tier 3 on explicitly assigned tasks |
+| Create related Problem/Action discussion | Same authority as the linked task and structured record |
+| Mention named user | Only when the target can access the same task/record |
+| Mark needs response | Tier 1 on any task; Tier 2/Tier 3 on explicitly assigned tasks |
+| Promote comment to delay/problem/action/evidence/handover | Tier 1 on any task; Tier 2/Tier 3 on explicitly assigned tasks, subject to the structured record's rules |
+| Comment on export review | Tier 1 only |
+| Add Project verification note | Tier 1 only |
+| Create announcement | Tier 1 only |
+| Hide/redact from ordinary view | Tier 1 under project policy; audit retained |
+| View audit history | Tier 1 project-wide; Tier 2/Tier 3 only for history exposed on assigned tasks |
 
-Be conservative with contractor visibility. Contractors should not see other contractors' comments unless explicitly permitted by project policy.
+Tier 2/Tier 3 visibility is conservative by default and cannot be widened by discipline, contractor, work group, area, WBS, categories, saved views, or Critical membership.
 
 ## Audit events
 
@@ -275,6 +269,6 @@ Future communications work is acceptable only if:
 - export comments do not imply Microsoft Project update;
 - Project verification notes do not imply `.mpp` save;
 - queued messages are visibly not sent;
-- contractor visibility is scoped;
+- Tier 2/Tier 3 visibility remains assignment-bounded;
 - no top-level Chat area appears in the MVP IA;
 - the feature reduces operational ambiguity rather than adding another message stream.

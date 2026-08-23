@@ -11,7 +11,7 @@ Offline-capable mobile workflows must preserve user trust, auditability, and rep
 - Offline capture time and server received time must both be preserved.
 - Server-side audit events must record offline sync lifecycle events.
 - Failed local work must remain visible and retryable.
-- Field users must not be asked to resolve complex re-import or export conflicts on mobile.
+- Tier 2/Tier 3 users must not be asked to resolve complex re-import or export conflicts on mobile.
 
 ## Required Offline Fields
 
@@ -55,12 +55,12 @@ Do not use `Thread may be out of date` for task progress screens.
 
 ## Task Progress Offline Rules
 
-- A local progress update is not available for supervisor review until the server receives it.
-- A supervisor cannot accept a local-only progress update from another user's device.
-- A planner cannot approve an export candidate based on local-only progress.
+- A local progress update is not available for Tier 2 tracking validation or Tier 1 review until the server receives it.
+- Tier 2 cannot validate a local-only progress update from another user's device.
+- Tier 1 cannot approve an export candidate based on local-only progress.
 - If a progress update is captured against an old snapshot and a re-import occurs before sync, mark the record as a conflict or stale candidate after server receipt.
 - The server should preserve local capture time and server received time.
-- Late arrival should be visible to supervisors/planners if due time matters.
+- Late arrival should be visible to the responsible Tier 2 and to Tier 1 if due time matters.
 - Duplicate submissions must be prevented with idempotency keys.
 
 ## Communications Offline Rules
@@ -127,12 +127,12 @@ The app must also sync on:
 - foreground resume;
 - explicit user retry;
 - ordinary network recovery;
-- manual retry-all from Sync screen.
+- manual retry/retry-all from the embedded sync recovery state.
 
 ## Visual Requirements
 
-- Mobile My Work should show a compact sync banner, not large diagnostic tiles.
-- Sync screen should show queued, failed, server received, and conflict items grouped by state.
+- Mobile Assigned Tasks should show a compact sync banner, not large diagnostic tiles.
+- Queued, failed, server-received, and conflict items should be available through an embedded recovery view; Sync is not a top-level destination.
 - Console Today should show sync health and failed/queued counts without becoming a dashboard wall.
 - All sync states must be text-visible and not colour-only.
 - High-impact failed states should include a recovery action or next step.

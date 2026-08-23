@@ -1,27 +1,27 @@
 # Task Progress Review and Project Input Approval
 
-Task Progress Review connects field execution truth and authorised planner Console input to a planner-controlled Microsoft Project candidate schedule.
+Task Progress Review connects assigned field execution truth and authorised Tier 1 Console input to a Tier 1-controlled Microsoft Project candidate schedule.
 
 ## Product decision
 
-Shutdown Tracker captures structured execution facts, routes field-originated facts through operational review, allows authorised planners to enter or correct permitted inputs in the Master Console, and then creates an approved input set for a complete updated Project candidate.
+Shutdown Tracker captures structured execution facts, allows Tier 2 to maintain tracking responsibility for assigned work, allows Tier 1 to enter or correct permitted inputs in the Master Console, and then creates an exactly approved input set for a complete updated Project candidate.
 
-The candidate is opened/imported in Microsoft Project, Microsoft Project recalculates it, and the planner reviews the resulting schedule before deciding whether to reject it, retain it, use it as the next schedule/master, or merge/import it into another existing schedule.
+The candidate is opened/imported in Microsoft Project, Microsoft Project recalculates it, and the Tier 1 schedule owner reviews the resulting schedule before deciding whether to reject it, retain it, use it as the next schedule/master, or merge/import it into another existing schedule.
 
-Planner input approval does **not** mean the resulting Project-calculated schedule has already been accepted or adopted.
+Tier 1 input approval does **not** mean the resulting Project-calculated schedule has already been accepted or adopted.
 
 Core workflow:
 
 ```text
-field execution update and/or authorised planner Console input
--> supervisor review where policy requires
--> planner input review
+Tier 2/Tier 3 execution update and/or authorised Tier 1 Console input
+-> Tier 2 tracking validation where project policy requires it
+-> Tier 1 Project-input review
 -> authoritative input candidates
 -> sealed approved-input manifest / preview
 -> complete updated Project candidate generated
 -> Microsoft Project opens/imports and recalculates candidate
 -> candidate delta review
--> planner chooses reject / retain / use as next schedule / merge-import
+-> Tier 1 chooses reject / retain / use as next schedule / merge-import
 -> adoption or merge outcome recorded separately
 ```
 
@@ -29,12 +29,12 @@ field execution update and/or authorised planner Console input
 
 An input may originate from:
 
-- field user execution capture;
-- supervisor correction of a field update;
-- planner entry or correction in the Master Console; or
+- Tier 2 or Tier 3 execution capture on an explicitly assigned task;
+- Tier 2 correction or clarification within retained tracking responsibility;
+- Tier 1 entry or correction in the Master Console; or
 - another structured source explicitly authorised by project policy.
 
-Planner-originated input does not become unaudited or implicitly trusted. It must still carry:
+Tier 1-originated input does not become unaudited or implicitly trusted. It must still carry:
 
 - actor and timestamp;
 - accepted source snapshot/file identity;
@@ -45,20 +45,15 @@ Planner-originated input does not become unaudited or implicitly trusted. It mus
 - handoff policy/support state;
 - approval decision.
 
-A project policy may allow a planner-originated input to skip supervisor review when operational validation is not required, but it must not skip planner input authority, provenance, stale-data checks, or candidate preview.
+A Tier 1-originated input may bypass Tier 2 tracking validation when operational validation is not required, but it must not bypass Tier 1 input authority, provenance, stale-data checks, exact approval binding, or candidate preview.
 
 ## User responsibilities
 
-| User | Responsibility | Must not be burdened with |
+| Tier | Responsibility | Must not be burdened with |
 | --- | --- | --- |
-| Field User | Record what happened at the workfront | Project field mechanics or schedule-impact review |
-| Contractor | Submit scoped execution facts/evidence | Other contractors' work or planner decisions |
-| Supervisor | Validate operational credibility | Final candidate-schedule adoption |
-| Coordinator | Triage review queues, blockers, actions, handover | Project file mechanics |
-| Shutdown Control | Maintain live operational awareness | Routine planner file operations |
-| Planner | Enter/correct permitted inputs, approve exact Project inputs, review recalculated candidate, choose final disposition | Raw frontline evidence capture unless needed |
-| Inspector | Review assigned quality/evidence outcomes | Schedule handoff decisions unless separately authorised |
-| Viewer / Management | Read execution and candidate-impact summaries | Editable review/handoff controls |
+| Tier 1 | Whole-project execution authority; enter/correct permitted inputs; approve exact Project inputs; review recalculated candidate; choose disposition | No artificial category or saved-view restriction |
+| Tier 2 | Track tasks assigned by Tier 1; update them; assign field work to direct-report Tier 3 while retaining responsibility; submit assigned Critical reports | Whole-project browsing or Microsoft Project file mechanics |
+| Tier 3 | Update tasks assigned by Tier 2 as `WORKING_ON` or `FIELD_CONTROL` | Assigning work, whole-project browsing, or Project-input approval |
 
 ## State dimensions
 
@@ -67,8 +62,8 @@ Do not collapse task condition into one status.
 | Dimension | Examples |
 | --- | --- |
 | Execution state | Not started, Ready, In progress, Paused, Blocked, Completed |
-| Progress review state | Draft, Submitted, Supervisor accepted, Correction requested, Rejected, Superseded |
-| Planner input state | Needs review, Approved as input, Rejected, Clarification requested, Superseded |
+| Tracking review state | Draft, Submitted, Tier 2 validated where required, Correction requested, Rejected, Superseded |
+| Tier 1 input state | Needs review, Approved as input, Rejected, Clarification requested, Superseded |
 | Candidate schedule state | Not prepared, Calculation pending, Candidate produced, Delta ready, Accepted, Rejected, Superseded |
 | Candidate disposition | Retained, Adopted as next schedule, Merged/imported into existing, Superseded |
 | Sync state | Local draft, Queued, Sending, Server received, Failed, Conflict |
@@ -86,9 +81,9 @@ Do not collapse task condition into one status.
 
 Start/Pause/Resume/Block/Complete are execution events, not Project field aliases.
 
-## Planner Console entry
+## Tier 1 Console entry
 
-The Master Console may allow an authorised planner to enter or correct Project-bound execution facts that are enabled by the active project/handoff policy.
+The Master Console may allow Tier 1 to enter or correct Project-bound execution facts that are enabled by the active project/handoff policy.
 
 Examples may include:
 
@@ -134,16 +129,16 @@ Creating a candidate does not approve it. Approvals, rejection, correction reque
 For every possible Project input, track separately whether it is:
 
 1. recognised by the importer/candidate vocabulary;
-2. reviewable as a field or planner-entered fact;
+2. reviewable as a field or Tier 1-entered fact;
 3. authorised as a direct Project input by product policy;
 4. supported by the selected handoff mechanism;
 5. enabled for the current project/profile.
 
 A failed test of a patch-shaped MSPDI mechanism does not permanently prohibit the field. It proves only that the mechanism is not yet sufficient for that field.
 
-## Supervisor review
+## Tier 2 tracking validation
 
-Supervisor review confirms operational credibility. It does not approve Project input or candidate adoption.
+Tier 2 retains tracking responsibility for assigned tasks. Where project policy requires field validation, Tier 2 may validate, correct, reject, request evidence, or request clarification for a Tier 3 update inside the same Task Detail workflow. This is not a mandatory separate application screen.
 
 Possible decisions:
 
@@ -157,12 +152,12 @@ Possible decisions:
 Required copy:
 
 ```text
-Supervisor review confirms operational validity. It does not approve a Microsoft Project schedule change.
+Tier 2 tracking validation confirms operational credibility where required. It does not approve a Microsoft Project input or schedule change.
 ```
 
-## Planner input review
+## Tier 1 input review
 
-The planner decides whether a reviewed fact may be included in the approved-input manifest.
+Tier 1 decides whether a reviewed fact may be included in the approved-input manifest.
 
 The queue should show:
 
@@ -170,23 +165,23 @@ The queue should show:
 - imported task UID/ID/name and leaf/summary state;
 - current Project value;
 - proposed value;
-- input origin: field / supervisor correction / planner Console / other approved source;
+- input origin: Tier 2/Tier 3 field capture / Tier 2 correction / Tier 1 Console / other approved source;
 - source actor/time;
-- supervisor decision where required;
+- Tier 2 tracking decision where required;
 - evidence/blocker state;
 - re-import/lineage conflict state;
 - current handoff-mechanism support;
-- planner approve/reject/clarify decision.
+- Tier 1 approve/reject/clarify decision.
 
 Required copy:
 
 ```text
-Planner approval authorises this exact input for an updated Project candidate. The current master schedule is unchanged.
+Tier 1 approval authorises this exact input for an updated Project candidate. The current master schedule is unchanged.
 ```
 
 ## Approved-input manifest
 
-The manifest contains only the exact planner-approved inputs plus their authority/provenance. It does not contain guessed Project-calculated consequences.
+The manifest contains only the exact Tier 1-approved inputs plus their authority/provenance. It does not contain guessed Project-calculated consequences.
 
 The manifest should record:
 
@@ -209,15 +204,15 @@ The candidate is always separate from the accepted source/master.
 
 After it is opened/imported in Microsoft Project, Microsoft Project may recalculate dependent schedule state. That may include planned dates, durations, summary roll-ups, assignment work, timephased data, slack, or criticality.
 
-Those values must be labelled **Microsoft Project-calculated consequence**. Shutdown Tracker must not present them as if the planner directly approved them as input.
+Those values must be labelled **Microsoft Project-calculated consequence**. Shutdown Tracker must not present them as if Tier 1 directly approved them as input.
 
 ## Candidate delta review
 
-The planner should see:
+Tier 1 should see:
 
 - approved inputs;
 - Project-calculated schedule consequences;
-- planner edits made in Microsoft Project, if any;
+- Tier 1 schedule-owner edits made in Microsoft Project, if any;
 - unchanged source facts;
 - unexpected/unexplained changes;
 - project finish movement;
@@ -229,18 +224,18 @@ The planner should see:
 
 ## Candidate disposition
 
-After review the planner may:
+After review the Tier 1 schedule owner may:
 
 - **Reject** — candidate remains evidence only.
 - **Retain for further review** — candidate remains separate from the master.
-- **Use as next schedule/master** — planner adopts the reviewed candidate as the next controlled schedule.
-- **Merge/import into existing schedule** — planner uses Microsoft Project to merge/import the candidate into a disposable/backed-up existing schedule and reviews the merged result.
+- **Use as next schedule/master** — the Tier 1 schedule owner adopts the reviewed candidate as the next controlled schedule.
+- **Merge/import into existing schedule** — the Tier 1 schedule owner uses Microsoft Project to merge/import the candidate into a disposable/backed-up existing schedule and reviews the merged result.
 
 Candidate acceptance does not itself perform adoption or merge.
 
 ## Merge/import control
 
-Merge/import is a Microsoft Project operation controlled by the planner.
+Merge/import is a Microsoft Project operation controlled by the Tier 1 schedule owner.
 
 Shutdown Tracker should record:
 
@@ -250,7 +245,7 @@ Shutdown Tracker should record:
 - merge/import mode;
 - warnings/conflicts;
 - result schedule identity/hash;
-- planner decision.
+- Tier 1 decision.
 
 Shutdown Tracker must not silently overwrite the only master copy.
 
@@ -302,4 +297,4 @@ This workflow does not build:
 - summary-task actual input;
 - generic chat.
 
-A read-only planner candidate-impact view and a separately reviewed Project-native companion are allowed by the product boundary.
+A read-only Tier 1 candidate-impact view and a separately reviewed Project-native companion are allowed by the product boundary.

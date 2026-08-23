@@ -4,31 +4,31 @@
 
 This document defines the product contract between reviewed Shutdown Tracker execution inputs and Microsoft Project schedule recalculation.
 
-The product objective is to turn approved information gathered from the field and/or entered by an authorised planner in the Master Console into a **complete updated Microsoft Project candidate schedule**. The candidate is opened in Microsoft Project, Project performs its own recalculation, and the planner reviews the result before deciding what to do with it.
+The product objective is to turn approved information gathered from assigned field work and/or entered by Tier 1 in the Master Console into a **complete updated Microsoft Project candidate schedule**. The candidate is opened in Microsoft Project, Project performs its own recalculation, and the Tier 1 schedule owner reviews the result before deciding what to do with it.
 
 The candidate may then be:
 
 - rejected;
 - retained for further review;
-- used as the next schedule/master under planner control; or
-- imported/merged by the planner into another existing Microsoft Project schedule.
+- used as the next schedule/master under Tier 1 control; or
+- imported/merged by the Tier 1 schedule owner into another existing Microsoft Project schedule.
 
-The goal is not to prevent the schedule from changing. The goal is to make every input and resulting change attributable, reviewable, reversible, and planner-controlled.
+The goal is not to prevent the schedule from changing. The goal is to make every input and resulting change attributable, reviewable, reversible, and Tier 1-controlled.
 
 ## Core rule
 
-> Shutdown Tracker controls and audits the approved inputs. Microsoft Project calculates the updated candidate schedule. The planner controls what happens to that candidate.
+> Shutdown Tracker controls and audits the approved inputs. Microsoft Project calculates the updated candidate schedule. The Tier 1 schedule owner controls what happens to that candidate.
 
-## Inputs may come from field execution or planner Console entry
+## Inputs may come from assigned field execution or Tier 1 Console entry
 
 Approved inputs may originate from:
 
 - field execution events and progress submissions;
-- supervisor-reviewed field corrections;
-- planner-entered execution/progress facts in the Master Console; or
+- Tier 2-corrected field facts where tracking validation is required;
+- Tier 1-entered execution/progress facts in the Master Console; or
 - another explicitly authorised structured source under the active handoff policy.
 
-Planner-entered values do not bypass provenance. They must still record actor, timestamp, source snapshot, task identity, old value, proposed value, policy, and approval state.
+Tier 1-entered values do not bypass provenance. They must still record actor, timestamp, source snapshot, task identity, old value, proposed value, policy, and approval state.
 
 This contract does not automatically authorise the Console to edit Project scheduling logic such as predecessors, calendars, constraints, baselines, resource levelling, or arbitrary planned dates. Direct input authority remains policy-controlled.
 
@@ -66,7 +66,7 @@ Every material difference should be classified as one of:
 
 - **Approved Shutdown Tracker input** — the exact fact approved before calculation.
 - **Microsoft Project-calculated consequence** — a dependent value Project recalculated.
-- **Planner edit in Microsoft Project** — an explicit manual change made by the planner during candidate review, if any.
+- **Tier 1 schedule-owner edit in Microsoft Project** — an explicit manual change made during candidate review, if any.
 - **Unexpected/unexplained difference** — a change that requires investigation before acceptance.
 
 Unchanged source facts remain traceable through the source identity/hash.
@@ -77,7 +77,7 @@ Unchanged source facts remain traceable through the source identity/hash.
 | --- | --- | --- |
 | Execution/input authority | Shutdown Tracker review workflow | Capture, enter, review, approve and audit exact inputs |
 | Calculation authority | Microsoft Project | Recalculate the complete updated candidate schedule |
-| Candidate/adoption authority | Planner | Reject, retain, use as next schedule, or merge/import the candidate |
+| Candidate/adoption authority | Tier 1 schedule owner | Reject, retain, use as next schedule, or merge/import the candidate |
 
 ## Target workflow
 
@@ -85,9 +85,9 @@ Unchanged source facts remain traceable through the source identity/hash.
 accepted source schedule + hash
         ↓
 field execution information
-+ planner-entered authorised information
++ Tier 1-entered authorised information
         ↓
-supervisor/planner review as policy requires
+Tier 2 tracking validation where required, then Tier 1 input review
         ↓
 approved-input manifest + hash
         ↓
@@ -99,7 +99,7 @@ Microsoft Project recalculates candidate
         ↓
 source-versus-candidate semantic delta
         ↓
-planner candidate review
+Tier 1 candidate review
         ↓
 choose one:
   reject
@@ -136,7 +136,7 @@ The presence of a Project-calculated consequence in the candidate does not expan
 Do not represent field support as a single boolean. Track these dimensions separately:
 
 - recognised by the importer/candidate vocabulary;
-- reviewable as an execution or planner-entered fact;
+- reviewable as an execution or Tier 1-entered fact;
 - authorised as a direct input by product policy;
 - supported by the selected handoff mechanism;
 - enabled for the current project/import profile.
@@ -168,7 +168,7 @@ This is the primary open-format target.
 
 This mechanism is valid only when manual Project testing proves the exact approved inputs survive and the resulting complete schedule is reviewable.
 
-### Planner-controlled Microsoft Project companion
+### Tier 1-controlled Microsoft Project companion
 
 A future Windows companion may:
 
@@ -182,13 +182,13 @@ A future Windows companion may:
 
 This mechanism requires a dedicated implementation review before production use.
 
-### Manual planner input package
+### Manual Tier 1 input package
 
-A fallback mode may present the approved inputs as a signed/reviewable package for the planner to enter manually in Project. It is slower but preserves the same authority model.
+A fallback mode may present the approved inputs as a signed/reviewable package for the Tier 1 schedule owner to enter manually in Project. It is slower but preserves the same authority model.
 
 ## Candidate review
 
-The planner review surface should show:
+The Tier 1 review surface should show:
 
 - source schedule identity/hash;
 - updated candidate identity/hash;
@@ -200,15 +200,15 @@ The planner review surface should show:
 - summary roll-up changes;
 - assignment/work changes;
 - critical/slack changes reported by Project;
-- planner edits made during review, if any;
+- Tier 1 schedule-owner edits made during review, if any;
 - unexplained differences;
 - final candidate decision.
 
-A read-only Gantt or timeline comparison is permitted here if it helps the planner understand impact. It must not become a Shutdown Tracker scheduling engine or dependency editor.
+A read-only Gantt or timeline comparison is permitted here if it helps Tier 1 understand impact. It must not become a Shutdown Tracker scheduling engine or dependency editor.
 
-## Planner outcomes
+## Tier 1 outcomes
 
-The planner may choose one of these outcomes after review.
+The Tier 1 schedule owner may choose one of these outcomes after review.
 
 ### Reject candidate
 
@@ -220,11 +220,11 @@ The candidate remains separate from the master and can be reviewed again or supe
 
 ### Use as the next schedule/master
 
-The planner may adopt the reviewed candidate as the next controlled schedule. Adoption is a separate event and must record the adopted file/hash and lineage.
+The Tier 1 schedule owner may adopt the reviewed candidate as the next controlled schedule. Adoption is a separate event and must record the adopted file/hash and lineage.
 
 ### Merge/import into an existing Project schedule
 
-The planner may use Microsoft Project's own import/merge workflow to apply the candidate to another schedule. This is a **planner-controlled Microsoft Project operation**, not an unattended Shutdown Tracker write-back.
+The Tier 1 schedule owner may use Microsoft Project's own import/merge workflow to apply the candidate to another schedule. This is a **Tier 1-controlled Microsoft Project operation**, not an unattended Shutdown Tracker write-back.
 
 Because merge/import can affect matching tasks and schedule state, the first supported workflow must operate on a disposable/backed-up destination copy and record:
 
@@ -234,7 +234,7 @@ Because merge/import can affect matching tasks and schedule state, the first sup
 - merge/import mode used;
 - result schedule identity/hash;
 - observed merge warnings/conflicts;
-- planner decision after reviewing the merged result.
+- Tier 1 decision after reviewing the merged result.
 
 The original destination/master must not be silently overwritten by Shutdown Tracker.
 
@@ -247,7 +247,7 @@ Record the final disposition separately with at least:
 - source schedule hash;
 - approved-input manifest hash;
 - candidate hash;
-- planner decision;
+- Tier 1 decision;
 - disposition: rejected / retained / adopted_as_new_master / merged_into_existing;
 - destination schedule identity/hash where applicable;
 - result hash where applicable;
@@ -264,9 +264,9 @@ A candidate handoff passes only when:
 4. Microsoft Project can open/import and recalculate it;
 5. Project-calculated consequences are identifiable;
 6. unexplained changes are surfaced;
-7. the planner can reject the candidate without affecting the source;
+7. Tier 1 can reject the candidate without affecting the source;
 8. candidate and source hashes are recorded;
-9. the planner decision is audited.
+9. the Tier 1 decision is audited.
 
 A merge/import workflow has an additional gate: it must be tested separately against a disposable existing schedule and must record the destination-before and result-after identities/hashes.
 
@@ -274,6 +274,6 @@ Do not fail a candidate merely because Microsoft Project legitimately recalculat
 
 ## Current implementation implication
 
-Existing minimal MSPDI/XML patch generation should be treated as an authority-boundary and diagnostic mechanism, not as the final product output. The target product output is a complete updated Project candidate suitable for Microsoft Project review and subsequent planner-controlled adoption or merge/import.
+Existing minimal MSPDI/XML patch generation should be treated as an authority-boundary and diagnostic mechanism, not as the final product output. The target product output is a complete updated Project candidate suitable for Microsoft Project review and subsequent Tier 1-controlled adoption or merge/import.
 
 Security controls around authoritative candidates, exact approvals, stale-data rejection, immutable audit, and batch provenance remain valuable and should be preserved regardless of which candidate-calculation mechanism is selected.

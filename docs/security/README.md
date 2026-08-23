@@ -1,31 +1,33 @@
 # Security
 
-## Authentication and Authorization
+## Authentication and authorization
 
-Use OIDC for authentication. Authorization should be project-scoped and role-based, with room for explicit permissions on sensitive workflows such as export approval and evidence access.
+Use OIDC for authentication. Authentication identifies a user; it does not grant project access.
 
-See [Authorization Model](authorization-model.md) for the baseline authorization rules.
+Authorization is project-scoped and follows the exact three-tier and explicit-assignment model in [Authorization Model](authorization-model.md) and [User Tier and Assignment Model](../product/user-tier-and-assignment-model.md):
 
-## Project-Scoped RBAC
+- Tier 1 has whole-project Master Console authority;
+- Tier 2 has Mobile App authority over explicitly assigned tracking tasks and reporting obligations;
+- Tier 3 has Mobile App authority over tasks explicitly assigned by the Tier 2 user to whom they directly report, as `WORKING_ON` or `FIELD_CONTROL`.
 
-Permissions should be evaluated against project membership and role assignments. Global administrator access should be limited and audited.
+Membership tier, direct-report relationships, and task/reporting assignments must be explicit and auditable. Discipline, contractor, work group, area, WBS, Project custom fields, Resource `Group`, Critical membership, Operational Categories, filters, and Saved Views never grant application authority.
 
-Authentication identifies the user, but project-scoped roles decide what the user can do. Export authority, evidence access, and audit-log access should be explicit rather than implied by login alone.
+A workspace-level `can-create-project` entitlement may authorize project creation. It is not a project role or a fourth tier.
 
-## Audit Events
+The target OIDC and three-tier authorization model is designed but not implemented, as recorded in [Implementation Status Map](../product/implementation-status-map.md).
 
-Audit events should capture important changes to task execution state, problems, actions, evidence metadata, handover, import batches, export approvals, permissions, and security-sensitive settings.
+## Audit events
 
-Audit events should be append-only and tied to actor, project, timestamp, action, target, and relevant request metadata.
+Audit events capture material changes to project membership, tiers, direct-report relationships, task and Critical-reporting assignments, task execution, problems, actions, evidence metadata, import/export decisions, exact candidate approval, offline sync, and security-sensitive settings.
 
-Audit-log access is protected. Admins can view/export audit logs by default, while Planner, Shutdown Control, and other roles receive scoped access only where their work requires it.
+Audit events are append-only and retain actor, project, timestamp, action, target, relevant authorization context, and request metadata. Deactivation, reassignment, correction, and supersession do not erase prior history.
 
-## Evidence Access
+## Evidence access
 
-Evidence files should be stored in object storage. Access should be mediated by application authorization and short-lived access mechanisms rather than public object URLs.
+Evidence files should be stored in object storage. Access is mediated by application authorization and short-lived access mechanisms rather than public object URLs.
 
-Evidence metadata, original file download, unlinking, supersession, and audit history should be separately permissioned. Contractors should be isolated to their own contract scope unless explicitly granted broader access.
+Tier 1 has project-level evidence access under project policy. Tier 2 and Tier 3 evidence access follows explicit task assignments. Evidence metadata, original-file download, unlinking, supersession, and audit history may require distinct controls.
 
-## Baseline Standards
+## Baseline standards
 
 Use OWASP ASVS and OWASP SAMM as security baselines for planning, implementation, review, and release readiness.

@@ -2,7 +2,7 @@
 
 ## Status
 
-Architecture/design source for the implementation of [Project Operational Mapping](../product/project-operational-mapping.md) under [ADR-011](../adr/ADR-011-project-operational-mapping.md).
+Architecture/design source for the implementation of [Project Operational Mapping](../product/project-operational-mapping.md) under [ADR-011](../adr/ADR-011-project-operational-mapping.md). Application authority comes from [User Tier and Assignment Model](../product/user-tier-and-assignment-model.md); mapping output never grants access. Current implementation status is recorded in [Implementation Status Map](../product/implementation-status-map.md).
 
 This document defines the intended backend/domain/API/migration shape before production implementation begins. It does not itself change database schema or runtime behaviour.
 
@@ -12,13 +12,14 @@ The implementation must:
 
 - preserve imported Microsoft Project values as immutable snapshot facts;
 - expose what was actually present in each imported snapshot;
-- let planners define Tracker-owned operational meaning without rewriting Project data;
+- let Tier 1 define Tracker-owned operational meaning without rewriting Project data;
 - support direct task-field, hierarchy/summary-ancestry, and assigned-resource `Group` mappings;
 - support one or many category values per task;
 - retain provenance for every resolved membership;
 - survive Project re-import safely through explicit mapping-health validation;
 - separate classification from application permissions;
-- make Scope and Saved Views use the same underlying category/filter model;
+- make operational filters and Saved Views use the same underlying category/filter model;
+- support mapped context as a Tier 1 bulk-selection aid while saving every resulting Tier 2 assignment explicitly;
 - avoid adding schedule calculation, formula evaluation, or hidden write-back.
 
 ## Existing foundation
@@ -65,13 +66,13 @@ category source mappings
         v
 snapshot-specific membership resolution
         |
-        +-------------+---------------+----------------+
-        |             |               |                |
-        v             v               v                v
-Scope/Saved Views   Critical Watch   reporting    responsibility context
+        +----------------+-------------------+-------------------+
+        |                |                   |                   |
+        v                v                   v                   v
+filters/Saved Views   Critical selection   reporting   Tier 2 bulk-selection aid
         |
         v
-Problems / Actions / Evidence / Handover historical category context
+Task Dashboard operational-record historical category context
 ```
 
 ## Ownership boundaries
@@ -101,8 +102,8 @@ The API owns:
 - category value aliases/roll-ups;
 - mapping activation and validation decisions;
 - resolved category membership persistence/orchestration;
-- Scope and Saved View definitions;
-- responsibility-scope/delegation configuration;
+- operational filter and Saved View definitions;
+- optional bulk-assignment selection output that is converted into explicit task assignments by the assignment domain;
 - audit events;
 - authorization.
 
@@ -162,7 +163,7 @@ Suggested responsibilities:
 
 - stable profile ID;
 - name/description;
-- owner/project or reusable scope;
+- owner project or reusable applicability boundary;
 - active/retired state;
 - created/updated audit metadata.
 
@@ -191,10 +192,10 @@ Examples: Assigned Department, Work Group, Area.
 
 Suggested concepts:
 
-- project/profile scope;
+- project/profile applicability;
 - display name and description;
 - cardinality (`single`, `multi`);
-- usage flags or policy object for filter/group/scope/saved-view/report/mobile/Critical-Watch eligibility;
+- usage flags or policy object for filter/group/display/saved-view/report/Critical-selection/bulk-Tier-2-selection eligibility;
 - active/retired state.
 
 Category identity should remain stable while source mapping changes are represented through versioned mapping definitions.
@@ -310,21 +311,23 @@ Saved Views should persist one shared filter model rather than embed bespoke que
 
 Suggested concepts:
 
-- owner/project/visibility (`private`, `shared`, `role_default` where approved);
-- scope definition;
+- owner/project/visibility (`private` or `project_shared` where approved);
+- filter definition;
 - sort/group/column preferences;
 - filter rows referencing category IDs or supported Tracker execution dimensions;
 - stable operators limited to the MVP rule set.
 
 Do not allow arbitrary SQL, scripting, or Project schedule expressions.
 
-### `responsibility_scopes` and `user_delegations`
+Saved Views are presentation/query configuration only. They do not narrow Tier 1 authority and cannot add a task to Tier 2 or Tier 3 visibility.
 
-These remain Tracker-owned authorization/responsibility configuration.
+### Bulk Tier 2 assignment selection
 
-A responsibility scope may reference category values, but membership in the category does not itself grant permission.
+Resolved mapping values may help Tier 1 select a task set for bulk assignment of Tier 2 tracking responsibility.
 
-The permission engine must always evaluate role + project membership + explicit assignment/responsibility/delegation policy.
+The selection result is not an authorization rule. The assignment domain must save an explicit Tier 2 assignment for each selected task, with actor, time, assignment history, and optional selection provenance. Later category changes do not silently add, remove, or reassign task authority.
+
+Tier 3 authority is never produced by Operational Mapping. It requires an explicit `WORKING_ON` or `FIELD_CONTROL` assignment from the task's Tier 2 tracking user to an active direct-report Tier 3 user.
 
 ## Membership resolution
 
@@ -395,10 +398,10 @@ source file stored
 -> Source Catalogue built/read
 -> selected Import Profile version validated against snapshot
 -> validation findings persisted
--> planner reviews confirmation-required/broken/profile-mismatch findings
+-> Tier 1 reviews confirmation-required/broken/profile-mismatch findings
 -> profile version activated for snapshot when policy gate passes
 -> task category memberships resolved and persisted
--> Scope/Saved Views/operational surfaces become available
+-> filters/Saved Views/operational surfaces become available
 ```
 
 A Project snapshot can exist before an Operational Mapping profile is activated. Import acceptance and mapping activation should be related but not silently conflated.
@@ -416,7 +419,7 @@ For a new snapshot:
 5. identify new/disappeared values and structural/resource-group changes;
 6. persist validation findings;
 7. allow safe unchanged mappings to resolve automatically;
-8. require planner confirmation for uncertain source moves or ambiguous hierarchy changes;
+8. require Tier 1 confirmation for uncertain source moves or ambiguous hierarchy changes;
 9. activate the profile version for the new snapshot only when the mapping-health policy allows;
 10. resolve new snapshot memberships;
 11. leave historical operational records linked to their historical category context.
@@ -434,11 +437,11 @@ Recommended pattern:
 - UI/reporting can display historical context from that snapshot;
 - current context can be resolved through the task's active/current snapshot lineage where explicitly requested.
 
-Avoid copying all category data into every record if a stable immutable membership reference provides the same audit result. The implementation PR should choose the smallest normalized representation that still answers both historical/current ownership questions.
+Avoid copying all category data into every record if a stable immutable membership reference provides the same audit result. The implementation PR should choose the smallest normalized representation that still answers both historical and current classification questions. Current operational responsibility comes from explicit task assignments, not category context.
 
-## Scope query model
+## Operational filter query model
 
-Global Scope is a query concern over resolved memberships plus Tracker execution dimensions.
+Operational filtering is a query concern over resolved memberships plus Tracker execution dimensions.
 
 MVP category predicate shape:
 
@@ -454,11 +457,11 @@ Supported category operators should initially be limited to:
 
 Across different dimensions use AND. Within one category's selected values use OR/multi-select.
 
-Scope must always be constrained by authorization first. A user's chosen Scope may narrow what they can see; it must never widen permission scope.
+Filtering is always applied after authorization. Tier 1 starts from whole-project authority and may narrow the current view. Tier 2 and Tier 3 filters operate only over explicitly assigned tasks and must never widen that assignment-visible set.
 
 ## Saved View query model
 
-Saved Views reuse the same Scope/filter representation plus presentation preferences.
+Saved Views reuse the same filter representation plus presentation preferences.
 
 A Saved View must store identifiers, not generated SQL.
 
@@ -493,14 +496,14 @@ Exact routes may follow existing API conventions, but the capability boundary sh
 - configure value alias/roll-up;
 - preview resolved membership before activation.
 
-### Scope/Saved Views
+### Filters/Saved Views
 
-- query category values available within authorized project scope;
+- query category values available within the already-authorized task set;
 - create/update/delete private views;
-- create/update shared views subject to permission;
+- create/update project-shared views through Tier 1 authority;
 - apply one saved view to supported operational surfaces.
 
-Write endpoints must enforce role/permission rules from the product permission matrix and emit audit events.
+Write endpoints must enforce the three-tier, project-membership, explicit-assignment, and direct-report rules in [Authorization Model](../security/authorization-model.md) and emit audit events. Operational Mapping write configuration is Tier 1 authority. Tier 2 and Tier 3 consume mapped display context only through assigned tasks.
 
 ## Audit event families
 
@@ -520,11 +523,11 @@ mapping_validation.detected
 mapping_remap.confirmed
 mapping_validation.overridden
 saved_view.shared_changed
-responsibility_scope.changed
-delegation.changed
 ```
 
 Event payloads should include relevant project, snapshot, profile/version, category/mapping IDs, actor, and before/after values where applicable.
+
+When mapping output is used to select a Tier 2 bulk assignment, the assignment domain emits explicit per-task assignment audit events. No mapping event grants continuing category-derived access.
 
 Do not log immutable imported source facts as though a user changed them; source import already has its own snapshot/import audit context.
 
@@ -534,15 +537,17 @@ The implementation must preserve this order:
 
 ```text
 authentication
--> project membership
--> role/capability
--> explicit assignment/responsibility/delegation
--> requested operational Scope/filter
+-> active project membership and Tier 1/Tier 2/Tier 3 tier
+-> project lifecycle and client boundary
+-> explicit task or Critical-reporting assignment for Tier 2/Tier 3
+-> active direct-report relationship for a Tier 2-to-Tier 3 assignment action
+-> requested action and record-state policy
+-> operational filter/Saved View
 ```
 
-Project-derived category membership can participate in responsibility rules only after explicit Tracker configuration.
+Tier 1 has whole-project authority and does not need a task assignment. Tier 2 and Tier 3 visibility comes only from saved explicit assignments.
 
-A Scope or Saved View must never be used as an authorization primitive by itself.
+Project-derived category membership, filter definitions, and Saved Views must never be used as authorization primitives. They may help Tier 1 select tasks for an explicit bulk assignment, but they do not become dynamic access rules.
 
 ## Transaction and consistency requirements
 
@@ -565,8 +570,7 @@ The implementation migration should plan indexes for the common queries:
 - mappings by profile version + category;
 - value config by category + source value;
 - validation findings by project/snapshot/profile version + health state;
-- saved-view filters by saved view;
-- responsibility scope by project/category/value/user as required.
+- saved-view filters by saved view.
 
 Distinct-value counts for large snapshots may be materialized/cached later, but the immutable imported rows remain source truth.
 
@@ -580,7 +584,7 @@ Recommended migration increments, subject to the then-current migration number:
 
 1. mapping configuration tables (`import_profiles`, versions, categories, mappings, value config, activation/validation);
 2. resolved task-category membership and provenance constraints/indexes;
-3. Saved Views / responsibility scope only when their backend slice is implemented.
+3. Saved Views and bulk-selection support only when their backend slice is implemented.
 
 Do not create all future tables in one speculative migration if the corresponding implementation and tests are not being delivered in that PR.
 
@@ -629,13 +633,13 @@ Deliver explicit structural-anchor mapping and re-import health behaviour.
 
 Deliver assignment-to-resource-group multi-value classification, deduplication, provenance, and coverage checks.
 
-### Increment 5 — Scope and Saved Views
+### Increment 5 — Filters and Saved Views
 
 Reuse resolved memberships for operational filtering/grouping without changing authorization.
 
-### Increment 6 — responsibility context and operational-record inheritance
+### Increment 6 — bulk assignment aid and operational-record context
 
-Add explicit Tracker responsibility scopes/delegation and historical category context to Problems/Actions/Evidence/Handover as corresponding production domains are implemented.
+Allow Tier 1 to select mapped task sets for explicit Tier 2 bulk assignment, and add historical category context to task-owned Problems, Actions, Evidence, and Handover records as corresponding production domains are implemented. Every resulting assignment remains a saved assignment-domain record; mapping membership does not become authority.
 
 The exact PR sequence may split these further; each coding PR should remain vertically testable and independently reviewable.
 
@@ -653,11 +657,13 @@ Required behavioural tests include:
 - Resource Group mapping returns all distinct groups for a multi-resource task;
 - repeated assignments to the same group do not duplicate membership;
 - category membership does not grant update/review/export permission;
+- a category-based bulk selection creates explicit Tier 2 task assignments rather than a continuing category access rule;
+- no mapping value can create Tier 3 authority or bypass the Tier 2-to-Tier 3 direct-report check;
 - new source values produce `HEALTHY_NEW_VALUES` without breaking the mapping;
 - likely field move produces `CONFIRMATION_REQUIRED` and remains inactive until confirmed;
 - disappeared values retain historical value configuration;
 - previous snapshot memberships remain unchanged after re-import;
-- Saved View filtering cannot widen authorization scope;
+- Saved View filtering cannot widen the Tier 1 whole-project or Tier 2/Tier 3 assignment-derived authorization set;
 - membership generation cannot expose mixed old/new active sets;
 - audit events are produced for configuration/remap/activation changes.
 
@@ -674,7 +680,7 @@ The first implementation PR after this design should be limited to **Source Cata
 - coverage/distinct-value summaries;
 - source provenance back to the immutable snapshot.
 
-It should not yet add editable category mappings, Saved Views, responsibility rules, or frontend workflow expansion.
+It should not yet add editable category mappings, Saved Views, bulk-assignment aids, task-assignment rules, or frontend workflow expansion.
 
 ## Explicit non-goals
 
@@ -686,8 +692,10 @@ This architecture does not authorize:
 - resource levelling;
 - predecessor/constraint/calendar/baseline modification;
 - automatic date movement;
-- Project `Critical`/slack-driven Critical Watch membership;
+- Project `Critical`/slack-driven Critical reporting membership;
 - hidden Project write-back;
 - native `.mpp` writing;
 - category-derived automatic application permissions;
+- Project-substructure or classification-derived security scopes;
+- Tier 3 assignment inferred from mapping data;
 - arbitrary scripting/rules engines.
