@@ -77,6 +77,7 @@ describe("mobile PWA assigned-task shell", () => {
     for (const section of [
       "Overview",
       "Execution",
+      "End-of-shift progress",
       "People",
       "Critical reporting",
       "Discussion",
@@ -91,21 +92,81 @@ describe("mobile PWA assigned-task shell", () => {
     expect(html).toContain("Tier 3 user B · WORKING_ON");
     expect(html).toContain("Tier 2 reporting owner");
     expect(html).toContain("Tier 2 user A");
-    expect(html).toContain("Fixed times");
+    expect(html).toContain("Four-hour work-pack reporting");
+    expect(html).toContain("Policy v2");
+    expect(html).toContain("Fixed times + shift-based");
+    expect(html).toContain("Requested update + significant condition change");
+    expect(html).toContain("Required supported content");
+    expect(html).toContain("Pre-populated known execution facts");
+    expect(html).toContain("Tier 2 judgement / input still needed");
     expect(html).toContain("Due in 45 min");
+  });
+
+  it("represents the five system-timestamped execution actions without manual time entry", () => {
+    const html = renderToString(<App initialPersona="tier2" initialTaskId="c2-access-cover" />);
+    const normalizedHtml = html.replaceAll("&#x27;", "'");
+
+    for (const label of ["Can't Start", "Start", "Pause", "Resume", "Finish"]) {
+      expect(normalizedHtml).toMatch(new RegExp(`<button type="button" disabled="">${label}</button>`));
+    }
+    expect(html).toContain("Action times are recorded automatically when confirmed.");
+    expect(html).toContain("Ordinary Mobile execution has no manual date/time entry or backdating.");
+    expect(html).toContain("System-recorded event facts");
+    expect(html).not.toMatch(/>Actual start<|>Actual finish<|type="datetime-local"|type="date"|type="time"/i);
+  });
+
+  it("keeps Can't Start, late Start, Pause, Resume, and Finish semantics distinct", () => {
+    const notStarted = renderToString(<App initialPersona="tier2" initialTaskId="d2-scaffold-inspection" />);
+    const paused = renderToString(<App initialPersona="tier3" initialTaskId="permit-isolation-release" />);
+
+    expect(notStarted).toContain("execution remains Not Started");
+    expect(notStarted).toContain("structured reason, what must happen, and an action/problem link");
+    expect(notStarted).toContain("Ask for cause, whether anything still requires action, and optional note/evidence only when the start is late.");
+    expect(paused).toContain("Ask separately whether this is an adverse delay");
+    expect(paused).toContain("The linked operations-release problem remains open.");
+    expect(paused).toContain("Record whether a linked issue is resolved or remains open.");
+    expect(paused).toContain("concise confirmation and record the current completion time");
+    expect(paused).toContain("Require evidence only when configured policy says so.");
+  });
+
+  it("represents unfinished end-of-shift progress as a Tracker field observation", () => {
+    const html = renderToString(<App initialPersona="tier3" initialTaskId="hv-inlet-cleanout" />);
+
+    expect(html).toContain("How much of the task is complete?");
+    expect(html).toContain("What remains");
+    expect(html).toContain("Issue affecting next shift");
+    expect(html).toContain("Optional note / evidence");
+    expect(html).toContain("Record end-of-shift update");
+    expect(html).not.toMatch(/% Work Complete|Physical % Complete/i);
+  });
+
+  it("keeps ordinary progress separate from contextual Tier 2 Critical reporting", () => {
+    const tier2 = renderToString(<App initialPersona="tier2" initialTaskId="c2-access-cover" />);
+    const tier3 = renderToString(<App initialPersona="tier3" initialTaskId="permit-isolation-release" />);
+
+    expect(tier2).toContain("Routine reports are not required for every task.");
+    expect(tier2).toContain("Critical reporting");
+    expect(tier2).toContain("Progress 75% from the latest field observation");
+    expect(tier2).toContain("Policy v2 created this obligation");
+    expect(tier3).toContain("Critical context");
+    expect(tier3).toContain("Reporting remains assigned to Tier 2.");
+    expect(tier3).not.toContain("Submit Critical report");
+    expect(tier2).not.toMatch(/add custom field|build report form|form builder/i);
   });
 
   it("keeps all production write controls disabled", () => {
     const tier2Detail = renderToString(
       <App initialPersona="tier2" initialTaskId="c2-access-cover" />
     );
+    const normalizedDetail = tier2Detail.replaceAll("&#x27;", "'");
 
     for (const label of [
       "Start",
+      "Can't Start",
       "Pause",
       "Resume",
-      "Mark blocked",
-      "Complete",
+      "Finish",
+      "Record end-of-shift update",
       "Assign Tier 3 direct report",
       "Submit Critical report",
       "Add comment",
@@ -113,7 +174,7 @@ describe("mobile PWA assigned-task shell", () => {
       "Add action",
       "Add evidence"
     ]) {
-      expect(tier2Detail).toMatch(new RegExp(`<button type="button" disabled="">${label}</button>`));
+      expect(normalizedDetail).toMatch(new RegExp(`<button type="button" disabled="">${label}</button>`));
     }
 
     expect(tier2Detail).toContain(

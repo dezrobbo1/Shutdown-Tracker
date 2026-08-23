@@ -516,6 +516,73 @@ dd {
   gap: 8px;
 }
 
+.execution-time-rule,
+.ordinary-progress-rule,
+.report-history {
+  border-left: 3px solid #4361a3;
+  background: #f3f6fb;
+  padding: 9px 10px;
+}
+
+.action-context-list {
+  display: grid;
+  margin: 0;
+  border: 1px solid #dfe5dc;
+}
+
+.action-context-list > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.action-context-list > div + div {
+  border-top: 1px solid #e3e8e0;
+}
+
+.recorded-event-facts,
+.critical-report-content > div {
+  display: grid;
+  gap: 6px;
+}
+
+.recorded-event-facts ul,
+.critical-report-content ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #536258;
+}
+
+.recorded-event-facts li,
+.critical-report-content li {
+  margin: 4px 0;
+  line-height: 1.4;
+}
+
+.end-shift-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.end-shift-heading span {
+  color: #68776e;
+  font-size: 0.72rem;
+}
+
+.end-shift-facts > div {
+  border-left-color: #b7792a;
+}
+
+.critical-report-content {
+  display: grid;
+  gap: 12px;
+  border-block: 1px solid #dfe5dc;
+  padding-block: 11px;
+}
+
 .task-detail-section button {
   min-height: 44px;
   border: 1px solid #aebbad;
@@ -529,42 +596,6 @@ dd {
 .task-detail-section button:disabled {
   cursor: not-allowed;
   opacity: 0.62;
-}
-
-.progress-fields {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.progress-fields label {
-  display: grid;
-  gap: 5px;
-}
-
-.progress-fields label > span {
-  color: #66756c;
-  font-size: 0.72rem;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.progress-fields input,
-.progress-fields textarea {
-  width: 100%;
-  border: 1px solid #cbd6ca;
-  border-radius: 4px;
-  background: #f8faf5;
-  color: #17201a;
-  padding: 10px;
-}
-
-.progress-fields textarea {
-  resize: none;
-}
-
-.wide-field {
-  grid-column: 1 / -1;
 }
 
 .not-implemented,
@@ -664,13 +695,18 @@ dd {
   }
 
   .execution-actions,
-  .progress-fields,
   .detail-facts {
     grid-template-columns: 1fr;
   }
 
-  .wide-field {
-    grid-column: auto;
+  .action-context-list > div {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .end-shift-heading {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .assignment-summary {

@@ -8,6 +8,10 @@ The ordinary Console and Mobile App now represent the approved information archi
 
 The Console represents `Login -> Projects Home -> Project Console`, with Today, Tasks, Task Dashboard, Critical, Import / Export, and Project Settings. The Mobile App represents `Assigned Tasks -> Task Detail`. Their ordinary product data is synthetic and their write-like controls are disabled. Login and project/task navigation use non-persisted local React state for visual review only.
 
+The Task Dashboard/Task Detail statically represent Can't Start, Start, Pause, Resume, and Finish, automatic event-time semantics, late-start/pause/resume/finish context, and an end-of-shift Tracker field progress observation. They do not persist execution events/timestamps or implement manual correction/backdating.
+
+Console Critical statically represents a Tier 2 owner, reusable template, effective policy version, supported timing/trigger combinations, controlled required content, due/report/history state, and disabled Tier 1 configuration. Mobile presents the Tier 2 obligation only in task/work-pack context with known facts pre-populated and remaining judgement fields identified. This does not implement policy evaluation, reporting APIs, arbitrary schemas, or a second execution-state model.
+
 The ordinary Console may fetch read-only snapshot list/detail and optional export-preview data when explicitly configured. Those GET-only reads are the sole production API wiring in the ordinary shell.
 
 The guarded Microsoft Project round-trip acceptance workspace is verified in the repository and integrated beneath Console Import / Export. Its entry is enabled by:
@@ -26,6 +30,7 @@ The current visual shells do not implement:
 - three-tier membership or direct-report relationships;
 - Tracker task assignments;
 - production task execution APIs or event-derived state;
+- production system-timestamp capture or audited execution-time correction;
 - production Task Dashboard writes;
 - Tier 2 tracking-validation or Tier 1 review writes in the ordinary Console;
 - production discussion, delay/problem, action, or evidence workflows;
@@ -85,6 +90,8 @@ The Mobile App is Tier 2/Tier 3 only and is limited to explicit assignments. It 
 
 There is no separate Mobile Today, Problems, Evidence, Sync, or Critical destination. Delay/problem capture, actions, evidence, discussion, and Critical reporting obligations appear inside the relevant assigned Task Detail. Sync is a compact visible transport/recovery state.
 
+Ordinary Mobile execution uses system-timestamped Can't Start / Start / Pause / Resume / Finish actions. Can't Start remains Not Started. Unfinished end-of-shift work uses plain operational progress language. Routine reporting is not mandatory for every task; an assigned Tier 2 Critical obligation is a policy-bound snapshot over known execution truth.
+
 ## Task-centred placement
 
 | Surface | Approved placement |
@@ -105,7 +112,7 @@ There is no separate Mobile Today, Problems, Evidence, Sync, or Critical destina
 
 ## Visual-only current areas
 
-Current source includes static/synthetic examples for Login, Projects Home, project switching, Today, the Tasks explorer, Task Dashboard records, Critical reporting, Project Settings, assigned mobile work, progress capture, and compact sync/recovery state. These examples demonstrate the approved ordinary placement but not production workflow implementation.
+Current source includes static/synthetic examples for Login, Projects Home, project switching, Today, the Tasks explorer, Task Dashboard records, five-action execution, end-of-shift field progress, versioned Critical policy/reporting, Project Settings, assigned mobile work, and compact sync/recovery state. These examples demonstrate the approved ordinary placement but not production workflow implementation.
 
 The configured ordinary Console import/export reads remain **Read-only API-wired**. The guarded browser round-trip path remains a **Verified in repository** review workspace. Neither classification promotes the surrounding visual shell to a production client.
 
@@ -193,6 +200,11 @@ Revise a visual PR if it:
 - uses the old Console or Mobile navigation;
 - adds a permanent top-level Problems, Evidence, review, verification, chat, reports, or dashboard zone;
 - adds a separate Mobile Today, Problems, Evidence, Sync, or Critical destination;
+- asks ordinary Mobile users to enter execution dates/times or backdate an event;
+- lets Can't Start establish In Progress;
+- treats every Pause as an adverse delay or silently closes a linked problem on Resume;
+- presents routine periodic reporting as mandatory for every task;
+- presents Critical reporting as a second execution-state model or an arbitrary report/form builder;
 - permits Mobile whole-project browsing;
 - creates a generic card wall;
 - separates operational records from their Task Dashboard without a clear linked workflow;

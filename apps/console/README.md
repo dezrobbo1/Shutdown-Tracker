@@ -20,6 +20,10 @@ Project Console
 
 The Login transition, Projects Home/project switcher, Today, Tasks explorer, Task Dashboard, Critical, and Project Settings are **Static visual only**. They use sanitized synthetic data and local view state. OIDC, production project APIs, lifecycle persistence, task execution, assignment, Critical, mapping, and operational-record writes are not implemented. Write-like controls are disabled.
 
+The Task Dashboard now represents the approved Can't Start / Start / Pause / Resume / Finish action vocabulary and system-captured timestamp boundary. It does not persist execution events or provide manual correction/backdating.
+
+The Critical shell represents selected leaf/work-pack items, Tier 2 ownership, reusable templates, effective policy versions, interval/time/shift/request/event mechanisms and combinations, controlled required content, due state, condition, and history. Configuration controls are disabled. The shell does not implement a Critical API, arbitrary field schema, or a second task-execution model.
+
 Problems, Discussion, Actions, Evidence, and History belong to the relevant Task Dashboard; they are not project-level navigation destinations. Execution state and schedule attention are shown separately. In particular, a passed planned start never creates `In Progress` without a Tracker Start/Resume event or accepted imported start/progress evidence.
 
 The ordinary Import / Export surface is **Read-only API-wired** when a project ID is explicitly configured. It performs snapshot list/detail and optional export-preview GET requests only:

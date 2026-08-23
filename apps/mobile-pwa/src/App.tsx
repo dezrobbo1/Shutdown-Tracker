@@ -15,6 +15,14 @@ type AppProps = {
   initialTaskId?: string;
 };
 
+const executionActionGuidance = [
+  { action: "Can't Start", detail: "Record the current time, structured reason, what must happen, and an action/problem link where appropriate. Execution stays Not Started." },
+  { action: "Start", detail: "Record the current time and establish In Progress. Ask for cause, whether anything still requires action, and optional note/evidence only when the start is late." },
+  { action: "Pause", detail: "Record the current time, pause reason, what must happen, and optional note/evidence. Ask separately whether this is an adverse delay and link a problem/action where appropriate." },
+  { action: "Resume", detail: "Close the pause interval and return to In Progress. Record whether a linked issue is resolved or remains open." },
+  { action: "Finish", detail: "Use a concise confirmation and record the current completion time. Require evidence only when configured policy says so." }
+] as const;
+
 export function App({ initialPersona = "tier2", initialTaskId }: AppProps) {
   const [persona, setPersona] = useState<ReviewPersona>(initialPersona);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
@@ -181,32 +189,29 @@ function TaskDetail({ task, onBack }: { task: MobileTask; onBack: () => void }) 
       </TaskDetailSection>
 
       <TaskDetailSection title="Execution">
+        <p className="execution-time-rule"><strong>Action times are recorded automatically when confirmed.</strong> Ordinary Mobile execution has no manual date/time entry or backdating.</p>
         <div className="execution-actions" aria-label="Static execution controls">
+          <button type="button" disabled>Can't Start</button>
           <button type="button" disabled>Start</button>
           <button type="button" disabled>Pause</button>
           <button type="button" disabled>Resume</button>
-          <button type="button" disabled>Mark blocked</button>
-          <button type="button" disabled>Complete</button>
+          <button type="button" disabled>Finish</button>
         </div>
-        <div className="progress-fields">
-          <label>
-            <span>Percent complete</span>
-            <input value={task.percentComplete} readOnly />
-          </label>
-          <label>
-            <span>Actual start</span>
-            <input value={task.actualStart} readOnly />
-          </label>
-          <label>
-            <span>Actual finish</span>
-            <input value={task.actualFinish} readOnly />
-          </label>
-          <label className="wide-field">
-            <span>Progress comment</span>
-            <textarea value={task.progressComment} readOnly rows={3} />
-          </label>
-        </div>
+        <dl className="action-context-list">{executionActionGuidance.map((item) => <div key={item.action}><dt>{item.action}</dt><dd>{item.detail}</dd></div>)}</dl>
+        <div className="recorded-event-facts"><strong>System-recorded event facts</strong><ul>{task.recordedEventFacts.map((fact) => <li key={fact}>{fact}</li>)}</ul></div>
+        <p className="ordinary-progress-rule">Execution events, end-of-shift observations, and explicitly requested updates are ordinary task progress. Routine reports are not required for every task.</p>
         <p className="not-implemented">Execution updates are not yet implemented.</p>
+      </TaskDetailSection>
+
+      <TaskDetailSection title="End-of-shift progress">
+        <div className="end-shift-heading"><strong>How much of the task is complete?</strong><span>Tracker field progress observation · static example</span></div>
+        <dl className="detail-facts end-shift-facts">
+          <div><dt>Completion</dt><dd>{task.endOfShiftObservation.completion}</dd></div>
+          <div><dt>What remains</dt><dd>{task.endOfShiftObservation.remainingWork}</dd></div>
+          <div><dt>Issue affecting next shift</dt><dd>{task.endOfShiftObservation.nextShiftIssue}</dd></div>
+          <div><dt>Optional note / evidence</dt><dd>{task.endOfShiftObservation.noteEvidence}</dd></div>
+        </dl>
+        <button type="button" disabled>Record end-of-shift update</button>
       </TaskDetailSection>
 
       <TaskDetailSection title="People">
@@ -250,8 +255,16 @@ function TaskDetail({ task, onBack }: { task: MobileTask; onBack: () => void }) 
               <dd>{task.criticalReport.reportingOwner}</dd>
             </div>
             <div>
-              <dt>Reporting mode</dt>
-              <dd>{task.criticalReport.reportingMode}</dd>
+              <dt>Policy / template</dt>
+              <dd>{task.criticalReport.policyTemplate} · {task.criticalReport.policyVersion}</dd>
+            </div>
+            <div>
+              <dt>Timing mechanisms</dt>
+              <dd>{task.criticalReport.timingMechanisms}</dd>
+            </div>
+            <div>
+              <dt>Triggers</dt>
+              <dd>{task.criticalReport.triggers}</dd>
             </div>
             <div>
               <dt>Latest report</dt>
@@ -267,6 +280,12 @@ function TaskDetail({ task, onBack }: { task: MobileTask; onBack: () => void }) 
             </div>
           </dl>
           <StatusChip status={task.criticalReport.dueState} />
+          <div className="critical-report-content">
+            <FieldList title="Required supported content" values={task.criticalReport.requiredFields} />
+            <FieldList title="Pre-populated known execution facts" values={task.criticalReport.prepopulatedFacts} />
+            <FieldList title="Tier 2 judgement / input still needed" values={task.criticalReport.judgementInputs} />
+          </div>
+          <p className="report-history">{task.criticalReport.history}</p>
           <button type="button" disabled>Submit Critical report</button>
         </TaskDetailSection>
       ) : task.criticalContext ? (
@@ -338,6 +357,10 @@ function TaskDetailSection({ title, children }: { title: string; children: React
       {children}
     </section>
   );
+}
+
+function FieldList({ title, values }: { title: string; values: string[] }) {
+  return <div><strong>{title}</strong><ul>{values.map((value) => <li key={value}>{value}</li>)}</ul></div>;
 }
 
 function ExecutionState({ status, attention }: { status: StatusLabel; attention?: StatusLabel }) {

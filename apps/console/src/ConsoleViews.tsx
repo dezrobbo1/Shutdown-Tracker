@@ -3,6 +3,10 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
   criticalItems,
+  criticalSupportedFields,
+  criticalTemplates,
+  criticalTimingMechanisms,
+  criticalTriggerExamples,
   operationalTasks,
   projects,
   recentActivity,
@@ -19,7 +23,6 @@ export function StatusLabel({ children, tone = "neutral" }: { children: ReactNod
 
 function stateTone(state: OperationalTask["state"]): StatusTone {
   if (state === "Completed") return "success";
-  if (state === "Blocked") return "danger";
   if (state === "Paused" || state === "Not Started") return "warning";
   return "info";
 }
@@ -106,12 +109,12 @@ export function ProjectsHome({ onOpenProject }: { onOpenProject: (projectId: str
 export function TodayView({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const counts = [
     ["Planned in period", "5", "neutral"], ["Not Started", "1", "warning"], ["In Progress", "1", "info"],
-    ["Paused", "1", "warning"], ["Blocked", "1", "danger"], ["Completed", "1", "success"]
+    ["Paused", "2", "warning"], ["Blocked / delayed", "1", "danger"], ["Completed", "1", "success"]
   ] as const;
   return (
     <>
       <PageHeading eyebrow="Today · configurable 24-hour view" title="Operational day" description="24 August 2026 · 06:00 to 25 August 2026 · 06:00 · Australia/Perth" status="Static visual only" />
-      <section className="status-strip" aria-label="Execution state summary">
+      <section className="status-strip" aria-label="Execution state and operational condition summary">
         {counts.map(([label, value, tone]) => <div key={label}><span>{label}</span><strong>{value}</strong><StatusLabel tone={tone}>{label}</StatusLabel></div>)}
       </section>
       <section className="split-layout">
@@ -198,9 +201,9 @@ export function TaskDashboard({ taskId, backLabel, onBack }: { taskId: string; b
       <nav className="section-tabs" aria-label="Task Dashboard sections">{taskDashboardSections.map((section, index) => <button type="button" className={index === 0 ? "selected" : ""} disabled={index !== 0} key={section}>{section}</button>)}</nav>
       <section className="dashboard-grid">
         <article className="detail-panel"><PanelHeading title="Overview" detail="One operational record for this task." /><dl className="detail-list"><div><dt>Planned window</dt><dd>{task.planned}</dd></div><div><dt>Progress</dt><dd>{task.progress}%</dd></div><div><dt>Last update</dt><dd>{task.lastUpdate}</dd></div><div><dt>Project context</dt><dd>Accepted snapshot v4 · imported read-only schedule context</dd></div></dl></article>
-        <article className="detail-panel"><PanelHeading title="Operational record" detail="Task-owned surfaces; no competing applications." /><ul className="record-list"><li><strong>Execution</strong><span>Start, Resume, Pause, Block, and Complete events</span></li><li><strong>Discussion</strong><span>Unstructured collaboration and @mentions</span></li><li><strong>Delays / Problems</strong><span>Structured impact and ownership</span></li><li><strong>Actions</strong><span>Owned due work</span></li><li><strong>Evidence</strong><span>Task-linked files and metadata</span></li><li><strong>History</strong><span>Immutable activity trail</span></li></ul></article>
+        <article className="detail-panel"><PanelHeading title="Operational record" detail="Task-owned surfaces; no competing applications." /><ul className="record-list"><li><strong>Execution</strong><span>Can't Start, Start, Pause, Resume, and Finish · action times recorded automatically</span></li><li><strong>Discussion</strong><span>Unstructured collaboration and @mentions</span></li><li><strong>Delays / Problems</strong><span>Structured impact and ownership</span></li><li><strong>Actions</strong><span>Owned due work</span></li><li><strong>Evidence</strong><span>Task-linked files and metadata</span></li><li><strong>History</strong><span>Immutable activity trail</span></li></ul></article>
       </section>
-      <div className="disabled-action-row"><button type="button" disabled>Start task</button><button type="button" disabled>Record progress</button><button type="button" disabled>Add problem</button><button type="button" disabled>Add evidence</button><span>Not yet implemented</span></div>
+      <div className="disabled-action-row"><button type="button" disabled>Can't Start</button><button type="button" disabled>Start</button><button type="button" disabled>Pause</button><button type="button" disabled>Resume</button><button type="button" disabled>Finish</button><span>Not yet implemented · static visual only · no execution API</span></div>
     </>
   );
 }
@@ -208,12 +211,41 @@ export function TaskDashboard({ taskId, backLabel, onBack }: { taskId: string; b
 export function CriticalView() {
   return (
     <>
-      <PageHeading eyebrow="Critical · Tier 1 configuration and oversight" title="Critical reporting" description="Tier 1 explicitly selects special reporting coverage. Shutdown Tracker does not calculate critical path." status="Static visual only" />
+      <PageHeading eyebrow="Critical · Tier 1 configuration and oversight" title="Critical reporting" description="Tier 1 explicitly selects coverage and a versioned per-item reporting policy. Shutdown Tracker does not calculate critical path." status="Static visual only" />
       <section className="critical-summary"><div><span>Active Critical items</span><strong>3</strong></div><div><span>Reports overdue</span><strong>1</strong></div><div><span>Due next 2 hours</span><strong>1</strong></div><button type="button" disabled>Add Critical item</button></section>
-      <section className="table-panel"><div className="table-scroll"><table className="data-table critical-table"><thead><tr><th>Critical item</th><th>Source type / scope</th><th>Tier 2 reporting owner</th><th>Reporting mode</th><th>Latest report</th><th>Next due</th><th>Operational condition</th></tr></thead><tbody>{criticalItems.map((item) => <tr key={item.id}><td><strong>{item.name}</strong></td><td><StatusLabel>{item.sourceType}</StatusLabel><small>{item.scope}</small></td><td>{item.reportingOwner}</td><td>{item.reportingMode}</td><td>{item.latestReport}</td><td><strong>{item.nextDue}</strong><small>{item.reportingState}</small></td><td><StatusLabel tone={item.condition === "Blocked" ? "danger" : item.condition === "At risk" ? "warning" : "success"}>{item.condition}</StatusLabel></td></tr>)}</tbody></table></div></section>
+      <section className="table-panel"><div className="table-scroll"><table className="data-table critical-table"><thead><tr><th>Critical item / source</th><th>Tier 2 reporting owner</th><th>Policy / template</th><th>Timing, triggers, and required content</th><th>Next due</th><th>Latest report / condition</th><th>Reporting history</th></tr></thead><tbody>{criticalItems.map((item) => <tr key={item.id}>
+        <td><strong>{item.name}</strong><StatusLabel>{item.sourceType}</StatusLabel><small>{item.scope}</small></td>
+        <td>{item.reportingOwner}</td>
+        <td><strong>{item.policyTemplate}</strong><small>{item.policyVersion}</small></td>
+        <td><strong>{item.timing}</strong><small>Triggers: {item.triggers}</small><small>Required: {item.requiredContent.join(", ")}</small></td>
+        <td><strong>{item.nextDue}</strong><small>{item.reportingState}</small></td>
+        <td><strong>{item.latestReport}</strong><StatusLabel tone={item.condition === "Blocked" ? "danger" : item.condition === "At risk" ? "warning" : "success"}>{item.condition}</StatusLabel></td>
+        <td>{item.history}</td>
+      </tr>)}</tbody></table></div></section>
+
+      <section className="detail-panel critical-policy-panel" aria-labelledby="critical-policy-heading">
+        <header className="panel-heading"><div><h2 id="critical-policy-heading">Critical Reporting Policy</h2><p>Disabled Tier 1 configuration preview for the selected item. Supported catalogue only.</p></div></header>
+        <div className="policy-config-row">
+          <label><span>Tier 2 reporting owner</span><select defaultValue="Morgan Lee · Tier 2" disabled><option>Morgan Lee · Tier 2</option></select></label>
+          <label><span>Template</span><select defaultValue="Two-hour critical-task reporting" disabled>{criticalTemplates.map((template) => <option key={template}>{template}</option>)}</select></label>
+          <label><span>Current version</span><input value="Policy v3 · effective 24 Aug 06:00" readOnly disabled /></label>
+        </div>
+        <div className="policy-catalogue-grid">
+          <PolicyCatalogue title="Timing mechanisms" values={criticalTimingMechanisms} selected={["Fixed interval", "Event / exception triggered"]} />
+          <PolicyCatalogue title="Event / exception triggers" values={criticalTriggerExamples} selected={["Task or work pack starts", "Pause / block", "Finish / completion"]} />
+          <PolicyCatalogue title="Supported required content" values={criticalSupportedFields} selected={["Completion / progress", "Operational condition", "Main delay / constraint", "Next target", "Forecast completion"]} />
+        </div>
+        <div className="disabled-action-row"><button type="button" disabled>Create new policy version</button><button type="button" disabled>Save item override</button><span>Configuration API not implemented</span></div>
+      </section>
+      <div className="rule-note"><strong>Policy and report history</strong><span>Policy changes create a new effective version and do not mutate templates, sibling items, earlier obligations, or immutable reports. Corrections supersede rather than overwrite.</span></div>
+      <div className="rule-note"><strong>Execution truth first</strong><span>Known task facts are pre-populated and reused. Critical reporting is not mandatory for every task and does not create another execution-state model.</span></div>
       <div className="rule-note"><strong>Imported schedule boundary</strong><span>Project Critical is read-only context. Neither automatic selection nor critical-path calculation is provided.</span></div>
     </>
   );
+}
+
+function PolicyCatalogue({ title, values, selected }: { title: string; values: readonly string[]; selected: readonly string[] }) {
+  return <fieldset><legend>{title}</legend>{values.map((value) => <label key={value}><input type="checkbox" checked={selected.includes(value)} readOnly disabled /><span>{value}</span></label>)}</fieldset>;
 }
 
 export function ProjectSettingsView({ initialSection = "General" }: { initialSection?: (typeof settingsSections)[number] }) {

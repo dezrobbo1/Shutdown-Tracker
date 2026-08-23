@@ -20,11 +20,25 @@ export type SyncState = StatusLabel & {
 export type CriticalReportObligation = {
   source: string;
   reportingOwner: string;
-  reportingMode: string;
+  policyTemplate: string;
+  policyVersion: string;
+  timingMechanisms: string;
+  triggers: string;
+  requiredFields: string[];
+  prepopulatedFacts: string[];
+  judgementInputs: string[];
   latestReport: string;
   nextReportDue: string;
   dueState: StatusLabel;
   operationalCondition: string;
+  history: string;
+};
+
+export type FieldProgressObservation = {
+  completion: string;
+  remainingWork: string;
+  nextShiftIssue: string;
+  noteEvidence: string;
 };
 
 export type MobileTask = {
@@ -43,9 +57,8 @@ export type MobileTask = {
   tier3Assignments?: string[];
   taskIndicator: StatusLabel;
   syncState: SyncState;
-  actualStart: string;
-  actualFinish: string;
-  progressComment: string;
+  recordedEventFacts: string[];
+  endOfShiftObservation: FieldProgressObservation;
   discussionSummary: string;
   problemSummary: string;
   actionSummary: string;
@@ -75,9 +88,16 @@ export const mobileTasks: MobileTask[] = [
       detail: "Last synced at 13:15.",
       tone: "success"
     },
-    actualStart: "20 Jun 2026 · 07:12",
-    actualFinish: "Not set",
-    progressComment: "Access cover removed. Inspection handoff is ready.",
+    recordedEventFacts: [
+      "Start · 07:12 · event time recorded automatically.",
+      "Field progress observation · 13:15 · server received."
+    ],
+    endOfShiftObservation: {
+      completion: "75%",
+      remainingWork: "Complete inspection handoff and refit the cover.",
+      nextShiftIssue: "No known issue affecting the next shift.",
+      noteEvidence: "Two existing photo records can be linked; no new evidence required."
+    },
     discussionSummary: "Tier 3 user B added a field handoff note at 12:48.",
     problemSummary: "No active delay or problem.",
     actionSummary: "Confirm inspection access before 14:00.",
@@ -90,11 +110,18 @@ export const mobileTasks: MobileTask[] = [
     criticalReport: {
       source: "Critical Work Pack · C2 refractory outage",
       reportingOwner: "Tier 2 user A",
-      reportingMode: "Fixed times",
+      policyTemplate: "Four-hour work-pack reporting",
+      policyVersion: "Policy v2",
+      timingMechanisms: "Fixed times + shift-based",
+      triggers: "Requested update + significant condition change",
+      requiredFields: ["Completion / progress", "Operational condition", "Main delay / constraint", "Action / recovery", "Next target", "Forecast completion"],
+      prepopulatedFacts: ["Progress 75% from the latest field observation", "Execution In Progress from Start at 07:12"],
+      judgementInputs: ["Current position / focus", "Forecast completion", "Next target"],
       latestReport: "10:00 · On plan",
       nextReportDue: "14:00",
       dueState: { label: "Due in 45 min", tone: "warning" },
-      operationalCondition: "On plan"
+      operationalCondition: "On plan",
+      history: "Policy v2 created this obligation; earlier reports retain their original policy version."
     }
   },
   {
@@ -117,14 +144,21 @@ export const mobileTasks: MobileTask[] = [
       detail: "Queued on this device. Not yet sent.",
       tone: "warning"
     },
-    actualStart: "Not set",
-    actualFinish: "Not set",
-    progressComment: "Awaiting the scaffold release before execution can start.",
+    recordedEventFacts: [
+      "Can't Start · 13:15 · event time recorded automatically; execution remains Not Started."
+    ],
+    endOfShiftObservation: {
+      completion: "0%",
+      remainingWork: "Scaffold release, inspection, and task execution.",
+      nextShiftIssue: "Access release remains outstanding for the next shift.",
+      noteEvidence: "Optional release note; no evidence required before start."
+    },
     discussionSummary: "No discussion entries in this visual example.",
     problemSummary: "Access release is late; no Tracker Start event exists.",
     actionSummary: "Follow up scaffold inspection release at 13:30.",
     evidenceSummary: "No evidence required before start.",
     history: [
+      "13:15 · Can't Start event recorded automatically; execution remained Not Started.",
       "13:15 · Late-to-start attention condition shown separately.",
       "11:00 · Planned start passed without execution evidence."
     ]
@@ -147,9 +181,16 @@ export const mobileTasks: MobileTask[] = [
       detail: "Saved locally.",
       tone: "neutral"
     },
-    actualStart: "20 Jun 2026 · 12:06",
-    actualFinish: "Not set",
-    progressComment: "Clean-out progress is saved as a visual local draft.",
+    recordedEventFacts: [
+      "Start · 12:06 · event time recorded automatically.",
+      "Field progress observation · 13:12 · saved locally."
+    ],
+    endOfShiftObservation: {
+      completion: "30%",
+      remainingWork: "Continue vacuum clean-out and final inspection.",
+      nextShiftIssue: "Confirm vacuum availability at shift handover.",
+      noteEvidence: "One photo record is saved locally."
+    },
     discussionSummary: "Tier 2 user A requested an update before 15:00.",
     problemSummary: "No active delay or problem.",
     actionSummary: "Provide progress update before 15:00.",
@@ -166,9 +207,9 @@ export const mobileTasks: MobileTask[] = [
     title: "Permit isolation — await operations release",
     workPackage: "Calciner isolation workfront",
     plannedWindow: "10:00–14:00",
-    executionState: { label: "Blocked", tone: "critical" },
-    stateBasis: "Tracker Block event recorded at 11:20 with an operations-release reason.",
-    attentionCondition: { label: "Running beyond planned finish", tone: "critical" },
+    executionState: { label: "Paused", tone: "warning" },
+    stateBasis: "Tracker Pause event recorded at 11:20. The linked operations-release problem remains open.",
+    attentionCondition: { label: "Blocked · operations release", tone: "critical" },
     percentComplete: "20%",
     assignmentRelationship: "FIELD_CONTROL",
     assignmentDetail: "Assigned by Tier 2 user A, who retains tracking responsibility.",
@@ -178,16 +219,23 @@ export const mobileTasks: MobileTask[] = [
       detail: "Could not send. Still saved on this device.",
       tone: "critical"
     },
-    actualStart: "20 Jun 2026 · 10:18",
-    actualFinish: "Not set",
-    progressComment: "Field control remains in place while the release is resolved.",
+    recordedEventFacts: [
+      "Start · 10:18 · event time recorded automatically.",
+      "Pause · 11:20 · event time recorded automatically; linked adverse problem remains open."
+    ],
+    endOfShiftObservation: {
+      completion: "20%",
+      remainingWork: "Obtain operations release and resume field control.",
+      nextShiftIssue: "Open operations-release problem requires next-shift follow-up.",
+      noteEvidence: "Permit reference is available as optional context."
+    },
     discussionSummary: "Tier 2 user A acknowledged the blocked-state example.",
     problemSummary: "Operations release is outstanding.",
     actionSummary: "Confirm isolation release owner and recovery time.",
     evidenceSummary: "Permit reference is shown as context only.",
     history: [
       "14:05 · Failed sync example remains saved on this device.",
-      "11:20 · Tracker Block event recorded.",
+      "11:20 · Tracker Pause event linked to the open operations-release problem.",
       "10:18 · Tracker Start event recorded."
     ],
     criticalContext: "Critical Work Pack context is visible. Reporting remains assigned to Tier 2."

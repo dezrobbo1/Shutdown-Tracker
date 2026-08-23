@@ -37,7 +37,8 @@ describe("approved Master Console information architecture", () => {
   it("renders Today as a 24-hour project projection with separate state and attention", () => {
     const html = renderToString(<App initialView="console" initialSection="Today" />);
     expect(html).toContain("24 August 2026 · 06:00 to 25 August 2026 · 06:00");
-    for (const state of ["Not Started", "In Progress", "Paused", "Blocked", "Completed"]) expect(html).toContain(state);
+    for (const state of ["Not Started", "In Progress", "Paused", "Completed"]) expect(html).toContain(state);
+    expect(html).toContain("Blocked / delayed");
     expect(html).toContain("Late to Start");
     expect(html).toContain("No Tracker start; imported progress 0%");
     expect(html).toContain("A passed planned start never creates In Progress");
@@ -63,18 +64,34 @@ describe("approved Master Console information architecture", () => {
     expect(todayHtml).toMatch(/Back to.*Today/);
     for (const section of taskDashboardSections) expect(html).toContain(section);
     expect(html).toContain("One operational record for this task");
+    const normalizedHtml = html.replaceAll("&#x27;", "'");
+    for (const action of ["Can't Start", "Start", "Pause", "Resume", "Finish"]) expect(normalizedHtml).toContain(`>${action}<`);
+    expect(html).toContain("action times recorded automatically");
     expect(html).toContain("Not yet implemented");
   });
 
-  it("renders explicit Critical selection and reporting without calculation claims", () => {
+  it("renders configurable versioned Critical policy without calculation or form-building claims", () => {
     const html = renderToString(<App initialView="console" initialSection="Critical" />);
     expect(html).toContain("Project-critical leaf");
     expect(html).toContain("Critical Work Pack");
     expect(html).toContain("Summary task 1.1 plus all descendants");
     expect(html).toContain("Tier 2 reporting owner");
+    expect(html).toContain("Critical Reporting Policy");
+    expect(html).toContain("Policy v3");
+    expect(html).toContain("Two-hour critical-task reporting");
     expect(html).toContain("Fixed interval");
+    expect(html).toContain("Fixed times");
+    expect(html).toContain("Shift-based");
+    expect(html).toContain("Ad hoc / requested");
+    expect(html).toContain("Event / exception triggered");
+    for (const field of ["Completion / progress", "Operational condition", "Current position / focus", "Main delay / constraint", "Action / recovery", "Next target", "Forecast completion", "Resources / labour where configured", "Evidence / photo requirement", "Comment / update text"]) expect(html).toContain(field);
+    expect(html).toContain("Create new policy version");
+    expect(html).toContain("Save item override");
+    expect(html).toContain("Policy changes create a new effective version");
+    expect(html).toContain("Critical reporting is not mandatory for every task");
     expect(html).toContain("Overdue");
     expect(html).toContain("does not calculate critical path");
+    expect(html).not.toMatch(/add custom field|build report form|form builder/i);
   });
 
   it("renders the complete static Project Settings shell and lifecycle boundary", () => {
