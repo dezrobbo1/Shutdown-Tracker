@@ -38,6 +38,7 @@ The six primary product-authority documents are:
 
 Supporting product contracts include:
 
+- [Deterministic Operational Trial](deterministic-operational-trial.md)
 - [Project Operational Mapping](project-operational-mapping.md)
 - [Trial Foundation Retention Map](trial-foundation-retention-map.md)
 - [Communications Layer](communications-layer.md)
