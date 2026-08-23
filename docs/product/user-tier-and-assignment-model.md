@@ -15,7 +15,7 @@ Tier 1:
 - may view and update any task;
 - may perform execution actions on any task;
 - may create, update, correct, supersede, or close related operational records under the record's audit rules;
-- may create and configure Critical items;
+- may create Critical items and configure their Tier 2 owner, versioned reporting policy/template, timing/triggers, and supported required content;
 - may assign tasks or tracking responsibility to Tier 2;
 - may manage project users, direct-report relationships, settings, imports, exports, and lifecycle;
 - remains unrestricted by categories, filters, saved views, discipline, contractor, WBS, or Critical membership.
@@ -28,10 +28,10 @@ Tier 2:
 
 - accesses the Mobile App only;
 - sees tasks explicitly assigned by Tier 1 for tracking;
-- may update those assigned tasks;
+- may update those assigned tasks through ordinary system-timestamped Mobile execution actions and field observations;
 - may assign those tasks to Tier 3 users who directly report to them in that project;
 - retains tracking responsibility after assigning field work to Tier 3;
-- may submit Critical reports explicitly assigned by Tier 1 through the assigned task or summary-work-pack view;
+- may submit Critical reports explicitly assigned by Tier 1 through the assigned task or summary-work-pack view, against the applicable policy version;
 - may not browse the whole project.
 
 A Tier 2 assignment means **tracking responsibility**. Assigning a task onward does not transfer or end that responsibility.
@@ -42,12 +42,15 @@ Tier 3:
 
 - accesses the Mobile App only;
 - sees tasks explicitly assigned by Tier 2;
-- may update those assigned tasks;
+- may update those assigned tasks through ordinary system-timestamped Mobile execution actions and field observations;
 - is assigned to each task as either `WORKING_ON` or `FIELD_CONTROL`;
 - may not assign work to other users;
-- does not configure or own formal Critical reporting.
+- may see Critical context on assigned work; and
+- does not configure or own the formal Tier 2 Critical reporting obligation by default.
 
 `WORKING_ON` records that the Tier 3 user is performing the work. `FIELD_CONTROL` records that the Tier 3 user controls or coordinates the work at the field task level. Both are explicit task-assignment relationships, not application tiers or permissions derived from schedule data.
+
+Ordinary Mobile execution captures the current system time for Can't Start, Start, Pause, Resume, and Finish. Tier 2/Tier 3 task-update authority does not include ordinary manual execution-date/time entry or backdating. Any future correction workflow must be explicit, separately authorised, and auditable.
 
 ## Application tiers and external schedule responsibilities
 

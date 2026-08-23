@@ -82,7 +82,7 @@ Today is a high-signal 24-hour project attention surface, not a full workflow du
 Today should show by default:
 
 - planned work in the configured 24-hour period;
-- actual execution position: Not Started, In Progress, Paused, Blocked, and Completed;
+- actual execution position: Not Started, In Progress, Paused, and Completed, with blocked/delayed operational conditions kept separate;
 - late starts and work running beyond planned finish;
 - tasks with no recent update;
 - Critical reports due or overdue;

@@ -49,7 +49,7 @@ The Console top-level sections are:
 
 1. **Today** — high-signal view of the configured 24-hour operational day, attention conditions, due reporting, and exceptions.
 2. **Tasks** — project task explorer, filters, saved views, and entry to each Task Dashboard.
-3. **Critical** — Tier 1 configuration and oversight of selected operational reporting items.
+3. **Critical** — Tier 1 configuration and oversight of selected operational reporting items, their versioned per-item policies/templates, timing/triggers, supported required content, and report history.
 4. **Import / Export** — schedule intake, immutable snapshot history, candidate preparation, and the Microsoft Project handoff.
 5. **Project Settings** — membership, direct-report relationships, operational mappings, timezone, operational-day settings, and lifecycle controls.
 
@@ -62,7 +62,7 @@ Today is Console-only. It is a configurable 24-hour operational projection over 
 Today should show:
 
 - planned work that overlaps the period;
-- actual execution position, including Not Started, In Progress, Paused, Blocked, and Completed work;
+- actual execution position, including Not Started, In Progress, Paused, and Completed work, plus blocked/delayed operational conditions;
 - late starts and work running beyond planned finish;
 - tasks with no recent update;
 - Critical reports due or overdue;
@@ -80,7 +80,7 @@ Tasks is the full Project-like explorer for the accepted project task set. It su
 - Saved Views; and
 - entry to the Task Dashboard for leaf and summary tasks.
 
-Summary tasks remain aggregate work-pack views. Normal Start, Pause, Resume, Block, and Complete actions apply to executable leaf tasks.
+Summary tasks remain aggregate work-pack views. The ordinary Can't Start, Start, Pause, Resume, and Finish actions apply to executable leaf tasks. Can't Start leaves execution Not Started; a blocked/delayed condition is linked operational context rather than another way to establish In Progress.
 
 ### Project Settings
 
@@ -101,6 +101,8 @@ The Mobile App has one top-level operational destination:
 - **Assigned Tasks**
 
 An assigned task or assigned summary-work-pack reporting obligation opens its Task Detail. The Task Detail exposes only the task-owned functions available to that Tier 2 or Tier 3 assignment.
+
+Mobile execution actions capture their event times automatically; ordinary Tier 2/Tier 3 users do not enter execution dates/times manually. Formal Tier 2 Critical obligations remain contextual to the relevant task/work-pack and reuse known execution facts under the item's versioned reporting policy.
 
 There is no separate Mobile Today, Problems, Evidence, Sync, or Critical page. Problems and evidence are created or reviewed in the relevant Task Detail. Critical reporting is delivered through the assigned task or summary-work-pack view.
 

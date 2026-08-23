@@ -87,17 +87,49 @@ Use a small semantic palette. Do not create a new colour for every state.
 
 ## Domain state mapping
 
-### Execution state
+### Execution state and operational condition
 
 | State | Class | Notes |
 | --- | --- | --- |
 | Not Started | Neutral | No imported or Tracker evidence of start, and not complete |
 | In Progress | Info | Imported start/progress evidence or an active Tracker-event projection |
 | Paused | Warning | Temporary stop; reason required |
-| Blocked | Critical | Structured blocker required |
 | Completed | Success | Imported completion or Tracker completion; may still need review/evidence |
 
-Readiness and schedule variance are separate attention conditions. A planned start passing, a task appearing in Today, or a task being ready to start does not establish **In Progress**. See [Task Operational Model](task-operational-model.md) for the authoritative derivation.
+Blocked/delayed context is a structured operational condition kept separate from the execution projection:
+
+| Condition | Class | Notes |
+| --- | --- | --- |
+| Late to Start | Warning | Planned start passed without valid start evidence |
+| Delayed / blocked before start | Critical | Can't Start context; execution remains Not Started |
+| Adverse delay / blocked | Critical | Linked pause/delay/problem context; do not hide the governing pause interval |
+| Running beyond planned finish | Warning/Critical | Attention only; class depends on operational impact |
+
+Readiness, blocked/delayed condition, and schedule variance are separate from execution state. A planned start passing, a task appearing in Today, a Can't Start observation, or a task being ready to start does not establish **In Progress**. See [Task Operational Model](task-operational-model.md) for the authoritative derivation.
+
+### Mobile execution action copy
+
+Use exactly these ordinary action labels:
+
+```text
+Can't Start / Start / Pause / Resume / Finish
+```
+
+- Show that the event time is recorded automatically when the action is confirmed; do not show ordinary editable Actual Start/Actual Finish or execution date/time inputs.
+- Show late-start cause/action fields only when Start is late, unless a later project policy explicitly adds another requirement.
+- After Pause, immediately show the pause reason and whether it is an adverse delay; do not classify every Pause as adverse.
+- On Resume, ask whether a linked issue is resolved or work resumed while it remains open; do not silently close it.
+- Use a concise Finish confirmation; request evidence only when configured policy requires it.
+- Keep each contextual workflow short and progressively disclosed rather than presenting all action fields at once.
+
+At end of shift, ask **How much of the task is complete?** and use plain field language for completion, remaining work, next-shift issue, and optional note/evidence. Do not expose `% Work Complete` or `Physical % Complete` terminology to ordinary Mobile users.
+
+### Critical reporting presentation
+
+- Console Critical shows the reporting owner, policy/template and version, timing mechanisms/triggers, supported required content, due state, latest report, condition, and history.
+- Tier 2 sees an assigned obligation in task/work-pack context with known execution facts pre-populated and only the remaining judgement/input fields exposed.
+- Routine reporting is not shown as mandatory for every task.
+- Configuration uses the controlled supported-field catalogue; never render an arbitrary schema editor or generic form builder.
 
 ### Progress review state
 
@@ -200,6 +232,7 @@ Maximum default chips:
 | TaskCard | Mobile assigned work | Full review/export lifecycle on every card |
 | TaskDashboardSection | Console task/problem/evidence detail | Detached modal sprawl |
 | DataTable | Tier 1 review | Spreadsheet-like inline editing across many columns |
+| CriticalPolicySummary | Policy version, timing/triggers, supported required content | Generic form-builder or arbitrary field-schema controls |
 
 ## Empty, loading, and error states
 
@@ -236,6 +269,9 @@ Before accepting a frontend visual PR, confirm:
 - Tier 1 Import / Export screens use old/new/source comparison;
 - Project handoff copy is visible;
 - queued/failed/server-received states are explicit;
+- ordinary Mobile execution timestamps are system-captured rather than editable;
+- Can't Start leaves execution Not Started and blocked/delayed context remains separate;
+- Critical configuration uses the supported catalogue rather than a generic form builder;
 - no screen implies hidden `.mpp` update;
 - no screen introduces scheduler visuals or chat;
 - synthetic labels are sanitized and realistic;

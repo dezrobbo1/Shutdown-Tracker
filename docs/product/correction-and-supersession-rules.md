@@ -27,7 +27,7 @@ Submitted operational records should generally be corrected by superseding recor
 
 - Completion reversal is a distinct auditable action, not an edit to hide the original completion.
 - Reversal should require a reason.
-- Reversal may return a task to an appropriate prior state such as in progress, blocked, or awaiting review.
+- Reversal may return a task to an appropriate prior state such as In Progress or Paused while preserving any linked blocked/delayed condition and review state.
 - Reversal does not automatically remove an already generated export artifact; export supersession rules apply.
 
 ## Problem Reopen

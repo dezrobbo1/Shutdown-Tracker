@@ -85,7 +85,7 @@ Project Critical/slack fields may be displayed as read-only Project context but 
 
 The platform should support:
 
-- Start, Pause, Resume, Block, Complete;
+- system-timestamped Can't Start, Start, Pause, Resume, and Finish actions;
 - structured progress;
 - Tier 2 tracking validation where required;
 - Tier 1 input review;
@@ -95,6 +95,8 @@ The platform should support:
 - candidate schedule review and audit.
 
 Execution actions are not automatic aliases for Project fields.
+
+Can't Start leaves execution Not Started. Pause intervals may link to adverse delays/problems without making every pause adverse. Unfinished end-of-shift work uses a plain-language Tracker field progress observation. Ordinary Mobile users are not asked to enter execution times or shown Project-specific progress-field terminology.
 
 ## Progress methods
 
@@ -106,6 +108,8 @@ Projects may configure the business-appropriate progress method:
 - state-only tracking where a percentage is not meaningful.
 
 Field recognition, reviewability, handoff support, and project enablement remain separate decisions.
+
+Critical reporting uses a versioned per-item policy with supported timing/triggers and a controlled content catalogue. Routine reporting is not mandatory for every task, known execution facts should be reused, and the product does not provide a generic report/form builder.
 
 ## MVP direction
 

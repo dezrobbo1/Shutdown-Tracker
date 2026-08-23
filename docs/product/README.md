@@ -96,7 +96,9 @@ Tier 1 Console input does not bypass provenance or authority checks. Each direct
 
 ## Task execution and progress
 
-Field actions such as Start, Pause, Resume, Block, and Complete are Tracker execution events. They do not map one-to-one to Project fields automatically.
+Ordinary Mobile field actions are Can't Start, Start, Pause, Resume, and Finish. Their event timestamps are system-captured; Tier 2/Tier 3 users do not ordinarily type execution dates/times. Can't Start leaves the task Not Started, and a pause interval remains distinct from any linked adverse delay/problem. These Tracker facts do not map one-to-one to Project fields automatically.
+
+At end of shift, unfinished work may receive a plain-language Tracker field progress observation. Project-specific `% Work Complete` and `Physical % Complete` labels are not exposed to ordinary field users; any eventual Project interpretation remains a separate reviewed handoff-policy decision.
 
 A project may configure a progress method appropriate to its work:
 
@@ -151,6 +153,8 @@ Classification is not authorisation. Categories and saved views support filterin
 A Critical item is an operational reporting object, not a scheduling object. The first approved Critical Work Pack UX selects one imported summary task plus descendants.
 
 Project `Critical`, Total Slack, Free Slack, or other schedule-calculated values may be displayed as read-only Project context but do not automatically create a Critical reporting item or assignment.
+
+Tier 1 configures a versioned per-item Critical Reporting Policy using supported interval/time/shift/request/event mechanisms and a controlled reporting-content catalogue. Templates are reusable starting configurations with isolated item overrides. Critical reporting reuses known execution facts, does not impose routine reports on every task, and is not a generic form builder or a second execution-state system.
 
 ## Task-owned operational records
 

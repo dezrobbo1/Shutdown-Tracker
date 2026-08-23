@@ -148,7 +148,7 @@ A failed diagnostic for one handoff mechanism means **unsupported by that handof
 - `% Complete` is duration-progress and can trigger Project duration/actual calculations.
 - `Physical % Complete` is physical-scope progress and should be enabled only where the site uses it consistently.
 - `% Work Complete` is work/assignment progress and should be deferred unless Project resource assignments and Work are intentionally maintained.
-- Start/Pause/Resume/Block/Complete buttons are Tracker execution events; they are not automatically equivalent to Project percentage fields.
+- Can't Start/Start/Pause/Resume/Finish are the ordinary system-timestamped Mobile execution actions; they are not automatically equivalent to Project percentage or date fields. Can't Start remains Not Started, and linked blocked/delayed context does not create an Actual Start.
 
 ## Handoff mechanisms
 
