@@ -1,4 +1,5 @@
 import { createShutdownTrackerApiClient } from "@shutdown-tracker/api-client";
+import { createInitialTrialState } from "@shutdown-tracker/trial-model";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
@@ -6,6 +7,8 @@ import { buildConsoleReviewConfig, loadConsoleReviewData } from "./apiReviewClie
 import { consoleNavItems, taskDashboardSections } from "./consoleData";
 import { ProjectSettingsView } from "./ConsoleViews";
 import { ImportExportView } from "./ImportExportView";
+import { TrialTaskDashboard } from "./TrialConsoleViews";
+import { buildTrialConsoleConfig } from "./trialMode";
 
 describe("approved Master Console information architecture", () => {
   it("starts with a clearly synthetic Login view", () => {
@@ -126,6 +129,89 @@ describe("approved Master Console information architecture", () => {
     for (const removedControl of ["Approve exact inputs", "Generate candidate", "Open round-trip review workspace", "Record verification"]) {
       expect(`${shell}\n${importView}\n${exportView}`).not.toContain(`>${removedControl}<`);
     }
+  });
+});
+
+describe("deterministic Console operational trial", () => {
+  it("enables only from an explicit true flag", () => {
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: "true" }).enabled).toBe(true);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: " true " }).enabled).toBe(false);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: " TRUE " }).enabled).toBe(false);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: "false" }).enabled).toBe(false);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: "1" }).enabled).toBe(false);
+  });
+
+  it("labels deterministic local state and exposes all simulation clock controls", () => {
+    const html = renderToString(<App initialView="console" trialMode />);
+    expect(html).toContain("Synthetic operational trial");
+    expect(html).toContain("Deterministic local state");
+    expect(html).toContain("No production persistence");
+    expect(html).toContain("Simulated shutdown time");
+    for (const control of ["+15 minutes", "+1 hour", "Next event", "Next report due", "Next shift boundary", "Reset trial", "Open Mobile trial"]) expect(html).toContain(control);
+    expect(html).toContain("24 Aug 2026 · 06:00");
+  });
+
+  it("derives Today from the shared trial scenario and includes the guided free-interaction checklist", () => {
+    const html = renderToString(<App initialView="console" initialSection="Today" trialMode />).replaceAll("&#x27;", "'");
+    expect(html).toContain("deterministic 24-hour projection");
+    expect(html).toContain("D2 Stack — scaffold access release");
+    expect(html).toContain("Permit isolation — await operations release");
+    expect(html).toContain("Delayed / blocked before start");
+    expect(html).toContain("Guided operational scenario");
+    expect(html).toContain("Optional review path. Controls remain available for free interaction.");
+    expect(html).toContain("Can't Start");
+    expect(html).toContain("end-of-shift progress");
+    expect(html).toContain("Planned-time passage can create Late to Start, but never In Progress");
+  });
+
+  it("renders the hierarchy and task-centred dashboard with local Tier 2 assignment", () => {
+    const tasks = renderToString(<App initialView="console" initialSection="Tasks" trialMode />);
+    const dashboard = renderToString(<App initialView="console" initialSection="Tasks" initialTaskId="task-expansion-joint" trialMode />);
+    expect(tasks).toContain("Synthetic task structure");
+    expect(tasks).toContain("Calciner trial shutdown");
+    expect(tasks).toContain('aria-expanded="true"');
+    expect(dashboard).toContain("Outlet duct — replace expansion joint");
+    expect(dashboard).toContain("Paused");
+    expect(dashboard).toContain("Reassign Tier 2 tracking responsibility");
+    expect(dashboard).toContain("Updates the shared Tier 2 Mobile projection immediately");
+    for (const section of taskDashboardSections) expect(dashboard).toContain(section);
+  });
+
+  it("makes problem resolution, action completion, and shared task history exercisable", () => {
+    const state = createInitialTrialState();
+    const common = { state, taskId: "task-expansion-joint", backLabel: "Tasks" as const, onBack: () => undefined, onAction: () => undefined };
+    const problems = renderToString(<TrialTaskDashboard {...common} initialSection="Delays / Problems" />);
+    const actions = renderToString(<TrialTaskDashboard {...common} initialSection="Actions" />);
+    const history = renderToString(<TrialTaskDashboard {...common} initialSection="History" />);
+    expect(problems).toContain("Resolve problem in trial");
+    expect(problems).toContain("Replacement material not at workfront");
+    expect(actions).toContain("Complete action in trial");
+    expect(actions).toContain("Deliver verified expansion-joint material");
+    expect(history).toContain("Expansion-joint work paused");
+  });
+
+  it("renders configurable, controlled, versioned Critical policy trial controls", () => {
+    const html = renderToString(<App initialView="console" initialSection="Critical" trialMode />).replaceAll("<!-- -->", "");
+    expect(html).toContain("Tier 1 deterministic configuration");
+    expect(html).toContain("Project-critical leaf");
+    expect(html).toContain("Critical Work Pack");
+    expect(html).toContain("Current Policy v1");
+    expect(html).toContain("Create new policy version");
+    expect(html).toContain("Add Critical item");
+    expect(html).toContain("Report history");
+    for (const mechanism of ["No routine reporting", "Ad hoc / requested", "Fixed interval", "Fixed times", "Shift-based", "Event / exception triggered"]) expect(html).toContain(mechanism);
+    for (const field of ["Completion / progress", "Operational condition", "Main delay / constraint", "Action / recovery", "Forecast completion", "Resources / labour where configured", "Evidence / photo requirement", "Comment / update text"]) expect(html).toContain(field);
+    expect(html).toContain("no generic form builder");
+    expect(html).toContain("corrections supersede rather than overwrite");
+    expect(html).toContain("does not create another execution-state model");
+  });
+
+  it("keeps Import / Export deferred and deterministic in trial mode", () => {
+    const html = renderToString(<App initialView="console" initialSection="Import / Export" trialMode />);
+    expect(html).toContain("Project schedule exchange");
+    expect(html).toContain("final export and round-trip contract is intentionally deferred");
+    expect(html).toContain("Deterministic trial mode does not load backend snapshot data");
+    expect(html).not.toContain("Generate candidate");
   });
 });
 

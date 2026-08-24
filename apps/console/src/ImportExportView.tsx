@@ -17,17 +17,20 @@ export function ImportExportView({
   reviewData,
   loadState,
   onRefresh,
-  initialSection = "Current Schedule"
+  initialSection = "Current Schedule",
+  trialMode = false
 }: {
   shellProjectLabel: string;
   reviewData: ConsoleReviewData | null;
   loadState: ConsoleReviewLoadState;
   onRefresh: () => void;
   initialSection?: ImportExportSection;
+  trialMode?: boolean;
 }) {
   const [active, setActive] = useState<ImportExportSection>(initialSection);
   const reviewRows = useMemo(() => buildReviewRows(reviewData), [reviewData]);
-  const ordinaryMode = reviewApiRuntimeConfig.liveEnabled ? "Read-only API-wired" : "Static visual only";
+  const liveEnabled = !trialMode && reviewApiRuntimeConfig.liveEnabled;
+  const ordinaryMode = trialMode ? "Synthetic operational trial" : liveEnabled ? "Read-only API-wired" : "Static visual only";
   const selectedSnapshot = reviewData?.snapshotDetail?.snapshot ?? null;
 
   return (
@@ -42,7 +45,7 @@ export function ImportExportView({
         <strong>Current direction</strong>
         <span>Import inspection remains useful for the product trial. Export is not finalised and no candidate, approval, or Microsoft Project acceptance workflow is presented as required product behaviour.</span>
       </div>
-      {reviewApiRuntimeConfig.liveEnabled && (
+      {liveEnabled && (
         <div className="review-context-warning" role="note">
           <strong>Configured read-only source</strong>
           <span>The static shell project is {shellProjectLabel}. Snapshot reads use configured project <code>{reviewApiRuntimeConfig.projectId}</code>; switching the visual shell does not retarget that environment value.</span>
@@ -76,7 +79,7 @@ export function ImportExportView({
             <button
               type="button"
               onClick={onRefresh}
-              disabled={!reviewApiRuntimeConfig.liveEnabled || loadState.status === "loading"}
+              disabled={!liveEnabled || loadState.status === "loading"}
             >
               <RefreshCw size={16} aria-hidden="true" /> Refresh imported schedule
             </button>
@@ -98,7 +101,7 @@ export function ImportExportView({
         <ImportReview
           reviewRows={reviewRows}
           loadState={loadState}
-          liveEnabled={reviewApiRuntimeConfig.liveEnabled}
+          liveEnabled={liveEnabled}
           onRefresh={onRefresh}
         />
       )}

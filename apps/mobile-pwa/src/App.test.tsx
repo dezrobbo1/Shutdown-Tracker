@@ -1,6 +1,9 @@
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { applyTrialAction, createInitialTrialState } from "@shutdown-tracker/trial-model";
 import { App } from "./App";
+import { TrialMobileApp } from "./TrialMobileApp";
+import { normalizeTrialHostOrigin } from "./trialBridgeClient";
 
 describe("mobile PWA assigned-task shell", () => {
   it("uses Assigned Tasks as the only top-level operational destination", () => {
@@ -209,3 +212,192 @@ describe("mobile PWA assigned-task shell", () => {
     }
   });
 });
+
+describe("mobile deterministic operational trial", () => {
+  it("activates an explicitly bounded deterministic trial without changing ordinary mode", () => {
+    const ordinary = renderToString(<App />);
+    const trial = renderToString(<App trialMode />);
+
+    expect(ordinary).toContain("Visual review shell. Static/synthetic data. No production write workflow.");
+    expect(ordinary).not.toContain("Synthetic operational trial");
+    expect(trial).toContain("Synthetic operational trial");
+    expect(trial).toContain("Deterministic local state · No production persistence");
+    expect(trial).toContain("Standalone in-memory trial session.");
+    expect(trial).toContain("Simulated shutdown time");
+    expect(trial).toContain("24 Aug 2026 · 06:00");
+  });
+
+  it("uses named Tier 2 and Tier 3 personas while retaining Assigned Tasks only", () => {
+    const html = normalizeMarkup(renderToString(<App trialMode />));
+
+    for (const persona of [
+      "Morgan Lee · Tier 2",
+      "Avery Singh · Tier 2",
+      "Riley Jones · Tier 3",
+      "Sam Patel · Tier 3",
+      "Jamie Chen · Tier 3",
+      "Casey Brown · Tier 3",
+      "Drew Wilson · Tier 3"
+    ]) expect(html).toContain(persona);
+
+    expect(html).toContain("Assigned Tasks");
+    expect(html).not.toContain("<nav");
+    for (const destination of ["Today", "Import / Export", "Project Settings"]) {
+      expect(html).not.toContain(`>${destination}<`);
+    }
+  });
+
+  it("renders Tier 3 Can't Start and Start without manual execution time fields", () => {
+    const html = normalizeMarkup(renderToString(
+      <App
+        trialMode
+        initialTrialUserId="tier3-riley"
+        initialTaskId="task-scaffold-access"
+      />
+    ));
+
+    expect(html).toContain(">Can't Start<");
+    expect(html).toContain(">Start<");
+    expect(html).toContain("Record Can't Start at 06:00");
+    expect(html).toContain("Start at 06:00");
+    expect(html).toContain("There is no manual date/time entry or backdating.");
+    expect(html).not.toMatch(/type="datetime-local"|type="date"|type="time"/i);
+  });
+
+  it("shows late-start context and keeps Can't Start as Not Started", () => {
+    let state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 420 });
+    state = applyTrialAction(state, {
+      type: "cant-start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Access or scaffold unavailable",
+      whatIsNeeded: "Release the scaffold tag",
+      createProblem: true,
+      createAction: true
+    });
+    const html = renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier3-riley" initialTaskId="task-scaffold-access" />
+    ).replaceAll("&#x27;", "'");
+
+    expect(html).toContain("Not Started");
+    expect(html).toContain("Late to Start");
+    expect(html).toContain("Delayed / blocked before start");
+    expect(html).toContain("This start is late against the accepted planned start.");
+    expect(html).toContain("What caused the late start?");
+    expect(html).toContain("Access or scaffold unavailable");
+  });
+
+  it("renders Pause, Resume, and Finish according to the derived execution state", () => {
+    const inProgress = renderToString(
+      <App trialMode initialTrialUserId="tier3-jamie" initialTaskId="task-dust-hood" />
+    );
+    const paused = renderToString(
+      <App trialMode initialTrialUserId="tier3-drew" initialTaskId="task-expansion-joint" />
+    );
+
+    expect(inProgress).toContain(">Pause<");
+    expect(inProgress).toContain(">Finish<");
+    expect(inProgress).toContain("Normal pause — not an adverse delay");
+    expect(inProgress).toContain("Adverse delay — create linked problem");
+    expect(paused).toContain(">Resume<");
+    expect(paused).toContain("Work resumed; problem remains open");
+    expect(paused).toContain("Replacement material not at workfront");
+    expect(paused).toContain("Resolve problem");
+    expect(paused).toContain("Complete action");
+  });
+
+  it("derives problem resolution and action completion from the shared history", () => {
+    let state = applyTrialAction(createInitialTrialState(), {
+      type: "resume",
+      taskId: "task-expansion-joint",
+      actorId: "tier3-drew",
+      issueResolution: "remains-open"
+    });
+    state = applyTrialAction(state, { type: "resolve-problem", problemId: "problem-material", actorId: "tier3-drew" });
+    state = applyTrialAction(state, { type: "complete-action", actionId: "action-material", actorId: "tier3-drew" });
+    const html = renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier3-drew" initialTaskId="task-expansion-joint" />
+    );
+
+    expect(html).toContain("Problem resolved explicitly: Replacement material not at workfront.");
+    expect(html).toContain("Action completed: Deliver verified expansion-joint material.");
+    expect(html).not.toContain(">Resolve problem<");
+    expect(html).not.toContain(">Complete action<");
+  });
+
+  it("allows Tier 2 to delegate only to named direct-report Tier 3 users", () => {
+    const morgan = renderToString(
+      <App trialMode initialTrialUserId="tier2-morgan" initialTaskId="task-scaffold-access" />
+    );
+    const avery = renderToString(
+      <App trialMode initialTrialUserId="tier2-avery" initialTaskId="task-permit-release" />
+    );
+
+    expect(morgan).toContain("Assign direct-report Tier 3");
+    expect(morgan).toContain("Riley Jones");
+    expect(morgan).toContain("Sam Patel");
+    expect(morgan).toContain("Jamie Chen");
+    expect(morgan).not.toContain(">Drew Wilson</option>");
+    expect(morgan).toContain("WORKING_ON");
+    expect(morgan).toContain("FIELD_CONTROL");
+    expect(morgan).toContain("retains Tier 2 tracking responsibility");
+    expect(avery).toContain("Casey Brown");
+    expect(avery).toContain("Drew Wilson");
+  });
+
+  it("renders contextual Critical obligations with known facts and controlled inputs", () => {
+    const html = normalizeMarkup(renderToString(
+      <App trialMode initialTrialUserId="tier2-morgan" initialTaskId="task-scaffold-access" />
+    ));
+
+    expect(html).toContain(">Critical reporting<");
+    expect(html).toContain("Known execution facts");
+    expect(html).toContain("Policy v1");
+    expect(html).toContain("Fixed interval");
+    expect(html).toContain("Submit immutable Critical report");
+    expect(html).toContain("Next target");
+    expect(html).toContain("Forecast completion");
+    expect(html).not.toMatch(/custom field|form builder/i);
+  });
+
+  it("shows immutable submitted Critical reports and superseding correction controls", () => {
+    const html = renderToString(
+      <App trialMode initialTrialUserId="tier2-morgan" initialTaskId="wp-cyclone" />
+    );
+
+    expect(html).toContain("Submitted report · immutable");
+    expect(html).toContain("Correction creates a new report that supersedes this one.");
+    expect(html).toContain("Submit superseding correction");
+    expect(html).not.toContain('name="progress"');
+    expect(html).not.toContain('name="condition"');
+    expect(html).toContain('name="focus"');
+  });
+
+  it("shows plain-language end-of-shift progress only after the deterministic boundary", () => {
+    const initial = renderToString(
+      <App trialMode initialTrialUserId="tier3-casey" initialTaskId="task-night-handover" />
+    );
+    const atShift = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 1080 });
+    const shifted = renderToString(
+      <TrialMobileApp initialState={atShift} initialUserId="tier3-casey" initialTaskId="task-night-handover" />
+    );
+
+    expect(initial).toContain("No unfinished-work update is due");
+    expect(shifted).toContain("How much of the task is complete?");
+    expect(shifted).toContain("What remains?");
+    expect(shifted).toContain("Issue affecting the next shift");
+    expect(shifted).not.toMatch(/% Work Complete|Physical % Complete/i);
+  });
+
+  it("normalizes only HTTP(S) Console host origins for the optional bridge", () => {
+    expect(normalizeTrialHostOrigin("https://console.example.test/review?x=1")).toBe("https://console.example.test");
+    expect(normalizeTrialHostOrigin("http://127.0.0.1:5173/path")).toBe("http://127.0.0.1:5173");
+    expect(normalizeTrialHostOrigin("javascript:alert(1)")).toBeNull();
+    expect(normalizeTrialHostOrigin("not a URL")).toBeNull();
+    expect(normalizeTrialHostOrigin(null)).toBeNull();
+  });
+});
+
+function normalizeMarkup(html: string) {
+  return html.replaceAll("<!-- -->", "").replaceAll("&#x27;", "'");
+}

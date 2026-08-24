@@ -9,10 +9,13 @@ import {
   type StatusLabel,
   type SyncState
 } from "./mobileData";
+import { TrialMobileApp } from "./TrialMobileApp";
 
 type AppProps = {
   initialPersona?: ReviewPersona;
   initialTaskId?: string;
+  initialTrialUserId?: string;
+  trialMode?: boolean;
 };
 
 const executionActionGuidance = [
@@ -23,7 +26,25 @@ const executionActionGuidance = [
   { action: "Finish", detail: "Use a concise confirmation and record the current completion time. Require evidence only when configured policy says so." }
 ] as const;
 
-export function App({ initialPersona = "tier2", initialTaskId }: AppProps) {
+export function App({
+  initialPersona = "tier2",
+  initialTaskId,
+  initialTrialUserId,
+  trialMode = false
+}: AppProps) {
+  if (trialMode) {
+    return (
+      <TrialMobileApp
+        initialTaskId={initialTaskId}
+        initialUserId={initialTrialUserId}
+      />
+    );
+  }
+
+  return <StaticMobileApp initialPersona={initialPersona} initialTaskId={initialTaskId} />;
+}
+
+function StaticMobileApp({ initialPersona, initialTaskId }: { initialPersona: ReviewPersona; initialTaskId?: string }) {
   const [persona, setPersona] = useState<ReviewPersona>(initialPersona);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
   const assignedTasks = mobileTasks.filter((task) => task.persona === persona);
