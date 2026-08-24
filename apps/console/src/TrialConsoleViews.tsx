@@ -68,12 +68,12 @@ export function TrialClock({
 export function TrialTodayView({ state, onOpenTask, onAction }: { state: TrialState; onOpenTask: (taskId: string) => void; onAction: TrialActionHandler }) {
   const today = selectTodayProjection(state);
   const counts = [
-    ["Planned in period", today.tasks.length, "neutral"],
-    ["Not Started", today.counts["Not Started"], "warning"],
-    ["In Progress", today.counts["In Progress"], "info"],
-    ["Paused", today.counts.Paused, "warning"],
-    ["Blocked / Can't Start", today.blocked, "danger"],
-    ["Completed", today.counts.Completed, "success"]
+    ["Planned in period", today.tasks.length],
+    ["Not Started", today.counts["Not Started"]],
+    ["In Progress", today.counts["In Progress"]],
+    ["Paused", today.counts.Paused],
+    ["Blocked / Can't Start", today.blocked],
+    ["Completed", today.counts.Completed]
   ] as const;
 
   return (
@@ -85,7 +85,7 @@ export function TrialTodayView({ state, onOpenTask, onAction }: { state: TrialSt
         status="Synthetic operational trial"
       />
       <section className="status-strip" aria-label="Derived execution state and attention summary">
-        {counts.map(([label, value, tone]) => <div key={label}><span>{label}</span><strong>{value}</strong><StatusLabel tone={tone}>{label}</StatusLabel></div>)}
+        {counts.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </section>
       <section className="split-layout">
         <article className="table-panel wide-panel">
@@ -171,7 +171,7 @@ function TrialTaskTable({
             <td className={projection.attention.length === 0 ? "muted" : "attention-text"}>{projection.attention.join(" · ") || "None"}</td>
             <td>{projection.trackingOwner?.name ?? "Unassigned"}</td>
             <td>{formatTrialWindow(task.plannedStart, task.plannedFinish)}</td>
-            <td><strong>{projection.progressPercent}%</strong></td>
+            <td><strong>{projection.progressPercent}%</strong>{projection.latestFieldProgressObservation ? <small>Field observation · {formatTrialTime(projection.latestFieldProgressObservation.at)}{projection.executionState === "Not Started" ? " · does not establish Start" : ""}</small> : null}</td>
             <td>{projection.lastActivityAt === null ? "No activity" : formatTrialTime(projection.lastActivityAt)}</td>
           </tr>;
         })}</tbody>
@@ -200,7 +200,7 @@ export function TrialTaskDashboard({ state, taskId, backLabel, onBack, onAction,
         <label><span>Reassign Tier 2 tracking responsibility</span><select value={projection.trackingOwner?.id ?? ""} onChange={(event) => onAction({ type: "assign-tier2", taskId: task.id, tier2UserId: event.target.value, actorId: "tier1-dana" })}><option value="" disabled>Choose Tier 2</option>{tier2Users.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select></label>
         <span>Local trial action · Tier 2 retains responsibility after Tier 3 delegation.</span>
       </div>
-      <nav className="section-tabs" aria-label="Task Dashboard sections">{taskDashboardSections.map((section) => <button type="button" className={activeSection === section ? "selected" : ""} onClick={() => setActiveSection(section)} key={section}>{section}</button>)}</nav>
+      <nav className="section-tabs" aria-label="Task Dashboard sections">{taskDashboardSections.map((section) => <button type="button" className={activeSection === section ? "selected" : ""} aria-current={activeSection === section ? "page" : undefined} onClick={() => setActiveSection(section)} key={section}>{section}</button>)}</nav>
       <section className="detail-panel trial-dashboard-panel">
         {activeSection === "Overview" && <OverviewPanel projection={projection} />}
         {activeSection === "Execution" && <ExecutionPanel state={state} taskId={task.id} />}
@@ -217,7 +217,8 @@ export function TrialTaskDashboard({ state, taskId, backLabel, onBack, onAction,
 }
 
 function OverviewPanel({ projection }: { projection: TaskProjection }) {
-  return <><PanelHeading title="Overview" detail="One operational record for the selected task." /><dl className="detail-list"><div><dt>Planned window</dt><dd>{formatTrialWindow(projection.task.plannedStart, projection.task.plannedFinish)}</dd></div><div><dt>Tracker progress</dt><dd>{projection.progressPercent}%</dd></div><div><dt>Field assignments</dt><dd>{projection.fieldAssignments.length}</dd></div><div><dt>Critical context</dt><dd>{projection.criticalItems.length > 0 ? `${projection.criticalItems.length} configured item(s)` : "Not selected"}</dd></div></dl></>;
+  const fieldObservation = projection.latestFieldProgressObservation;
+  return <><PanelHeading title="Overview" detail="One operational record for the selected task." /><dl className="detail-list"><div><dt>Planned window</dt><dd>{formatTrialWindow(projection.task.plannedStart, projection.task.plannedFinish)}</dd></div><div><dt>{fieldObservation ? "Tracker field observation" : "Tracker progress"}</dt><dd>{projection.progressPercent}%{fieldObservation ? ` · ${formatTrialTime(fieldObservation.at)}` : ""}</dd></div><div><dt>Field assignments</dt><dd>{projection.fieldAssignments.length}</dd></div><div><dt>Critical context</dt><dd>{projection.criticalItems.length > 0 ? `${projection.criticalItems.length} configured item(s)` : "Not selected"}</dd></div></dl>{fieldObservation && projection.executionState === "Not Started" ? <div className="rule-note"><strong>Progress provenance</strong><span>Field progress does not establish Start. Execution remains Not Started until valid imported start/progress evidence or a Tracker Start event exists.</span></div> : null}</>;
 }
 
 function ExecutionPanel({ state, taskId }: { state: TrialState; taskId: string }) {
@@ -402,7 +403,8 @@ function GuidedTrial({ state, onAction }: { state: TrialState; onAction: TrialAc
 
 function executionTone(state: TaskProjection["executionState"]): StatusTone {
   if (state === "Completed") return "success";
-  if (state === "Paused" || state === "Not Started") return "warning";
+  if (state === "Paused") return "warning";
+  if (state === "Not Started") return "neutral";
   return "info";
 }
 

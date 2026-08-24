@@ -41,6 +41,8 @@ The named persona selector is a product-review tool:
 
 The Mobile trial also provides compact simulated-clock controls and the optional guided checklist. Reset restores the exact fixed state and removes generated actions, assignments, execution events, progress observations, policy changes, obligations, reports, corrections, problems, and history.
 
+Assigned work is presented before the collapsed trial controls. The trial rejects same-minute duplicate `Can't Start` observations and identical active Tier 3 assignment no-ops, then closes successful action disclosures. Submitted field progress remains explicitly identified as a Tracker observation and does not establish Start when execution evidence is absent. Reset also restores the default Tier 2 persona and Assigned Tasks list.
+
 When Console opens Mobile as a linked trial window, Mobile receives the Console's canonical in-memory state and sends typed trial actions back through a strictly validated `window.opener`/`postMessage` bridge. The Console origin is carried in the `trialHostOrigin` query parameter. This bridge is ephemeral, uses no browser or server persistence, and is not a production sync/API design. Standalone Mobile trial mode applies the same shared reducer locally.
 
 See [Deterministic Operational Trial](../../docs/product/deterministic-operational-trial.md) for the scenario, clock, guided sequence, and review questions.

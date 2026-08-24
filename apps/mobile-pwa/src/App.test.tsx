@@ -247,6 +247,15 @@ describe("mobile deterministic operational trial", () => {
     }
   });
 
+  it("places assigned work before secondary trial diagnostics", () => {
+    const html = normalizeMarkup(renderToString(<App trialMode />));
+
+    expect(html.indexOf("Assigned work")).toBeGreaterThan(-1);
+    expect(html.indexOf("Trial controls and guided review")).toBeGreaterThan(html.indexOf("Assigned work"));
+    expect(html).toContain("<details class=\"trial-tools\"");
+    expect(html).not.toContain("trial-transport-strip");
+  });
+
   it("renders Tier 3 Can't Start and Start without manual execution time fields", () => {
     const html = normalizeMarkup(renderToString(
       <App
@@ -275,9 +284,9 @@ describe("mobile deterministic operational trial", () => {
       createProblem: true,
       createAction: true
     });
-    const html = renderToString(
+    const html = normalizeMarkup(renderToString(
       <TrialMobileApp initialState={state} initialUserId="tier3-riley" initialTaskId="task-scaffold-access" />
-    ).replaceAll("&#x27;", "'");
+    ));
 
     expect(html).toContain("Not Started");
     expect(html).toContain("Late to Start");
@@ -285,6 +294,10 @@ describe("mobile deterministic operational trial", () => {
     expect(html).toContain("This start is late against the accepted planned start.");
     expect(html).toContain("What caused the late start?");
     expect(html).toContain("Access or scaffold unavailable");
+    expect(html).toContain("Can't Start recorded at 07:00");
+    expect(html).toContain("Advance the simulated time before recording another distinct Can't Start observation.");
+    expect(html).not.toContain("Record Can't Start at 07:00");
+    expect(html).toContain("Start at 07:00");
   });
 
   it("renders Pause, Resume, and Finish according to the derived execution state", () => {
@@ -333,13 +346,15 @@ describe("mobile deterministic operational trial", () => {
       <App trialMode initialTrialUserId="tier2-avery" initialTaskId="task-permit-release" />
     );
 
-    expect(morgan).toContain("Assign direct-report Tier 3");
+    expect(morgan).toContain("Assign or update direct-report Tier 3");
     expect(morgan).toContain("Riley Jones");
     expect(morgan).toContain("Sam Patel");
     expect(morgan).toContain("Jamie Chen");
     expect(morgan).not.toContain(">Drew Wilson</option>");
     expect(morgan).toContain("WORKING_ON");
     expect(morgan).toContain("FIELD_CONTROL");
+    expect(morgan).toContain("This exact field assignment is already active.");
+    expect(morgan).toMatch(/<button type="submit" disabled="">Assign field work<\/button>/);
     expect(morgan).toContain("retains Tier 2 tracking responsibility");
     expect(avery).toContain("Casey Brown");
     expect(avery).toContain("Drew Wilson");
@@ -387,6 +402,28 @@ describe("mobile deterministic operational trial", () => {
     expect(shifted).toContain("What remains?");
     expect(shifted).toContain("Issue affecting the next shift");
     expect(shifted).not.toMatch(/% Work Complete|Physical % Complete/i);
+  });
+
+  it("shows a submitted field observation without changing Not Started execution", () => {
+    let state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 1080 });
+    const need = state.shiftProgressNeeds.find((candidate) => candidate.taskId === "task-night-handover" && candidate.userId === "tier3-casey")!;
+    state = applyTrialAction(state, {
+      type: "end-shift-progress",
+      needId: need.id,
+      actorId: "tier3-casey",
+      completionPercent: 45,
+      remainingWork: "Complete liner reinstatement and inspection",
+      nextShiftIssue: "Await final liner set"
+    });
+    const html = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier3-casey" initialTaskId="task-night-handover" />
+    ));
+
+    expect(html).toContain("Not Started");
+    expect(html).toContain("Tracker field observation · 45% complete");
+    expect(html).toContain("Complete liner reinstatement and inspection");
+    expect(html).toContain("This field observation does not establish Start; execution remains Not Started.");
+    expect(html).not.toContain("How much of the task is complete?");
   });
 
   it("normalizes only HTTP(S) Console host origins for the optional bridge", () => {

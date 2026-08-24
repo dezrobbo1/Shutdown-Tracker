@@ -23,7 +23,8 @@ export function StatusLabel({ children, tone = "neutral" }: { children: ReactNod
 
 function stateTone(state: OperationalTask["state"]): StatusTone {
   if (state === "Completed") return "success";
-  if (state === "Paused" || state === "Not Started") return "warning";
+  if (state === "Paused") return "warning";
+  if (state === "Not Started") return "neutral";
   return "info";
 }
 
@@ -109,14 +110,14 @@ export function ProjectsHome({ onOpenProject, trialProject }: { onOpenProject: (
 
 export function TodayView({ onOpenTask }: { onOpenTask: (taskId: string) => void }) {
   const counts = [
-    ["Planned in period", "5", "neutral"], ["Not Started", "1", "warning"], ["In Progress", "1", "info"],
-    ["Paused", "2", "warning"], ["Blocked / delayed", "1", "danger"], ["Completed", "1", "success"]
+    ["Planned in period", "5"], ["Not Started", "1"], ["In Progress", "1"],
+    ["Paused", "2"], ["Blocked / delayed", "1"], ["Completed", "1"]
   ] as const;
   return (
     <>
       <PageHeading eyebrow="Today · configurable 24-hour view" title="Operational day" description="24 August 2026 · 06:00 to 25 August 2026 · 06:00 · Australia/Perth" status="Static visual only" />
       <section className="status-strip" aria-label="Execution state and operational condition summary">
-        {counts.map(([label, value, tone]) => <div key={label}><span>{label}</span><strong>{value}</strong><StatusLabel tone={tone}>{label}</StatusLabel></div>)}
+        {counts.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
       </section>
       <section className="split-layout">
         <article className="table-panel wide-panel">
@@ -199,7 +200,7 @@ export function TaskDashboard({ taskId, backLabel, onBack }: { taskId: string; b
         <div><span>Schedule attention</span><strong>{task.attention}</strong><small>Attention does not change execution state.</small></div>
         <div><span>Tier 2 tracking owner</span><strong>{task.tier2Owner}</strong><small>Tier 1 retains unrestricted project authority.</small></div>
       </section>
-      <nav className="section-tabs" aria-label="Task Dashboard sections">{taskDashboardSections.map((section, index) => <button type="button" className={index === 0 ? "selected" : ""} disabled={index !== 0} key={section}>{section}</button>)}</nav>
+      <nav className="section-tabs" aria-label="Task Dashboard sections">{taskDashboardSections.map((section, index) => <button type="button" className={index === 0 ? "selected" : ""} aria-current={index === 0 ? "page" : undefined} disabled={index !== 0} key={section}>{section}</button>)}</nav>
       <section className="dashboard-grid">
         <article className="detail-panel"><PanelHeading title="Overview" detail="One operational record for this task." /><dl className="detail-list"><div><dt>Planned window</dt><dd>{task.planned}</dd></div><div><dt>Progress</dt><dd>{task.progress}%</dd></div><div><dt>Last update</dt><dd>{task.lastUpdate}</dd></div><div><dt>Project context</dt><dd>Accepted snapshot v4 · imported read-only schedule context</dd></div></dl></article>
         <article className="detail-panel"><PanelHeading title="Operational record" detail="Task-owned surfaces; no competing applications." /><ul className="record-list"><li><strong>Execution</strong><span>Can't Start, Start, Pause, Resume, and Finish · action times recorded automatically</span></li><li><strong>Discussion</strong><span>Unstructured collaboration and @mentions</span></li><li><strong>Delays / Problems</strong><span>Structured impact and ownership</span></li><li><strong>Actions</strong><span>Owned due work</span></li><li><strong>Evidence</strong><span>Task-linked files and metadata</span></li><li><strong>History</strong><span>Immutable activity trail</span></li></ul></article>
@@ -254,7 +255,7 @@ export function ProjectSettingsView({ initialSection = "General" }: { initialSec
   return (
     <>
       <PageHeading eyebrow="Project Settings · Tier 1" title="Project configuration" description="Configuration shells are visible for review. Production settings APIs are not implemented." status="Static visual only" />
-      <nav className="section-tabs" aria-label="Project Settings sections">{settingsSections.map((section) => <button type="button" className={active === section ? "selected" : ""} onClick={() => setActive(section)} key={section}>{section}</button>)}</nav>
+      <nav className="section-tabs" aria-label="Project Settings sections">{settingsSections.map((section) => <button type="button" className={active === section ? "selected" : ""} aria-current={active === section ? "page" : undefined} onClick={() => setActive(section)} key={section}>{section}</button>)}</nav>
       <section className="settings-panel">{active === "General" && <GeneralSettings />}{active === "Users" && <UsersSettings />}{active === "Operational Mapping" && <MappingSettings />}{active === "Project History" && <ProjectHistory />}{active === "Lifecycle" && <LifecycleSettings />}</section>
     </>
   );

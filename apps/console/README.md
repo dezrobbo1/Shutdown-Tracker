@@ -39,6 +39,8 @@ The Console trial provides:
 - Tier 2 reporting-owner, template, supported timing/trigger, controlled-content, and policy-version configuration; and
 - an optional guided checklist that does not advance time automatically or prevent free interaction.
 
+Review refinements keep the Task Dashboard section controls wrapped at normal desktop widths, reduce future-obligation activity noise without removing obligation records, label field-observation progress separately from execution state, and return Reset to Today with no task selected.
+
 Every generated assignment, execution fact, problem/action, Critical policy, obligation, report, correction, and history entry is synthetic and discarded on Reset or reload. None is sent to the production API.
 
 For an optional linked review session, configure:

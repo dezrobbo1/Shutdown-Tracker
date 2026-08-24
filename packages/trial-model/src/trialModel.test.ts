@@ -88,6 +88,26 @@ describe("deterministic operational trial model", () => {
     expect(state.executionEvents.at(-1)).toMatchObject({ type: "cant-start", at: 360 });
   });
 
+  it("prevents an accidental same-minute Can't Start repeat but permits a later observation", () => {
+    const action = {
+      type: "cant-start" as const,
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Scaffold access unavailable",
+      whatIsNeeded: "Access team to release the scaffold",
+      createProblem: false,
+      createAction: false
+    };
+    const recorded = applyTrialAction(createInitialTrialState(), action);
+
+    expect(() => applyTrialAction(recorded, action)).toThrow(/already been recorded.*current simulated time/i);
+    expect(recorded.executionEvents.filter((event) => event.taskId === action.taskId && event.type === "cant-start")).toHaveLength(1);
+
+    const later = applyTrialAction(applyTrialAction(recorded, { type: "advance-minutes", minutes: 15 }), action);
+    expect(later.executionEvents.filter((event) => event.taskId === action.taskId && event.type === "cant-start")).toHaveLength(2);
+    expect(later.executionEvents.at(-1)?.at).toBe(375);
+  });
+
   it("uses a system-timestamped Start and requires late-start context", () => {
     const late = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 420 });
 
@@ -164,6 +184,11 @@ describe("deterministic operational trial model", () => {
     });
     expect(selectShiftProgressNeedsForUser(updated, "tier3-casey").some((candidate) => candidate.id === need!.id)).toBe(false);
     expect(updated.progressObservations.at(-1)).toMatchObject({ completionPercent: 45, shiftBoundary: 1080 });
+    expect(selectTaskProjection(updated, "task-night-handover")).toMatchObject({
+      executionState: "Not Started",
+      progressPercent: 45,
+      latestFieldProgressObservation: { completionPercent: 45, remainingWork: "Complete liner reinstatement and inspection" }
+    });
   });
 
   it("updates Tier 2 projections when Tier 1 changes tracking responsibility", () => {
@@ -189,6 +214,52 @@ describe("deterministic operational trial model", () => {
 
     expect(selectTasksForUser(changed, "tier3-sam").some((item) => item.task.id === "task-scaffold-access")).toBe(true);
     expect(selectTasksForUser(changed, "tier3-drew").some((item) => item.task.id === "task-scaffold-access")).toBe(false);
+  });
+
+  it("rejects an identical active Tier 3 assignment while allowing a relationship update", () => {
+    const initial = createInitialTrialState();
+    const noOp = {
+      type: "assign-tier3" as const,
+      taskId: "task-access-cover",
+      tier2UserId: "tier2-morgan",
+      tier3UserId: "tier3-riley",
+      relationship: "WORKING_ON" as const
+    };
+
+    expect(() => applyTrialAction(initial, noOp)).toThrow(/already active/i);
+    expect(initial.fieldAssignments.filter((assignment) => assignment.taskId === noOp.taskId && assignment.active)).toHaveLength(1);
+
+    const updated = applyTrialAction(initial, { ...noOp, relationship: "FIELD_CONTROL" });
+    expect(updated.fieldAssignments.filter((assignment) => assignment.taskId === noOp.taskId && assignment.active)).toEqual([
+      expect.objectContaining({ tier3UserId: "tier3-riley", relationship: "FIELD_CONTROL" })
+    ]);
+    expect(updated.history.at(-1)?.type).toBe("assignment-tier3");
+  });
+
+  it("creates future Critical obligations without flooding activity history", () => {
+    const initial = createInitialTrialState();
+    const configured = applyTrialAction(initial, {
+      type: "configure-critical",
+      criticalItemId: "critical-scaffold",
+      actorId: "tier1-dana",
+      policy: {
+        ownerUserId: "tier2-morgan",
+        templateId: "template-two-hour-task",
+        mechanisms: ["interval", "fixed-time"],
+        intervalMinutes: 120,
+        fixedTimes: [600],
+        triggers: [],
+        requiredFields: ["progress", "condition"]
+      }
+    });
+    const addedHistory = configured.history.slice(initial.history.length);
+    const currentPolicy = configured.criticalPolicies.find((policy) => policy.criticalItemId === "critical-scaffold" && policy.version === 2)!;
+
+    expect(configured.criticalObligations.some((obligation) => obligation.policyVersionId === currentPolicy.id)).toBe(true);
+    expect(addedHistory.map((event) => event.type)).toEqual(["critical-configured"]);
+
+    const due = applyTrialAction(configured, { type: "advance-to", minute: 480 });
+    expect(due.history.some((event) => event.type === "report-due" && event.at === 480)).toBe(true);
   });
 
   it("derives interval, fixed-time, shift and event reporting obligations", () => {
@@ -249,6 +320,7 @@ describe("deterministic operational trial model", () => {
     expect(today.counts.Paused).toBeGreaterThan(0);
     expect(today.lateStarts).toBeGreaterThan(0);
     expect(today.activeProblems).toBeGreaterThan(0);
+    expect(today.recentActivity.length).toBeLessThanOrEqual(6);
     expect(history.map((item) => item.type)).toEqual(expect.arrayContaining(["cant-start", "problem-created"]));
   });
 

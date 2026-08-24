@@ -79,6 +79,8 @@ function assignTier3(state: TrialState, taskId: string, tier2UserId: string, tie
   const currentTracking = state.trackingAssignments.some((assignment) => assignment.taskId === taskId && assignment.tier2UserId === tier2UserId && assignment.active);
   if (!currentTracking) throw new Error("Tier 2 can assign only work they currently track.");
   if (!selectDirectReports(state, tier2UserId).some((user) => user.id === tier3UserId)) throw new Error("Tier 3 must be a direct report of the tracking Tier 2 user.");
+  const identicalAssignment = state.fieldAssignments.some((assignment) => assignment.taskId === taskId && assignment.tier2UserId === tier2UserId && assignment.tier3UserId === tier3UserId && assignment.relationship === relationship && assignment.active);
+  if (identicalAssignment) throw new Error("That Tier 3 assignment is already active. Choose another direct report or relationship to make a change.");
   for (const assignment of state.fieldAssignments) {
     if (assignment.taskId === taskId && assignment.tier3UserId === tier3UserId && assignment.active) assignment.active = false;
   }
@@ -90,6 +92,8 @@ function assignTier3(state: TrialState, taskId: string, tier2UserId: string, tie
 function recordCantStart(state: TrialState, action: Extract<TrialAction, { type: "cant-start" }>) {
   requireExecutableTask(state, action.taskId);
   if (selectExecutionState(state, action.taskId) !== "Not Started") throw new Error("Can't Start is available only before execution begins.");
+  const recordedAtCurrentTime = state.executionEvents.some((event) => event.taskId === action.taskId && event.type === "cant-start" && event.at === state.now);
+  if (recordedAtCurrentTime) throw new Error("Can't Start has already been recorded for this task at the current simulated time.");
   requireNonBlank(action.reason, "Can't Start reason");
   requireNonBlank(action.whatIsNeeded, "What must happen");
   let problemId: string | undefined;
@@ -299,7 +303,6 @@ function schedulePolicyObligations(state: TrialState, item: CriticalItem, policy
   for (const candidate of candidates.sort((left, right) => left.dueAt - right.dueAt)) {
     const obligation: CriticalObligation = { id: nextId(state, "obligation"), criticalItemId: item.id, policyVersionId: policy.id, ownerUserId: policy.ownerUserId, createdAt: state.now, dueAt: candidate.dueAt, mechanism: candidate.mechanism };
     state.criticalObligations.push(obligation);
-    appendHistory(state, "report-obligation", policy.ownerUserId, `Policy v${policy.version} scheduled a ${candidate.mechanism} obligation for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
   }
 }
 

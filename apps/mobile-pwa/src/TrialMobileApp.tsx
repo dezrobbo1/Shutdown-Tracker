@@ -5,6 +5,7 @@ import {
   REPORTING_FIELD_LABELS,
   REPORTING_MECHANISM_LABELS,
   TRIAL_DAY_END_MINUTE,
+  TRIAL_START_MINUTE,
   applyTrialAction,
   createInitialTrialState,
   formatTrialDateTime,
@@ -36,6 +37,7 @@ type TrialMobileAppProps = {
 };
 
 const DEFAULT_USER_ID = "tier2-morgan";
+type TrialDispatch = (action: TrialAction) => boolean;
 
 export function TrialMobileApp({
   initialState,
@@ -48,6 +50,10 @@ export function TrialMobileApp({
   const [actionError, setActionError] = useState<string | null>(null);
   const acceptHostState = useCallback((nextState: TrialState) => {
     setState(nextState);
+    if (isCanonicalResetState(nextState)) {
+      setUserId(DEFAULT_USER_ID);
+      setSelectedTaskId(null);
+    }
     setActionError(null);
   }, []);
   const { connectedToHost, sendAction } = useTrialBridge(acceptHostState);
@@ -67,9 +73,15 @@ export function TrialMobileApp({
     try {
       const nextState = applyTrialAction(state, action);
       if (!sendAction(action)) setState(nextState);
+      if (action.type === "reset") {
+        setUserId(DEFAULT_USER_ID);
+        setSelectedTaskId(null);
+      }
       setActionError(null);
+      return true;
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "The trial action could not be applied.");
+      return false;
     }
   }, [sendAction, state]);
 
@@ -95,10 +107,8 @@ export function TrialMobileApp({
         <section className="trial-boundary" aria-label="Trial boundary">
           <strong>Synthetic operational trial</strong>
           <span>Deterministic local state · No production persistence</span>
-          <small>{connectedToHost ? "Connected to the Console trial host." : "Standalone in-memory trial session."}</small>
+          <small>{formatTrialDateTime(state.now)} simulated · {connectedToHost ? "Connected to the Console trial host." : "Standalone in-memory trial session."}</small>
         </section>
-
-        <TrialClock state={state} dispatch={dispatch} />
 
         <label className="persona-control">
           <span>Trial persona</span>
@@ -120,11 +130,6 @@ export function TrialMobileApp({
           </select>
         </label>
 
-        <div className="trial-transport-strip" role="status">
-          <strong>Trial state</strong>
-          <span>Local simulation only · No server write or production sync</span>
-        </div>
-
         {actionError ? <p className="trial-error" role="alert">{actionError}</p> : null}
 
         {selectedTask ? (
@@ -142,12 +147,17 @@ export function TrialMobileApp({
             onOpenTask={setSelectedTaskId}
           />
         )}
+
+        <details className="trial-tools">
+          <summary><span>Trial controls and guided review</span><strong>{formatTrialTime(state.now)} simulated</strong></summary>
+          <TrialClock state={state} dispatch={dispatch} />
+        </details>
       </main>
     </div>
   );
 }
 
-function TrialClock({ state, dispatch }: { state: TrialState; dispatch: (action: TrialAction) => void }) {
+function TrialClock({ state, dispatch }: { state: TrialState; dispatch: TrialDispatch }) {
   const nextEvent = nextGuidedEventMinute(state);
   const nextReport = nextReportDueMinute(state);
   const nextShift = nextShiftBoundaryMinute(state);
@@ -227,9 +237,13 @@ function TrialAssignedTasks({
               </div>
               <dl className="task-card-facts">
                 <div><dt>Planned</dt><dd>{formatTrialWindow(projection.task.plannedStart, projection.task.plannedFinish)}</dd></div>
-                <div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div>
+                <div>
+                  <dt>{projection.latestFieldProgressObservation ? "Field observation" : "Progress"}</dt>
+                  <dd>{projection.progressPercent}%{projection.latestFieldProgressObservation ? " complete" : ""}</dd>
+                </div>
                 <div><dt>Assignment</dt><dd>{relationship}</dd></div>
               </dl>
+              {hasUnstartedFieldProgress(projection) ? <p className="field-progress-note">Field progress recorded without a Tracker Start. Execution remains Not Started.</p> : null}
               <div className="task-card-footer">
                 <div className="status-row">
                   {projection.attention.slice(0, 2).map((attention) => <TrialStatus key={attention} label={attention} tone={attentionTone(attention)} />)}
@@ -257,7 +271,7 @@ function TrialTaskDetail({
   state: TrialState;
   user: TrialUser;
   projection: TaskProjection;
-  dispatch: (action: TrialAction) => void;
+  dispatch: TrialDispatch;
   onBack: () => void;
 }) {
   const task = projection.task;
@@ -283,11 +297,15 @@ function TrialTaskDetail({
       <TrialDetailSection title="Overview">
         <dl className="detail-facts">
           <div><dt>Execution state</dt><dd>{projection.executionState}</dd></div>
-          <div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div>
+          <div>
+            <dt>{projection.latestFieldProgressObservation ? "Tracker field observation" : "Progress"}</dt>
+            <dd>{projection.progressPercent}%{projection.latestFieldProgressObservation ? ` at ${formatTrialTime(projection.latestFieldProgressObservation.at)}` : ""}</dd>
+          </div>
           <div><dt>Planned window</dt><dd>{formatTrialWindow(task.plannedStart, task.plannedFinish)}</dd></div>
           <div><dt>Attention</dt><dd>{projection.attention.join(" · ") || "No current attention condition"}</dd></div>
         </dl>
         <p className="state-basis"><strong>State basis:</strong> {projection.stateBasis}</p>
+        {hasUnstartedFieldProgress(projection) ? <p className="field-progress-note"><strong>Field observation:</strong> Progress does not establish Start; execution remains Not Started until valid imported start/progress evidence or a Tracker Start event exists.</p> : null}
       </TrialDetailSection>
 
       <TrialDetailSection title="Execution">
@@ -301,6 +319,8 @@ function TrialTaskDetail({
       <TrialDetailSection title="End-of-shift progress">
         {shiftNeed ? (
           <EndShiftProgressForm need={shiftNeed} taskName={task.name} user={user} dispatch={dispatch} />
+        ) : projection.latestFieldProgressObservation ? (
+          <SubmittedFieldProgress projection={projection} />
         ) : (
           <p>No unfinished-work update is due for this persona and task at the current simulated time.</p>
         )}
@@ -371,10 +391,14 @@ function TrialExecutionControls({
   state: TrialState;
   user: TrialUser;
   projection: TaskProjection;
-  dispatch: (action: TrialAction) => void;
+  dispatch: TrialDispatch;
 }) {
+  const [openAction, setOpenAction] = useState<string | null>(null);
   const task = projection.task;
   const late = state.now > task.plannedStart;
+  const cantStartRecordedAtCurrentTime = state.executionEvents
+    .filter((event) => event.taskId === task.id && event.type === "cant-start" && event.at === state.now)
+    .sort((left, right) => right.id.localeCompare(left.id))[0];
   const activePause = state.pauseIntervals
     .filter((pause) => pause.taskId === task.id && pause.endedAt === undefined)
     .sort((left, right) => right.startedAt - left.startedAt)[0];
@@ -387,10 +411,13 @@ function TrialExecutionControls({
       <p className="execution-time-rule"><strong>All action times use the simulated clock: {formatTrialTime(state.now)}.</strong> There is no manual date/time entry or backdating.</p>
       {projection.executionState === "Not Started" ? (
         <>
-          <ActionDisclosure label="Can't Start">
+          {cantStartRecordedAtCurrentTime ? (
+            <p className="completed-copy"><strong>Can't Start recorded at {formatTrialTime(cantStartRecordedAtCurrentTime.at)}.</strong> Execution remains Not Started. Advance the simulated time before recording another distinct Can't Start observation.</p>
+          ) : <ActionDisclosure label="Can't Start" open={openAction === "cant-start"} onOpenChange={(open) => setOpenAction(open ? "cant-start" : null)}>
             <form className="trial-form" onSubmit={(event) => {
+              const form = event.currentTarget;
               const data = formData(event);
-              dispatch({
+              const applied = dispatch({
                 type: "cant-start",
                 taskId: task.id,
                 actorId: user.id,
@@ -399,6 +426,10 @@ function TrialExecutionControls({
                 createProblem: data.get("createProblem") === "yes",
                 createAction: data.get("createAction") === "yes"
               });
+              if (applied) {
+                form.reset();
+                setOpenAction(null);
+              }
             }}>
               <label>Structured reason<select name="reason" required defaultValue=""><option value="" disabled>Choose reason</option><option>Access or scaffold unavailable</option><option>Permit or isolation unavailable</option><option>Material unavailable</option><option>Resource unavailable</option><option>Other operational constraint</option></select></label>
               <label>What needs to happen?<textarea name="whatIsNeeded" required rows={3} /></label>
@@ -407,17 +438,22 @@ function TrialExecutionControls({
               <button type="submit">Record Can't Start at {formatTrialTime(state.now)}</button>
               <small>Execution remains Not Started. Late to Start is shown separately when applicable.</small>
             </form>
-          </ActionDisclosure>
-          <ActionDisclosure label="Start">
+          </ActionDisclosure>}
+          <ActionDisclosure label="Start" open={openAction === "start"} onOpenChange={(open) => setOpenAction(open ? "start" : null)}>
             <form className="trial-form" onSubmit={(event) => {
+              const form = event.currentTarget;
               const data = formData(event);
-              dispatch({
+              const applied = dispatch({
                 type: "start",
                 taskId: task.id,
                 actorId: user.id,
                 lateCause: optionalString(data, "lateCause"),
                 actionStillNeeded: optionalString(data, "actionStillNeeded")
               });
+              if (applied) {
+                form.reset();
+                setOpenAction(null);
+              }
             }}>
               {late ? (
                 <>
@@ -434,11 +470,12 @@ function TrialExecutionControls({
 
       {projection.executionState === "In Progress" ? (
         <>
-          <ActionDisclosure label="Pause">
+          <ActionDisclosure label="Pause" open={openAction === "pause"} onOpenChange={(open) => setOpenAction(open ? "pause" : null)}>
             <form className="trial-form" onSubmit={(event) => {
+              const form = event.currentTarget;
               const data = formData(event);
               const adverseDelay = data.get("classification") === "adverse";
-              dispatch({
+              const applied = dispatch({
                 type: "pause",
                 taskId: task.id,
                 actorId: user.id,
@@ -447,6 +484,10 @@ function TrialExecutionControls({
                 whatIsNeeded: requiredString(data, "whatIsNeeded"),
                 createAction: data.get("createAction") === "yes"
               });
+              if (applied) {
+                form.reset();
+                setOpenAction(null);
+              }
             }}>
               <label>Pause reason<select name="reason" required defaultValue=""><option value="" disabled>Choose reason</option><option>Planned break or shift change</option><option>Await material</option><option>Await access or permit</option><option>Safety or quality hold</option><option>Other field interruption</option></select></label>
               <label>Classification<select name="classification" required defaultValue="normal"><option value="normal">Normal pause — not an adverse delay</option><option value="adverse">Adverse delay — create linked problem</option></select></label>
@@ -455,10 +496,10 @@ function TrialExecutionControls({
               <button type="submit">Pause at {formatTrialTime(state.now)}</button>
             </form>
           </ActionDisclosure>
-          <ActionDisclosure label="Finish">
+          <ActionDisclosure label="Finish" open={openAction === "finish"} onOpenChange={(open) => setOpenAction(open ? "finish" : null)}>
             <form className="trial-form" onSubmit={(event) => {
               event.preventDefault();
-              dispatch({ type: "finish", taskId: task.id, actorId: user.id });
+              if (dispatch({ type: "finish", taskId: task.id, actorId: user.id })) setOpenAction(null);
             }}>
               <p>Confirm this assigned task is complete. Completion time will be recorded automatically.</p>
               {task.evidenceRequirement ? (
@@ -474,10 +515,11 @@ function TrialExecutionControls({
       ) : null}
 
       {projection.executionState === "Paused" ? (
-        <ActionDisclosure label="Resume">
+        <ActionDisclosure label="Resume" open={openAction === "resume"} onOpenChange={(open) => setOpenAction(open ? "resume" : null)}>
           <form className="trial-form" onSubmit={(event) => {
+            const form = event.currentTarget;
             const data = formData(event);
-            dispatch({
+            const applied = dispatch({
               type: "resume",
               taskId: task.id,
               actorId: user.id,
@@ -485,6 +527,10 @@ function TrialExecutionControls({
                 ? requiredString(data, "issueResolution") as "resolved" | "remains-open"
                 : "not-applicable"
             });
+            if (applied) {
+              form.reset();
+              setOpenAction(null);
+            }
           }}>
             {linkedProblem ? (
               <>
@@ -502,32 +548,39 @@ function TrialExecutionControls({
   );
 }
 
-function Tier3AssignmentForm({ state, user, taskId, dispatch }: { state: TrialState; user: TrialUser; taskId: string; dispatch: (action: TrialAction) => void }) {
+function Tier3AssignmentForm({ state, user, taskId, dispatch }: { state: TrialState; user: TrialUser; taskId: string; dispatch: TrialDispatch }) {
   const reports = selectDirectReports(state, user.id);
+  const initialAssignment = state.fieldAssignments.find((assignment) => assignment.taskId === taskId && assignment.tier2UserId === user.id && assignment.active && reports.some((report) => report.id === assignment.tier3UserId));
+  const [open, setOpen] = useState(false);
+  const [tier3UserId, setTier3UserId] = useState(initialAssignment?.tier3UserId ?? reports[0]?.id ?? "");
+  const [relationship, setRelationship] = useState<Tier3Relationship>(initialAssignment?.relationship ?? "WORKING_ON");
   if (reports.length === 0) return <p className="restricted-copy">No active direct-report Tier 3 user is available in this synthetic scenario.</p>;
+  const identicalAssignment = state.fieldAssignments.some((assignment) => assignment.taskId === taskId && assignment.tier2UserId === user.id && assignment.tier3UserId === tier3UserId && assignment.relationship === relationship && assignment.active);
   return (
-    <details className="action-disclosure">
-      <summary>Assign direct-report Tier 3</summary>
+    <details className="action-disclosure" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
+      <summary>Assign or update direct-report Tier 3</summary>
       <form className="trial-form" onSubmit={(event) => {
-        const data = formData(event);
-        dispatch({
+        event.preventDefault();
+        const applied = dispatch({
           type: "assign-tier3",
           taskId,
           tier2UserId: user.id,
-          tier3UserId: requiredString(data, "tier3UserId"),
-          relationship: requiredString(data, "relationship") as Tier3Relationship
+          tier3UserId,
+          relationship
         });
+        if (applied) setOpen(false);
       }}>
-        <label>Direct report<select name="tier3UserId" required defaultValue={reports[0]?.id}>{reports.map((report) => <option key={report.id} value={report.id}>{report.name}</option>)}</select></label>
-        <label>Assignment relationship<select name="relationship" required defaultValue="WORKING_ON"><option value="WORKING_ON">WORKING_ON</option><option value="FIELD_CONTROL">FIELD_CONTROL</option></select></label>
-        <button type="submit">Assign field work</button>
+        <label>Direct report<select name="tier3UserId" required value={tier3UserId} onChange={(event) => setTier3UserId(event.target.value)}>{reports.map((report) => <option key={report.id} value={report.id}>{report.name}</option>)}</select></label>
+        <label>Assignment relationship<select name="relationship" required value={relationship} onChange={(event) => setRelationship(event.target.value as Tier3Relationship)}><option value="WORKING_ON">WORKING_ON</option><option value="FIELD_CONTROL">FIELD_CONTROL</option></select></label>
+        <button type="submit" disabled={identicalAssignment}>Assign field work</button>
+        {identicalAssignment ? <p className="assignment-current">This exact field assignment is already active. Choose another direct report or relationship to make a change.</p> : null}
         <small>{user.name} retains Tier 2 tracking responsibility.</small>
       </form>
     </details>
   );
 }
 
-function EndShiftProgressForm({ need, taskName, user, dispatch }: { need: ShiftProgressNeed; taskName: string; user: TrialUser; dispatch: (action: TrialAction) => void }) {
+function EndShiftProgressForm({ need, taskName, user, dispatch }: { need: ShiftProgressNeed; taskName: string; user: TrialUser; dispatch: TrialDispatch }) {
   return (
     <form className="trial-form end-shift-form" onSubmit={(event) => {
       const data = formData(event);
@@ -552,7 +605,23 @@ function EndShiftProgressForm({ need, taskName, user, dispatch }: { need: ShiftP
   );
 }
 
-function CriticalObligationCard({ projection, user, dispatch }: { projection: CriticalObligationProjection; user: TrialUser; dispatch: (action: TrialAction) => void }) {
+function SubmittedFieldProgress({ projection }: { projection: TaskProjection }) {
+  const observation = projection.latestFieldProgressObservation;
+  if (!observation) return null;
+  return (
+    <div className="submitted-field-progress">
+      <p><strong>Tracker field observation · {observation.completionPercent}% complete</strong></p>
+      <dl className="detail-facts">
+        <div><dt>Recorded</dt><dd>{formatTrialDateTime(observation.at)}</dd></div>
+        <div><dt>What remains</dt><dd>{observation.remainingWork}</dd></div>
+        <div><dt>Next-shift issue</dt><dd>{observation.nextShiftIssue}</dd></div>
+      </dl>
+      {hasUnstartedFieldProgress(projection) ? <p className="field-progress-note">This field observation does not establish Start; execution remains Not Started.</p> : null}
+    </div>
+  );
+}
+
+function CriticalObligationCard({ projection, user, dispatch }: { projection: CriticalObligationProjection; user: TrialUser; dispatch: TrialDispatch }) {
   const report = projection.currentReport;
   const prepopulated = Object.entries(projection.prepopulatedFacts).filter((entry): entry is [ReportingField, string] => entry[1] !== undefined);
   return (
@@ -601,8 +670,8 @@ function CriticalObligationCard({ projection, user, dispatch }: { projection: Cr
   );
 }
 
-function ActionDisclosure({ label, children }: { label: string; children: ReactNode }) {
-  return <details className="action-disclosure"><summary>{label}</summary>{children}</details>;
+function ActionDisclosure({ label, children, open, onOpenChange }: { label: string; children: ReactNode; open: boolean; onOpenChange: (open: boolean) => void }) {
+  return <details className="action-disclosure" open={open} onToggle={(event) => onOpenChange(event.currentTarget.open)}><summary>{label}</summary>{children}</details>;
 }
 
 function TrialDetailSection({ title, children }: { title: string; children: ReactNode }) {
@@ -617,6 +686,10 @@ function TrialExecutionState({ projection }: { projection: TaskProjection }) {
       {projection.attention.slice(0, 2).map((attention) => <span className={`attention-state ${attentionTone(attention)}`} key={attention}>{attention}</span>)}
     </div>
   );
+}
+
+function hasUnstartedFieldProgress(projection: TaskProjection) {
+  return projection.executionState === "Not Started" && projection.latestFieldProgressObservation !== null && projection.progressPercent > 0;
 }
 
 function TrialStatus({ label, tone }: { label: string; tone: "neutral" | "info" | "warning" | "critical" | "success" }) {
@@ -664,4 +737,8 @@ function requiredString(data: FormData, name: string) {
 function optionalString(data: FormData, name: string) {
   const value = requiredString(data, name);
   return value || undefined;
+}
+
+function isCanonicalResetState(state: TrialState) {
+  return state.now === TRIAL_START_MINUTE && state.nextSequence === 1000;
 }

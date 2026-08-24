@@ -25,6 +25,19 @@ The trial:
 
 The trial does not provide authentication, authorization enforcement, API writes, production persistence, offline replay, database records, a scheduling engine, CPM/critical-path calculation, or a final Microsoft Project export/round-trip workflow. It does not restore PR #48's candidate or acceptance workflow.
 
+## Review-driven interaction safeguards
+
+The first end-to-end Vercel review produced a narrow frontend refinement pass without changing the approved product model:
+
+- Mobile renders assigned work before the collapsed simulation controls and guided checklist.
+- A second `Can't Start` for the same task at the same simulated minute is rejected as an accidental repeat. A later, distinct blocked-before-start observation remains valid while execution is still Not Started.
+- Re-submitting an identical active Tier 3 user/relationship assignment is rejected; changing the relationship or choosing another eligible direct report remains available.
+- Creating or changing a Critical policy retains all generated obligation records but does not add one activity-history entry for every future scheduled occurrence. Due, requested, event-triggered, submitted, and corrected reporting activity remains visible.
+- A Tracker field progress observation is labelled with its source and time. Non-zero field progress without valid imported start/progress evidence or a Tracker Start event does not establish In Progress.
+- Console Task Dashboard section controls wrap without requiring horizontal scrolling, and selected sections expose current-page semantics.
+
+These are deterministic trial protections and presentation refinements, not production validation, persistence, or concurrency controls.
+
 ## Activation
 
 Trial mode is opt-in and is disabled unless the Vite flag has the exact value `true`:
@@ -176,6 +189,8 @@ The Task Dashboard derives Overview, Execution, People, Discussion, Delays / Pro
 - the initial deterministic ID sequence.
 
 Reset removes every generated execution event, assignment change, policy version, obligation, report, correction, progress observation, problem, action, and history entry. Repeating the same sequence after Reset produces the same result.
+
+Reset also returns the Console to Today with no selected task and returns Mobile to the default Tier 2 persona and Assigned Tasks list. This presentation reset is local review behaviour rather than a production navigation contract.
 
 ## Guided review sequence
 

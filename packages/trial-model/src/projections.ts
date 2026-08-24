@@ -74,6 +74,7 @@ export function selectTaskProgress(state: TrialState, taskId: string): number {
 
 export function selectTaskProjection(state: TrialState, taskId: string): TaskProjection {
   const task = requiredTask(state, taskId);
+  const latestFieldProgressObservation = task.summary ? null : selectLatestFieldProgressObservation(state, taskId);
   const tracking = state.trackingAssignments
     .filter((assignment) => assignment.taskId === taskId && assignment.active && assignment.assignedAt <= state.now)
     .sort((left, right) => right.assignedAt - left.assignedAt)[0];
@@ -102,6 +103,7 @@ export function selectTaskProjection(state: TrialState, taskId: string): TaskPro
     executionState,
     stateBasis: selectStateBasis(state, taskId),
     progressPercent: selectTaskProgress(state, taskId),
+    latestFieldProgressObservation,
     trackingOwner: tracking ? requiredUser(state, tracking.tier2UserId) : null,
     fieldAssignments,
     attention,
@@ -133,7 +135,7 @@ export function selectTodayProjection(state: TrialState): TodayProjection {
     criticalOverdue: obligationProjections.filter((item) => item.state === "overdue").length,
     activeProblems: state.problems.filter((problem) => problem.status === "open" && problem.createdAt <= state.now).length,
     dueActions: state.actions.filter((action) => action.status === "open" && action.createdAt <= state.now && action.dueAt !== undefined && action.dueAt <= state.now).length,
-    recentActivity: selectRecentActivity(state, 10)
+    recentActivity: selectRecentActivity(state, 6)
   };
 }
 
@@ -285,16 +287,27 @@ function selectPrepopulatedFacts(state: TrialState, item: CriticalItem, fields: 
   const task = requiredTask(state, item.sourceTaskId);
   const executionState = selectExecutionState(state, item.sourceTaskId);
   const progressPercent = selectTaskProgress(state, item.sourceTaskId);
+  const latestFieldProgressObservation = task.summary ? null : selectLatestFieldProgressObservation(state, item.sourceTaskId);
   const taskIds = new Set([item.sourceTaskId, ...(task.summary ? selectDescendantTasks(state, item.sourceTaskId).map((candidate) => candidate.id) : [])]);
   const activeProblems = state.problems.filter((problem) => taskIds.has(problem.taskId) && problem.createdAt <= state.now && problem.status === "open");
   const openActions = state.actions.filter((action) => taskIds.has(action.taskId) && action.createdAt <= state.now && action.status === "open");
   const values: Partial<Record<ReportingField, string>> = {};
-  if (fields.includes("progress")) values.progress = `${progressPercent}% · ${executionState}`;
+  if (fields.includes("progress")) {
+    values.progress = latestFieldProgressObservation
+      ? `${progressPercent}% field observation · ${executionState} execution`
+      : `${progressPercent}% · ${executionState}`;
+  }
   if (fields.includes("condition")) values.condition = activeProblems.length > 0 ? "Constraint active" : executionState;
   if (fields.includes("constraint") && activeProblems.length > 0) values.constraint = activeProblems.map((problem) => problem.reason).join("; ");
   if (fields.includes("recovery") && openActions.length > 0) values.recovery = openActions.map((action) => action.description).join("; ");
   if (fields.includes("evidence") && task.evidenceRequirement) values.evidence = task.evidenceRequirement;
   return values;
+}
+
+function selectLatestFieldProgressObservation(state: TrialState, taskId: string) {
+  return state.progressObservations
+    .filter((observation) => observation.taskId === taskId && observation.at <= state.now)
+    .sort(byNewestAt)[0] ?? null;
 }
 
 function obligationState(state: TrialState, dueAt: number, report: CriticalReport | null, satisfiedByEventId?: string): ObligationState {

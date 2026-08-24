@@ -74,6 +74,11 @@ export function App({
       const next = applyTrialAction(trialStateRef.current, action);
       trialStateRef.current = next;
       setTrialState(next);
+      if (action.type === "reset") {
+        setActiveSection("Today");
+        setTaskId(null);
+        setTaskOrigin("Today");
+      }
       setTrialError("");
     } catch (error) {
       setTrialError(error instanceof Error ? error.message : "The deterministic trial action could not be applied.");

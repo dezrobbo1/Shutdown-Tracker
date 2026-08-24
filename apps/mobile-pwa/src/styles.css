@@ -724,7 +724,7 @@ dd {
   border-left: 4px solid #b7792a;
   background: #fff7ea;
   color: #5f4a2f;
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .trial-boundary strong {
@@ -746,6 +746,39 @@ dd {
   border: 1px solid #cbd6ca;
   background: #ffffff;
   padding: 12px;
+}
+
+.trial-tools {
+  border: 1px solid #cbd6ca;
+  background: #ffffff;
+}
+
+.trial-tools > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #1d473d;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 800;
+  padding: 10px 12px;
+}
+
+.trial-tools > summary strong {
+  color: #607066;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.trial-tools[open] > summary {
+  border-bottom: 1px solid #dfe5dc;
+}
+
+.trial-tools .trial-clock {
+  border: 0;
 }
 
 .trial-clock > div:first-child {
@@ -841,22 +874,6 @@ dd {
   margin-top: 7px;
 }
 
-.trial-transport-strip {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  border-left: 4px solid #4361a3;
-  background: #f3f6fb;
-  color: #526056;
-  font-size: 0.76rem;
-  padding: 8px 10px;
-}
-
-.trial-transport-strip strong {
-  color: #35568f;
-}
-
 .trial-error {
   margin: 0;
   border-left: 4px solid #a43b32;
@@ -942,6 +959,11 @@ dd {
   opacity: 1;
 }
 
+.trial-form > button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .trial-form > small {
   color: #66756c;
   line-height: 1.4;
@@ -959,6 +981,25 @@ dd {
   background: #e9f3ed;
   color: #235b4a !important;
   padding: 9px 10px;
+}
+
+.field-progress-note,
+.assignment-current {
+  margin: 0;
+  border-left: 3px solid #54798c;
+  background: #eef5f8;
+  color: #315568;
+  line-height: 1.45;
+  padding: 8px 10px;
+}
+
+.submitted-field-progress {
+  display: grid;
+  gap: 10px;
+}
+
+.submitted-field-progress > p {
+  margin: 0;
 }
 
 .plain-list {
@@ -1083,10 +1124,15 @@ dd {
     max-width: none;
   }
 
-  .trial-transport-strip,
   .trial-obligation > header {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .trial-tools > summary {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
   }
 
   .trial-clock-actions {
@@ -1096,6 +1142,13 @@ dd {
 
   .trial-clock button {
     min-height: 44px;
+  }
+
+  .persona-control select,
+  .trial-form select,
+  .trial-form input:not([type="checkbox"]),
+  .trial-form textarea {
+    font-size: 16px;
   }
 
   .record-list li {

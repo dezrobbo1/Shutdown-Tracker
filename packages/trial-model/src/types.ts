@@ -297,6 +297,7 @@ export type TaskProjection = {
   executionState: ExecutionState;
   stateBasis: string;
   progressPercent: number;
+  latestFieldProgressObservation: FieldProgressObservation | null;
   trackingOwner: TrialUser | null;
   fieldAssignments: Array<FieldAssignment & { user: TrialUser }>;
   attention: string[];
