@@ -35,7 +35,7 @@ Trial mode is labelled `Synthetic operational trial`, `Deterministic local state
 The named persona selector is a product-review tool:
 
 - Tier 2 personas see only tasks/work packs for which they hold tracking responsibility. They can delegate work to a direct-report Tier 3 user as `WORKING_ON` or `FIELD_CONTROL` while retaining tracking responsibility.
-- Tier 2 reporting owners see contextual Critical obligations, pre-populated known execution facts, controlled judgement fields, immutable report submission, and correction by supersession.
+- Tier 2 reporting owners see contextual Critical obligations, pre-populated known execution facts, controlled judgement fields, immutable report submission, and correction by supersession. When the reporting owner is not the tracking owner, Assigned Tasks exposes a separate reporting-only context without execution, delegation, end-of-shift, or wider task-record controls.
 - Tier 3 personas see only explicitly delegated tasks. They can exercise Can't Start, Start, Pause, Resume, Finish, and end-of-shift unfinished progress with simulated system-captured times.
 - Assigned Tier 2/Tier 3 personas can resolve a task-owned trial problem or complete a task-owned trial action; those changes use the same event history as Task Detail and Console Today.
 
@@ -43,7 +43,7 @@ The Mobile trial also provides compact simulated-clock controls and the optional
 
 Assigned work is presented before the collapsed trial controls. The trial rejects same-minute duplicate `Can't Start` observations and identical active Tier 3 assignment no-ops, then closes successful action disclosures. Submitted field progress remains explicitly identified as a Tracker observation and does not establish Start when execution evidence is absent. Reset also restores the default Tier 2 persona and Assigned Tasks list.
 
-When Console opens Mobile as a linked trial window, Mobile receives the Console's canonical in-memory state and sends typed trial actions back through a strictly validated `window.opener`/`postMessage` bridge. The Console origin is carried in the `trialHostOrigin` query parameter. This bridge is ephemeral, uses no browser or server persistence, and is not a production sync/API design. Standalone Mobile trial mode applies the same shared reducer locally.
+When Console opens Mobile as a linked trial window, Mobile receives the Console's canonical in-memory state and sends typed trial actions back through a strictly validated `window.opener`/`postMessage` bridge. The Console origin is carried in the `trialHostOrigin` query parameter. Ephemeral session/request identifiers, action acknowledgements, duplicate-request handling, and a real-time heartbeat make connection loss explicit. The bridge rejects Tier 1-only Console actions, while the shared reducer enforces current tracking/field assignment for execution and task-owned record updates—including reporting-only personas. A validated Mobile action is retained in local trial state if the host cannot confirm it; the UI then identifies the session as disconnected/local-only. This bridge uses no browser or server persistence and is not a production sync/API design. Standalone Mobile trial mode applies the same shared reducer locally.
 
 See [Deterministic Operational Trial](../../docs/product/deterministic-operational-trial.md) for the scenario, clock, guided sequence, and review questions.
 

@@ -38,6 +38,10 @@ type TrialMobileAppProps = {
 
 const DEFAULT_USER_ID = "tier2-morgan";
 type TrialDispatch = (action: TrialAction) => boolean;
+type ReportingOnlyContext = {
+  sourceTask: CriticalObligationProjection["sourceTask"];
+  obligations: CriticalObligationProjection[];
+};
 
 export function TrialMobileApp({
   initialState,
@@ -56,7 +60,10 @@ export function TrialMobileApp({
     }
     setActionError(null);
   }, []);
-  const { connectedToHost, sendAction } = useTrialBridge(acceptHostState);
+  const { connectionState, connectedToHost, sendAction } = useTrialBridge(
+    acceptHostState,
+    (message) => setActionError(message)
+  );
 
   const mobileUsers = useMemo(
     () => state.users.filter((user) => user.tier === "Tier 2" || user.tier === "Tier 3"),
@@ -67,17 +74,22 @@ export function TrialMobileApp({
     () => user ? selectTasksForUser(state, user.id) : [],
     [state, user]
   );
+  const reportingOnlyContexts = useMemo(
+    () => user ? buildReportingOnlyContexts(state, user, tasks) : [],
+    [state, tasks, user]
+  );
   const selectedTask = tasks.find((projection) => projection.task.id === selectedTaskId) ?? null;
+  const selectedReportingContext = reportingOnlyContexts.find((context) => context.sourceTask.id === selectedTaskId) ?? null;
 
   const dispatch = useCallback((action: TrialAction) => {
     try {
       const nextState = applyTrialAction(state, action);
-      if (!sendAction(action)) setState(nextState);
+      setActionError(null);
+      sendAction(action, nextState);
       if (action.type === "reset") {
         setUserId(DEFAULT_USER_ID);
         setSelectedTaskId(null);
       }
-      setActionError(null);
       return true;
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "The trial action could not be applied.");
@@ -107,7 +119,13 @@ export function TrialMobileApp({
         <section className="trial-boundary" aria-label="Trial boundary">
           <strong>Synthetic operational trial</strong>
           <span>Deterministic local state · No production persistence</span>
-          <small>{formatTrialDateTime(state.now)} simulated · {connectedToHost ? "Connected to the Console trial host." : "Standalone in-memory trial session."}</small>
+          <small>{formatTrialDateTime(state.now)} simulated · {connectedToHost
+            ? "Connected to the Console trial host."
+            : connectionState === "connecting"
+              ? "Connecting to the Console trial host; validated actions remain local until confirmed."
+              : connectionState === "disconnected"
+                ? "Console trial host disconnected; continuing in local trial state."
+                : "Standalone in-memory trial session."}</small>
         </section>
 
         <label className="persona-control">
@@ -140,10 +158,18 @@ export function TrialMobileApp({
             dispatch={dispatch}
             onBack={() => setSelectedTaskId(null)}
           />
+        ) : selectedReportingContext ? (
+          <TrialReportingOnlyDetail
+            user={user}
+            context={selectedReportingContext}
+            dispatch={dispatch}
+            onBack={() => setSelectedTaskId(null)}
+          />
         ) : (
           <TrialAssignedTasks
             user={user}
             tasks={tasks}
+            reportingOnlyContexts={reportingOnlyContexts}
             onOpenTask={setSelectedTaskId}
           />
         )}
@@ -199,10 +225,12 @@ function TrialClock({ state, dispatch }: { state: TrialState; dispatch: TrialDis
 function TrialAssignedTasks({
   user,
   tasks,
+  reportingOnlyContexts,
   onOpenTask
 }: {
   user: TrialUser;
   tasks: TaskProjection[];
+  reportingOnlyContexts: ReportingOnlyContext[];
   onOpenTask: (taskId: string) => void;
 }) {
   return (
@@ -212,11 +240,11 @@ function TrialAssignedTasks({
           <p className="eyebrow">{user.name} · {user.tier}</p>
           <h2 id="assigned-tasks-heading">Assigned work</h2>
         </div>
-        <strong>{tasks.length} tasks</strong>
+        <strong>{tasks.length} tasks{reportingOnlyContexts.length > 0 ? ` · ${reportingOnlyContexts.length} reporting` : ""}</strong>
       </div>
       <p className="section-copy">
         {user.tier === "Tier 2"
-          ? "Only work explicitly assigned by Tier 1 for tracking. Delegation does not remove Tier 2 responsibility."
+          ? "Only work explicitly assigned by Tier 1 for tracking. Separate Critical reporting assignments provide reporting-only context and do not grant task authority."
           : "Only work explicitly assigned by the direct-report Tier 2 user. No whole-project browsing."}
       </p>
 
@@ -238,7 +266,7 @@ function TrialAssignedTasks({
               <dl className="task-card-facts">
                 <div><dt>Planned</dt><dd>{formatTrialWindow(projection.task.plannedStart, projection.task.plannedFinish)}</dd></div>
                 <div>
-                  <dt>{projection.latestFieldProgressObservation ? "Field observation" : "Progress"}</dt>
+                  <dt>{projection.latestFieldProgressObservation ? "Field observation" : projection.task.summary ? "Imported summary progress" : "Progress"}</dt>
                   <dd>{projection.progressPercent}%{projection.latestFieldProgressObservation ? " complete" : ""}</dd>
                 </div>
                 <div><dt>Assignment</dt><dd>{relationship}</dd></div>
@@ -257,7 +285,94 @@ function TrialAssignedTasks({
           );
         })}
       </div>
+
+      {reportingOnlyContexts.length > 0 ? (
+        <section className="critical-reporting-assignments" aria-labelledby="critical-reporting-assignments-heading">
+          <div>
+            <p className="eyebrow">Reporting-only access</p>
+            <h3 id="critical-reporting-assignments-heading">Critical reporting assignments</h3>
+          </div>
+          <p className="reporting-only-scope">These items are assigned for formal reporting only. Tracking responsibility and wider task authority remain with the assigned tracker.</p>
+          <div className="work-list reporting-only-list">
+            {reportingOnlyContexts.map((context) => {
+              const state = reportingContextState(context);
+              const nextObligation = context.obligations.find((obligation) => obligation.state !== "submitted" && obligation.state !== "superseded")
+                ?? context.obligations[0];
+              const sourceTypes = [...new Set(context.obligations.map((obligation) => obligation.item.sourceType))];
+              return (
+                <article className="work-card reporting-only-card" key={context.sourceTask.id}>
+                  <div className="task-title-row">
+                    <div>
+                      <span className="task-code">{context.sourceTask.wbs}</span>
+                      <h4>{context.sourceTask.name}</h4>
+                      <p>{context.sourceTask.workPackage}</p>
+                    </div>
+                    <TrialStatus label={state} tone={obligationTone(state)} />
+                  </div>
+                  <dl className="task-card-facts">
+                    <div><dt>Source</dt><dd>{sourceTypes.join(" · ")}</dd></div>
+                    <div><dt>Report due</dt><dd>{formatTrialDateTime(nextObligation.obligation.dueAt)}</dd></div>
+                    <div><dt>Access</dt><dd>Reporting only</dd></div>
+                  </dl>
+                  <div className="task-card-footer">
+                    <span className="reporting-only-note">Submit or correct the assigned report without wider task access.</span>
+                    <button className="open-task-button" type="button" aria-label={`Open Critical reporting for ${context.sourceTask.name}`} onClick={() => onOpenTask(context.sourceTask.id)}>
+                      <span>Open reporting</span><ChevronRight size={18} aria-hidden="true" />
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
     </section>
+  );
+}
+
+function TrialReportingOnlyDetail({
+  user,
+  context,
+  dispatch,
+  onBack
+}: {
+  user: TrialUser;
+  context: ReportingOnlyContext;
+  dispatch: TrialDispatch;
+  onBack: () => void;
+}) {
+  const sourceTypes = [...new Set(context.obligations.map((obligation) => obligation.item.sourceType))];
+  const policyVersions = [...new Set(context.obligations.map((obligation) => obligation.policy.version))].sort((left, right) => left - right);
+  const state = reportingContextState(context);
+
+  return (
+    <article className="task-detail trial-task-detail reporting-only-detail" aria-labelledby="reporting-only-detail-heading">
+      <header className="task-detail-header">
+        <button className="back-button" type="button" onClick={onBack}><ArrowLeft size={18} aria-hidden="true" /><span>Back to assigned tasks</span></button>
+        <p className="eyebrow">Critical reporting · reporting-only context</p>
+        <span className="task-code">{context.sourceTask.wbs}</span>
+        <h2 id="reporting-only-detail-heading">{context.sourceTask.name}</h2>
+        <p>{context.sourceTask.workPackage}</p>
+        <TrialStatus label={state} tone={obligationTone(state)} />
+      </header>
+
+      <TrialDetailSection title="Reporting scope">
+        <p className="restricted-copy"><strong>Bounded reporting assignment.</strong> This view grants report submission and correction only. It does not grant wider task update or record access.</p>
+        <dl className="detail-facts">
+          <div><dt>Reporting owner</dt><dd>{user.name}</dd></div>
+          <div><dt>Source type</dt><dd>{sourceTypes.join(" · ")}</dd></div>
+          <div><dt>Policy</dt><dd>{policyVersions.map((version) => `v${version}`).join(" · ")}</dd></div>
+          <div><dt>Source window</dt><dd>{formatTrialWindow(context.sourceTask.plannedStart, context.sourceTask.plannedFinish)}</dd></div>
+        </dl>
+      </TrialDetailSection>
+
+      <TrialDetailSection title="Critical reporting">
+        <p>Known execution facts needed by the policy are pre-populated. Enter only the assigned Tier 2 judgement that is not already recorded.</p>
+        <div className="trial-obligation-list">
+          {context.obligations.map((obligation) => <CriticalObligationCard key={obligation.obligation.id} projection={obligation} user={user} dispatch={dispatch} />)}
+        </div>
+      </TrialDetailSection>
+    </article>
   );
 }
 
@@ -298,9 +413,10 @@ function TrialTaskDetail({
         <dl className="detail-facts">
           <div><dt>Execution state</dt><dd>{projection.executionState}</dd></div>
           <div>
-            <dt>{projection.latestFieldProgressObservation ? "Tracker field observation" : "Progress"}</dt>
+            <dt>{projection.latestFieldProgressObservation ? "Tracker field observation" : task.summary ? "Imported summary progress" : "Progress"}</dt>
             <dd>{projection.progressPercent}%{projection.latestFieldProgressObservation ? ` at ${formatTrialTime(projection.latestFieldProgressObservation.at)}` : ""}</dd>
           </div>
+          <div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div>
           <div><dt>Planned window</dt><dd>{formatTrialWindow(task.plannedStart, task.plannedFinish)}</dd></div>
           <div><dt>Attention</dt><dd>{projection.attention.join(" · ") || "No current attention condition"}</dd></div>
         </dl>
@@ -624,15 +740,16 @@ function SubmittedFieldProgress({ projection }: { projection: TaskProjection }) 
 function CriticalObligationCard({ projection, user, dispatch }: { projection: CriticalObligationProjection; user: TrialUser; dispatch: TrialDispatch }) {
   const report = projection.currentReport;
   const prepopulated = Object.entries(projection.prepopulatedFacts).filter((entry): entry is [ReportingField, string] => entry[1] !== undefined);
+  const headingId = `critical-obligation-${projection.obligation.id}`;
   return (
-    <article className="trial-obligation">
+    <article className="trial-obligation" aria-labelledby={headingId}>
       <header>
-        <div><strong>{projection.sourceTask.name}</strong><span>{projection.item.sourceType} · Policy v{projection.policy.version}</span></div>
+        <div><h4 id={headingId}>{projection.sourceTask.name}</h4><span>{projection.item.sourceType} · Policy v{projection.policy.version}</span></div>
         <TrialStatus label={projection.state} tone={obligationTone(projection.state)} />
       </header>
       <dl className="detail-facts">
         <div><dt>Due</dt><dd>{formatTrialDateTime(projection.obligation.dueAt)}</dd></div>
-        <div><dt>Mechanism</dt><dd>{REPORTING_MECHANISM_LABELS[projection.obligation.mechanism]}</dd></div>
+        <div><dt>Mechanism</dt><dd>{projection.obligation.mechanisms.map((mechanism) => REPORTING_MECHANISM_LABELS[mechanism]).join(" + ")}</dd></div>
       </dl>
       {prepopulated.length > 0 ? <div className="known-facts"><strong>Known execution facts</strong><ul>{prepopulated.map(([field, value]) => <li key={field}>{REPORTING_FIELD_LABELS[field]}: {value}</li>)}</ul></div> : null}
       {projection.obligation.satisfiedByEventId ? <p className="completed-copy">Required structured facts were already supplied by the execution event; no duplicate report entry is required.</p> : null}
@@ -707,10 +824,37 @@ function obligationTone(state: CriticalObligationProjection["state"]): "neutral"
   return "info";
 }
 
+function reportingContextState(context: ReportingOnlyContext): CriticalObligationProjection["state"] {
+  if (context.obligations.some((obligation) => obligation.state === "overdue")) return "overdue";
+  if (context.obligations.some((obligation) => obligation.state === "due")) return "due";
+  if (context.obligations.some((obligation) => obligation.state === "upcoming")) return "upcoming";
+  if (context.obligations.some((obligation) => obligation.state === "submitted")) return "submitted";
+  return "superseded";
+}
+
+function buildReportingOnlyContexts(state: TrialState, user: TrialUser, trackedTasks: TaskProjection[]): ReportingOnlyContext[] {
+  if (user.tier !== "Tier 2") return [];
+  const trackedTaskIds = new Set(trackedTasks.map((projection) => projection.task.id));
+  const bySourceTask = new Map<string, CriticalObligationProjection[]>();
+  for (const obligation of selectCriticalObligationsForOwner(state, user.id)) {
+    if (trackedTaskIds.has(obligation.sourceTask.id)) continue;
+    const grouped = bySourceTask.get(obligation.sourceTask.id) ?? [];
+    grouped.push(obligation);
+    bySourceTask.set(obligation.sourceTask.id, grouped);
+  }
+  return [...bySourceTask.values()]
+    .map((obligations) => ({
+      sourceTask: obligations[0].sourceTask,
+      obligations: compactMobileObligations(obligations)
+    }))
+    .filter((context) => context.obligations.length > 0)
+    .sort((left, right) => left.sourceTask.plannedStart - right.sourceTask.plannedStart || left.sourceTask.wbs.localeCompare(right.sourceTask.wbs));
+}
+
 function compactMobileObligations(obligations: CriticalObligationProjection[]) {
   const selected = new Map<string, CriticalObligationProjection>();
   const byItem = new Map<string, CriticalObligationProjection[]>();
-  for (const obligation of obligations) {
+  for (const obligation of obligations.filter((item) => item.state !== "superseded" || item.reportHistory.length > 0)) {
     const current = byItem.get(obligation.item.id) ?? [];
     current.push(obligation);
     byItem.set(obligation.item.id, current);

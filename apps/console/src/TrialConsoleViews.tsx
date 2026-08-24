@@ -171,7 +171,14 @@ function TrialTaskTable({
             <td className={projection.attention.length === 0 ? "muted" : "attention-text"}>{projection.attention.join(" · ") || "None"}</td>
             <td>{projection.trackingOwner?.name ?? "Unassigned"}</td>
             <td>{formatTrialWindow(task.plannedStart, task.plannedFinish)}</td>
-            <td><strong>{projection.progressPercent}%</strong>{projection.latestFieldProgressObservation ? <small>Field observation · {formatTrialTime(projection.latestFieldProgressObservation.at)}{projection.executionState === "Not Started" ? " · does not establish Start" : ""}</small> : null}</td>
+            <td>
+              <strong>{projection.progressPercent}%</strong>
+              <small>{projection.task.summary
+                ? "Imported Project summary context · no Tracker roll-up"
+                : projection.latestFieldProgressObservation
+                  ? `Field observation · ${formatTrialTime(projection.latestFieldProgressObservation.at)}${projection.executionState === "Not Started" ? " · does not establish Start" : ""}`
+                  : projection.progressBasis}</small>
+            </td>
             <td>{projection.lastActivityAt === null ? "No activity" : formatTrialTime(projection.lastActivityAt)}</td>
           </tr>;
         })}</tbody>
@@ -218,7 +225,12 @@ export function TrialTaskDashboard({ state, taskId, backLabel, onBack, onAction,
 
 function OverviewPanel({ projection }: { projection: TaskProjection }) {
   const fieldObservation = projection.latestFieldProgressObservation;
-  return <><PanelHeading title="Overview" detail="One operational record for the selected task." /><dl className="detail-list"><div><dt>Planned window</dt><dd>{formatTrialWindow(projection.task.plannedStart, projection.task.plannedFinish)}</dd></div><div><dt>{fieldObservation ? "Tracker field observation" : "Tracker progress"}</dt><dd>{projection.progressPercent}%{fieldObservation ? ` · ${formatTrialTime(fieldObservation.at)}` : ""}</dd></div><div><dt>Field assignments</dt><dd>{projection.fieldAssignments.length}</dd></div><div><dt>Critical context</dt><dd>{projection.criticalItems.length > 0 ? `${projection.criticalItems.length} configured item(s)` : "Not selected"}</dd></div></dl>{fieldObservation && projection.executionState === "Not Started" ? <div className="rule-note"><strong>Progress provenance</strong><span>Field progress does not establish Start. Execution remains Not Started until valid imported start/progress evidence or a Tracker Start event exists.</span></div> : null}</>;
+  const progressLabel = fieldObservation
+    ? "Tracker field observation"
+    : projection.task.summary
+      ? "Imported summary progress"
+      : "Progress";
+  return <><PanelHeading title="Overview" detail="One operational record for the selected task." /><dl className="detail-list"><div><dt>Planned window</dt><dd>{formatTrialWindow(projection.task.plannedStart, projection.task.plannedFinish)}</dd></div><div><dt>{progressLabel}</dt><dd>{projection.progressPercent}%{fieldObservation ? ` · ${formatTrialTime(fieldObservation.at)}` : ""}</dd></div><div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div><div><dt>Field assignments</dt><dd>{projection.fieldAssignments.length}</dd></div><div><dt>Critical context</dt><dd>{projection.criticalItems.length > 0 ? `${projection.criticalItems.length} configured item(s)` : "Not selected"}</dd></div></dl>{fieldObservation && projection.executionState === "Not Started" ? <div className="rule-note"><strong>Progress provenance</strong><span>Field progress does not establish Start. Execution remains Not Started until valid imported start/progress evidence or a Tracker Start event exists.</span></div> : null}</>;
 }
 
 function ExecutionPanel({ state, taskId }: { state: TrialState; taskId: string }) {

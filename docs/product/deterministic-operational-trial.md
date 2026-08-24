@@ -71,7 +71,7 @@ The Console opens the separate Mobile application with its Console origin in the
 - both clients validate the expected window reference, exact origin, and versioned trial-message channel; and
 - a Tier 1 assignment change or Mobile execution/reporting action is immediately reflected in the other projection.
 
-This bridge is ephemeral review transport, not application persistence or a production API design. It does not use backend writes, `localStorage`, IndexedDB, or background sync. Closing or reloading the host discards generated state; Reset restores the fixed initial state. If the bridge is not configured, each client runs a standalone deterministic in-memory trial.
+This bridge is ephemeral review transport, not application persistence or a production API design. It uses an ephemeral linked-window session, correlated action acknowledgements, duplicate-request protection, and a real-time heartbeat. Tier 1-only Console actions are rejected at the Mobile bridge boundary; task execution and task-owned record mutations are also checked against the current synthetic Tier 2 tracking or Tier 3 field assignment in the shared reducer. If the Console closes, reloads, or stops acknowledging requests, Mobile retains its latest validated action locally, marks the bridge disconnected, and does not imply the change reached Console. It does not use backend writes, `localStorage`, IndexedDB, or background sync. Closing or reloading the host discards the host's generated state; Reset restores the fixed initial state. If the bridge is not configured, each client runs a standalone deterministic in-memory trial.
 
 ## Fixed synthetic scenario
 

@@ -1,4 +1,5 @@
-import { TRIAL_DAY_END_MINUTE, TRIAL_START_MINUTE, createInitialTrialState } from "./scenario";
+import { operationalDayWindow } from "./clock";
+import { TRIAL_DAY_END_MINUTE, TRIAL_START_MINUTE, TRIAL_SYSTEM_ACTOR_ID, createInitialTrialState } from "./scenario";
 import {
   selectCriticalItemsForTask,
   selectCriticalObligationProjections,
@@ -91,6 +92,7 @@ function assignTier3(state: TrialState, taskId: string, tier2UserId: string, tie
 
 function recordCantStart(state: TrialState, action: Extract<TrialAction, { type: "cant-start" }>) {
   requireExecutableTask(state, action.taskId);
+  requireTaskUpdateAuthority(state, action.taskId, action.actorId);
   if (selectExecutionState(state, action.taskId) !== "Not Started") throw new Error("Can't Start is available only before execution begins.");
   const recordedAtCurrentTime = state.executionEvents.some((event) => event.taskId === action.taskId && event.type === "cant-start" && event.at === state.now);
   if (recordedAtCurrentTime) throw new Error("Can't Start has already been recorded for this task at the current simulated time.");
@@ -108,6 +110,7 @@ function recordCantStart(state: TrialState, action: Extract<TrialAction, { type:
 
 function recordStart(state: TrialState, action: Extract<TrialAction, { type: "start" }>) {
   const task = requireExecutableTask(state, action.taskId);
+  requireTaskUpdateAuthority(state, task.id, action.actorId);
   if (selectExecutionState(state, action.taskId) !== "Not Started") throw new Error("Start is available only for Not Started work.");
   if (state.now > task.plannedStart) requireNonBlank(action.lateCause, "Late-start cause");
   const event: ExecutionEvent = { id: nextId(state, "event"), taskId: action.taskId, actorId: action.actorId, type: "start", at: state.now, lateCause: action.lateCause?.trim(), actionStillNeeded: action.actionStillNeeded?.trim() };
@@ -118,6 +121,7 @@ function recordStart(state: TrialState, action: Extract<TrialAction, { type: "st
 
 function recordPause(state: TrialState, action: Extract<TrialAction, { type: "pause" }>) {
   const task = requireExecutableTask(state, action.taskId);
+  requireTaskUpdateAuthority(state, task.id, action.actorId);
   if (selectExecutionState(state, task.id) !== "In Progress") throw new Error("Pause is available only while work is In Progress.");
   requireNonBlank(action.reason, "Pause reason");
   requireNonBlank(action.whatIsNeeded, "What must happen");
@@ -134,6 +138,7 @@ function recordPause(state: TrialState, action: Extract<TrialAction, { type: "pa
 
 function recordResume(state: TrialState, action: Extract<TrialAction, { type: "resume" }>) {
   const task = requireExecutableTask(state, action.taskId);
+  requireTaskUpdateAuthority(state, task.id, action.actorId);
   if (selectExecutionState(state, task.id) !== "Paused") throw new Error("Resume is available only while work is Paused.");
   const pause = state.pauseIntervals.filter((interval) => interval.taskId === task.id && interval.endedAt === undefined).sort((left, right) => right.startedAt - left.startedAt)[0];
   if (!pause) throw new Error("The active pause interval could not be found.");
@@ -150,6 +155,7 @@ function recordResume(state: TrialState, action: Extract<TrialAction, { type: "r
 
 function recordFinish(state: TrialState, action: Extract<TrialAction, { type: "finish" }>) {
   const task = requireExecutableTask(state, action.taskId);
+  requireTaskUpdateAuthority(state, task.id, action.actorId);
   if (selectExecutionState(state, task.id) !== "In Progress") throw new Error("Finish is available only while work is In Progress.");
   const event: ExecutionEvent = { id: nextId(state, "event"), taskId: task.id, actorId: action.actorId, type: "finish", at: state.now };
   state.executionEvents.push(event);
@@ -172,6 +178,7 @@ function recordEndShiftProgress(state: TrialState, action: Extract<TrialAction, 
 function resolveProblem(state: TrialState, problemId: string, actorId: string) {
   const problem = state.problems.find((candidate) => candidate.id === problemId);
   if (!problem || problem.status !== "open") throw new Error("The problem is not open.");
+  requireTaskUpdateAuthority(state, problem.taskId, actorId);
   problem.status = "resolved";
   problem.resolvedAt = state.now;
   problem.resolvedBy = actorId;
@@ -181,6 +188,7 @@ function resolveProblem(state: TrialState, problemId: string, actorId: string) {
 function completeAction(state: TrialState, actionId: string, actorId: string) {
   const record = state.actions.find((candidate) => candidate.id === actionId);
   if (!record || record.status !== "open") throw new Error("The action is not open.");
+  requireTaskUpdateAuthority(state, record.taskId, actorId);
   record.status = "completed";
   record.completedAt = state.now;
   appendHistory(state, "action-completed", actorId, `Action completed: ${record.description}.`, record.taskId);
@@ -193,7 +201,8 @@ function configureCritical(state: TrialState, criticalItemId: string, actorId: s
   const previous = selectCurrentPolicy(state, criticalItemId);
   const policy: CriticalPolicyVersion = { id: nextId(state, "policy"), criticalItemId, version: previous.version + 1, effectiveAt: state.now, ownerUserId: input.ownerUserId, templateId: input.templateId, mechanisms: unique(input.mechanisms), intervalMinutes: input.intervalMinutes, fixedTimes: unique(input.fixedTimes).sort((a, b) => a - b), triggers: unique(input.triggers), requiredFields: unique(input.requiredFields), itemOverride: true };
   state.criticalPolicies.push(policy);
-  appendHistory(state, "critical-configured", actorId, `Critical policy v${policy.version} created as an item-level override; earlier policy/report history remains unchanged.`, undefined, criticalItemId);
+  const supersededCount = supersedeFuturePolicyObligations(state, criticalItemId, policy.id);
+  appendHistory(state, "critical-configured", actorId, `Critical policy v${policy.version} created as an item-level override; earlier policy/report history remains unchanged${supersededCount > 0 ? ` and ${supersededCount} future unreported obligation${supersededCount === 1 ? " was" : "s were"} superseded` : ""}.`, undefined, criticalItemId);
   schedulePolicyObligations(state, requireCriticalItem(state, criticalItemId), policy);
 }
 
@@ -215,6 +224,8 @@ function submitCriticalReport(state: TrialState, obligationId: string, actorId: 
   const projection = selectCriticalObligationProjections(state).find((item) => item.obligation.id === obligationId);
   if (!projection) throw new Error("The reporting obligation is not available yet.");
   if (projection.owner.id !== actorId) throw new Error("Only the assigned Tier 2 reporting owner can submit this report.");
+  if (projection.obligation.supersededByPolicyVersionId) throw new Error("The reporting obligation was superseded by a newer Critical policy version.");
+  if (projection.obligation.satisfiedByEventId) throw new Error("Known structured task facts already satisfied this event-triggered reporting obligation.");
   if (projection.currentReport) throw new Error("The immutable report already exists; use a superseding correction.");
   for (const field of projection.requiredInputFields) requireNonBlank(values[field], `Critical report field ${field}`);
   const reportId = nextId(state, "report");
@@ -238,8 +249,10 @@ function processReportDueEvents(state: TrialState, previousMinute: number, targe
     const key = `report-due:${obligation.id}`;
     if (obligation.dueAt > previousMinute && obligation.dueAt <= targetMinute && !state.processedClockEvents.includes(key)) {
       state.processedClockEvents.push(key);
+      const alreadyReported = state.criticalReports.some((report) => report.obligationId === obligation.id);
+      if (alreadyReported || obligation.satisfiedByEventId || obligation.supersededByPolicyVersionId) continue;
       const item = requireCriticalItem(state, obligation.criticalItemId);
-      appendHistoryAt(state, "report-due", obligation.dueAt, obligation.ownerUserId, `Critical report became due for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
+      appendHistoryAt(state, "report-due", obligation.dueAt, TRIAL_SYSTEM_ACTOR_ID, `Critical report became due for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
     }
   }
 }
@@ -258,7 +271,7 @@ function processShiftBoundaries(state: TrialState, previousMinute: number, targe
       for (const userId of unique(users)) {
         const id = nextId(state, "shift-need");
         state.shiftProgressNeeds.push({ id, taskId: task.id, userId, shiftBoundary: boundary, createdAt: boundary });
-        appendHistoryAt(state, "end-shift-progress-due", boundary, userId, `End-of-shift progress requested for unfinished work: ${task.name}.`, task.id);
+        appendHistoryAt(state, "end-shift-progress-due", boundary, TRIAL_SYSTEM_ACTOR_ID, `End-of-shift progress requested for unfinished work: ${task.name}.`, task.id);
       }
     }
   }
@@ -281,29 +294,78 @@ function createEventObligations(state: TrialState, taskId: string, trigger: Repo
     const key = `event-obligation:${item.id}:${triggerEventId}`;
     if (state.processedClockEvents.includes(key)) continue;
     state.processedClockEvents.push(key);
-    const supplied = eventSuppliedFields(trigger);
-    const satisfied = policy.requiredFields.every((field) => supplied.has(field));
-    const obligation: CriticalObligation = { id: nextId(state, "obligation"), criticalItemId: item.id, policyVersionId: policy.id, ownerUserId: policy.ownerUserId, createdAt: eventAt, dueAt: eventAt + 15, mechanism: "event", triggerEventId, satisfiedByEventId: satisfied ? triggerEventId : undefined };
-    state.criticalObligations.push(obligation);
-    appendHistoryAt(state, "report-obligation", eventAt, policy.ownerUserId, satisfied ? `Event-triggered reporting obligation for ${requireTask(state, item.sourceTaskId).name} was satisfied by known structured task facts.` : `Event-triggered Critical report requested for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
+    const dueAt = eventAt + 15;
+    const obligation: CriticalObligation = state.criticalObligations.find((candidate) => candidate.criticalItemId === item.id
+      && candidate.policyVersionId === policy.id
+      && candidate.dueAt === dueAt
+      && candidate.supersededByPolicyVersionId === undefined
+      && !state.criticalReports.some((report) => report.obligationId === candidate.id))
+      ?? {
+        id: nextId(state, "obligation"),
+        criticalItemId: item.id,
+        policyVersionId: policy.id,
+        ownerUserId: policy.ownerUserId,
+        createdAt: eventAt,
+        dueAt,
+        mechanism: "event" as const,
+        mechanisms: ["event" as const]
+      };
+    if (!state.criticalObligations.includes(obligation)) state.criticalObligations.push(obligation);
+    if (!obligation.mechanisms.includes("event")) obligation.mechanisms.push("event");
+    obligation.triggerEventId ??= triggerEventId;
+    const projection = selectCriticalObligationProjections({ ...state, now: eventAt })
+      .find((candidate) => candidate.obligation.id === obligation.id);
+    const satisfied = policy.requiredFields.every((field) => projection?.prepopulatedFacts[field] !== undefined);
+    if (satisfied) obligation.satisfiedByEventId = triggerEventId;
+    appendHistoryAt(state, "report-obligation", eventAt, TRIAL_SYSTEM_ACTOR_ID, satisfied ? `Event-triggered reporting obligation for ${requireTask(state, item.sourceTaskId).name} was satisfied by known structured task facts.` : `Event-triggered Critical report requested for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
   }
 }
 
 function schedulePolicyObligations(state: TrialState, item: CriticalItem, policy: CriticalPolicyVersion) {
-  const candidates: Array<{ dueAt: number; mechanism: CriticalObligation["mechanism"] }> = [];
+  const candidates = new Map<number, Set<CriticalObligation["mechanism"]>>();
+  const addCandidate = (dueAt: number, mechanism: CriticalObligation["mechanism"]) => {
+    const mechanisms = candidates.get(dueAt) ?? new Set<CriticalObligation["mechanism"]>();
+    mechanisms.add(mechanism);
+    candidates.set(dueAt, mechanisms);
+  };
   if (policy.mechanisms.includes("interval") && policy.intervalMinutes && policy.intervalMinutes > 0) {
-    for (let dueAt = state.now + policy.intervalMinutes; dueAt <= TRIAL_DAY_END_MINUTE; dueAt += policy.intervalMinutes) candidates.push({ dueAt, mechanism: "interval" });
+    for (let dueAt = state.now + policy.intervalMinutes; dueAt <= TRIAL_DAY_END_MINUTE; dueAt += policy.intervalMinutes) addCandidate(dueAt, "interval");
   }
   if (policy.mechanisms.includes("fixed-time")) {
-    for (const dueAt of policy.fixedTimes) if (dueAt > state.now && dueAt <= TRIAL_DAY_END_MINUTE) candidates.push({ dueAt, mechanism: "fixed-time" });
+    const { start, end } = operationalDayWindow(state);
+    const operationalStartMinute = modulo(start, 1440);
+    for (const fixedTime of policy.fixedTimes) {
+      const dueAt = start + modulo(fixedTime - operationalStartMinute, 1440);
+      if (dueAt > state.now && dueAt < end && dueAt <= TRIAL_DAY_END_MINUTE) addCandidate(dueAt, "fixed-time");
+    }
   }
   if (policy.mechanisms.includes("shift")) {
-    for (const dueAt of state.project.shiftBoundaryMinutes) if (dueAt > state.now && dueAt <= TRIAL_DAY_END_MINUTE) candidates.push({ dueAt, mechanism: "shift" });
+    for (const dueAt of state.project.shiftBoundaryMinutes) if (dueAt > state.now && dueAt <= TRIAL_DAY_END_MINUTE) addCandidate(dueAt, "shift");
   }
-  for (const candidate of candidates.sort((left, right) => left.dueAt - right.dueAt)) {
-    const obligation: CriticalObligation = { id: nextId(state, "obligation"), criticalItemId: item.id, policyVersionId: policy.id, ownerUserId: policy.ownerUserId, createdAt: state.now, dueAt: candidate.dueAt, mechanism: candidate.mechanism };
+  for (const [dueAt, mechanismSet] of [...candidates.entries()].sort(([left], [right]) => left - right)) {
+    const mechanisms = [...mechanismSet];
+    const obligation: CriticalObligation = { id: nextId(state, "obligation"), criticalItemId: item.id, policyVersionId: policy.id, ownerUserId: policy.ownerUserId, createdAt: state.now, dueAt, mechanism: mechanisms[0], mechanisms };
     state.criticalObligations.push(obligation);
   }
+}
+
+function supersedeFuturePolicyObligations(state: TrialState, criticalItemId: string, supersedingPolicyVersionId: string) {
+  const reportedObligationIds = new Set(state.criticalReports.map((report) => report.obligationId));
+  let supersededCount = 0;
+  for (const obligation of state.criticalObligations) {
+    if (
+      obligation.criticalItemId !== criticalItemId
+      || obligation.policyVersionId === supersedingPolicyVersionId
+      || obligation.dueAt <= state.now
+      || reportedObligationIds.has(obligation.id)
+      || obligation.satisfiedByEventId
+      || obligation.supersededByPolicyVersionId
+    ) continue;
+    obligation.supersededAt = state.now;
+    obligation.supersededByPolicyVersionId = supersedingPolicyVersionId;
+    supersededCount += 1;
+  }
+  return supersededCount;
 }
 
 function createProblem(state: TrialState, taskId: string, actorId: string, reason: string, whatIsNeeded: string, adverse: boolean) {
@@ -326,20 +388,9 @@ function validatePolicyInput(state: TrialState, input: CriticalPolicyInput) {
   if (input.mechanisms.length === 0) throw new Error("Choose at least one supported reporting mechanism.");
   if (input.mechanisms.includes("none") && input.mechanisms.length > 1) throw new Error("No routine reporting cannot be combined with routine mechanisms.");
   if (input.mechanisms.includes("interval") && (!input.intervalMinutes || input.intervalMinutes < 15)) throw new Error("Fixed interval must be at least 15 minutes.");
+  if (input.mechanisms.includes("fixed-time") && input.fixedTimes.length === 0) throw new Error("Choose at least one fixed reporting time.");
+  if (input.mechanisms.includes("fixed-time") && input.fixedTimes.some((value) => !Number.isInteger(value) || value < 0 || value >= 1440)) throw new Error("Fixed reporting times must be whole wall-clock minutes from 00:00 to 23:59.");
   if (input.requiredFields.length === 0) throw new Error("Choose at least one supported report field.");
-}
-
-function eventSuppliedFields(trigger: ReportingTrigger) {
-  const fields: Record<ReportingTrigger, ReportingField[]> = {
-    "cant-start": ["progress", "condition", "constraint", "recovery"],
-    start: ["progress", "condition"],
-    pause: ["progress", "condition", "constraint", "recovery"],
-    resume: ["progress", "condition"],
-    finish: ["progress", "condition"],
-    "planned-finish-exceeded": ["progress", "condition"],
-    "condition-change": ["condition", "constraint"]
-  };
-  return new Set(fields[trigger]);
 }
 
 function appendHistory(state: TrialState, type: TrialHistoryEvent["type"], actorId: string, summary: string, taskId?: string, criticalItemId?: string, obligationId?: string, reportId?: string) {
@@ -380,6 +431,26 @@ function requireTier(state: TrialState, userId: string, tier: "Tier 1" | "Tier 2
   return user;
 }
 
+function requireTaskUpdateAuthority(state: TrialState, taskId: string, actorId: string) {
+  const actor = requireUser(state, actorId);
+  if (actor.tier === "Tier 1") return actor;
+  if (actor.tier === "Tier 2") {
+    const tracksTask = state.trackingAssignments.some((assignment) => assignment.taskId === taskId
+      && assignment.tier2UserId === actorId
+      && assignment.active
+      && assignment.assignedAt <= state.now);
+    if (tracksTask) return actor;
+  }
+  if (actor.tier === "Tier 3") {
+    const hasFieldAssignment = state.fieldAssignments.some((assignment) => assignment.taskId === taskId
+      && assignment.tier3UserId === actorId
+      && assignment.active
+      && assignment.assignedAt <= state.now);
+    if (hasFieldAssignment) return actor;
+  }
+  throw new Error(`${actor.name} does not have task-update authority for this assigned work.`);
+}
+
 function requireCriticalItem(state: TrialState, itemId: string) {
   const item = state.criticalItems.find((candidate) => candidate.id === itemId);
   if (!item) throw new Error(`Unknown Critical item ${itemId}.`);
@@ -396,4 +467,8 @@ function cleanValues(values: Partial<Record<ReportingField, string>>) {
 
 function unique<T>(values: T[]) {
   return [...new Set(values)];
+}
+
+function modulo(value: number, divisor: number) {
+  return ((value % divisor) + divisor) % divisor;
 }

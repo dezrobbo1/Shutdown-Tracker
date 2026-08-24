@@ -18,6 +18,7 @@ import type {
 export const TRIAL_START_MINUTE = 6 * 60;
 export const TRIAL_DAY_END_MINUTE = 30 * 60;
 export const TRIAL_SCENARIO_VERSION = "shutdown-trial-v1";
+export const TRIAL_SYSTEM_ACTOR_ID = "system:simulation-clock";
 
 export const REPORTING_FIELD_LABELS = {
   progress: "Completion / progress",
@@ -283,7 +284,7 @@ function obligation(
   dueAt: number,
   mechanism: CriticalObligation["mechanism"]
 ): CriticalObligation {
-  return { id, criticalItemId, policyVersionId, ownerUserId, createdAt, dueAt, mechanism };
+  return { id, criticalItemId, policyVersionId, ownerUserId, createdAt, dueAt, mechanism, mechanisms: [mechanism] };
 }
 
 function historyEvent(

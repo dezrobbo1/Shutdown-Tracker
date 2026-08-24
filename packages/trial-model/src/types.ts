@@ -178,9 +178,12 @@ export type CriticalObligation = {
   createdAt: number;
   dueAt: number;
   mechanism: Exclude<ReportingMechanism, "none">;
+  mechanisms: Array<Exclude<ReportingMechanism, "none">>;
   triggerEventId?: string;
   requestedReason?: string;
   satisfiedByEventId?: string;
+  supersededAt?: number;
+  supersededByPolicyVersionId?: string;
 };
 
 export type CriticalReport = {
@@ -297,6 +300,7 @@ export type TaskProjection = {
   executionState: ExecutionState;
   stateBasis: string;
   progressPercent: number;
+  progressBasis: string;
   latestFieldProgressObservation: FieldProgressObservation | null;
   trackingOwner: TrialUser | null;
   fieldAssignments: Array<FieldAssignment & { user: TrialUser }>;

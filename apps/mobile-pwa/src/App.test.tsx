@@ -375,6 +375,85 @@ describe("mobile deterministic operational trial", () => {
     expect(html).not.toMatch(/custom field|form builder/i);
   });
 
+  it("shows a non-tracking Critical owner one bounded reporting-only assignment without duplicating tracked work", () => {
+    const state = scaffoldReportingOwnedByAvery();
+    const tracker = state.trackingAssignments.find((assignment) => assignment.taskId === "task-scaffold-access" && assignment.active);
+    const avery = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier2-avery" />
+    ));
+    const morgan = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={createInitialTrialState()} initialUserId="tier2-morgan" />
+    ));
+
+    expect(tracker?.tier2UserId).toBe("tier2-morgan");
+    expect(avery).toContain("Critical reporting assignments");
+    expect(avery).toContain("Reporting-only access");
+    expect(avery).toContain('aria-label="Open Critical reporting for D2 Stack — scaffold access release"');
+    expect(countOccurrences(avery, 'class="work-card reporting-only-card"')).toBe(1);
+    expect(avery).not.toContain('aria-label="Open Critical reporting for Outlet duct — replace expansion joint"');
+    expect(morgan).not.toContain('class="work-card reporting-only-card"');
+    expect(countOccurrences(morgan, 'aria-label="Open D2 Stack — scaffold access release"')).toBe(1);
+  });
+
+  it("limits reporting-only detail to report submit and correction without wider task controls", () => {
+    const state = scaffoldReportingOwnedByAvery();
+    const detail = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier2-avery" initialTaskId="task-scaffold-access" />
+    )).split('<details class="trial-tools">')[0];
+
+    expect(detail).toContain("Critical reporting · reporting-only context");
+    expect(detail).toContain("Bounded reporting assignment.");
+    expect(detail).toContain("Submit immutable Critical report");
+    expect(detail).toContain("Fixed interval + Fixed times");
+    expect(detail).toContain('aria-labelledby="critical-obligation-');
+    expect(detail).toContain("<h4 id=\"critical-obligation-");
+    for (const restrictedSection of ["Execution", "End-of-shift progress", "People", "Discussion", "Delays / Problems", "Actions", "Evidence", "History"]) {
+      expect(detail).not.toContain(`>${restrictedSection}<`);
+    }
+    for (const restrictedControl of ["Can't Start", "Start at", "Pause at", "Resume at", "Finish at", "Assign or update direct-report Tier 3", "Record end-of-shift progress", "Resolve problem", "Complete action"]) {
+      expect(detail).not.toContain(restrictedControl);
+    }
+
+    const obligation = state.criticalObligations.find((candidate) => candidate.criticalItemId === "critical-scaffold"
+      && candidate.ownerUserId === "tier2-avery"
+      && candidate.supersededByPolicyVersionId === undefined)!;
+    const submitted = applyTrialAction(state, {
+      type: "submit-critical-report",
+      obligationId: obligation.id,
+      actorId: "tier2-avery",
+      values: {
+        progress: "Known Tracker position reviewed",
+        condition: "At risk",
+        constraint: "Access release pending",
+        recovery: "Scaffold team responding",
+        "next-target": "Release access",
+        "forecast-completion": "10:00 simulated"
+      }
+    });
+    const report = submitted.criticalReports.find((candidate) => candidate.obligationId === obligation.id)!;
+    const corrected = applyTrialAction(submitted, {
+      type: "correct-critical-report",
+      reportId: report.id,
+      actorId: "tier2-avery",
+      values: {
+        progress: "Known Tracker position reviewed",
+        condition: "Recovering",
+        constraint: "Access release pending",
+        recovery: "Scaffold team responding",
+        "next-target": "Release access",
+        "forecast-completion": "09:45 simulated"
+      }
+    });
+    const correction = corrected.criticalReports.find((candidate) => candidate.supersedesReportId === report.id);
+    const correctedDetail = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={corrected} initialUserId="tier2-avery" initialTaskId="task-scaffold-access" />
+    ));
+
+    expect(correction).toBeDefined();
+    expect(correctedDetail).toContain("Submitted report · immutable");
+    expect(correctedDetail).toContain("Submit superseding correction");
+  });
+
   it("shows immutable submitted Critical reports and superseding correction controls", () => {
     const html = renderToString(
       <App trialMode initialTrialUserId="tier2-morgan" initialTaskId="wp-cyclone" />
@@ -437,4 +516,26 @@ describe("mobile deterministic operational trial", () => {
 
 function normalizeMarkup(html: string) {
   return html.replaceAll("<!-- -->", "").replaceAll("&#x27;", "'");
+}
+
+function scaffoldReportingOwnedByAvery() {
+  const state = createInitialTrialState();
+  return applyTrialAction(state, {
+    type: "configure-critical",
+    criticalItemId: "critical-scaffold",
+    actorId: "tier1-dana",
+    policy: {
+      ownerUserId: "tier2-avery",
+      templateId: "template-two-hour-task",
+      mechanisms: ["interval", "fixed-time"],
+      intervalMinutes: 120,
+      fixedTimes: [480],
+      triggers: [],
+      requiredFields: ["progress", "condition", "constraint", "recovery", "next-target", "forecast-completion"]
+    }
+  });
+}
+
+function countOccurrences(value: string, expected: string) {
+  return value.split(expected).length - 1;
 }

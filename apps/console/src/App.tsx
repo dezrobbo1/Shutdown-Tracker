@@ -3,8 +3,16 @@ import {
   createInitialTrialState,
   formatTrialTime,
   isTrialBridgeMessage,
+  trialActionResultMessage,
+  trialHeartbeatResultMessage,
   trialStateMessage,
   type TrialAction,
+  type TrialBridgeActionMessage,
+  type TrialBridgeActionResultMessage,
+  type TrialBridgeHeartbeatMessage,
+  type TrialBridgeHeartbeatResultMessage,
+  type TrialBridgeMobileReadyMessage,
+  type TrialBridgeStateMessage,
   type TrialState
 } from "@shutdown-tracker/trial-model";
 import { ChevronDown, LogOut, RefreshCw } from "lucide-react";
@@ -46,6 +54,132 @@ export type AppProps = {
   trialMode?: boolean;
 };
 
+export type ConsoleTrialActionOutcome = {
+  accepted: boolean;
+  state: TrialState;
+  error?: string;
+};
+
+export function applyConsoleTrialAction(state: TrialState, action: TrialAction): ConsoleTrialActionOutcome {
+  try {
+    return { accepted: true, state: applyTrialAction(state, action) };
+  } catch (error) {
+    return {
+      accepted: false,
+      state,
+      error: error instanceof Error ? error.message : "The deterministic trial action could not be applied."
+    };
+  }
+}
+
+export function applyMobileTrialBridgeAction(state: TrialState, action: TrialAction): ConsoleTrialActionOutcome {
+  if (action.type === "assign-tier2" || action.type === "configure-critical" || action.type === "add-critical") {
+    return {
+      accepted: false,
+      state,
+      error: "That Tier 1 Console action is not available through the Mobile trial bridge."
+    };
+  }
+  if ("actorId" in action && state.users.find((user) => user.id === action.actorId)?.tier === "Tier 1") {
+    return {
+      accepted: false,
+      state,
+      error: "The Mobile trial bridge cannot act as a Tier 1 Console user."
+    };
+  }
+  return applyConsoleTrialAction(state, action);
+}
+
+export function createConsoleTrialActionResult(
+  sessionId: string,
+  requestId: string,
+  outcome: ConsoleTrialActionOutcome
+): TrialBridgeActionResultMessage {
+  return trialActionResultMessage(
+    sessionId,
+    requestId,
+    outcome.accepted,
+    outcome.state,
+    outcome.error
+  );
+}
+
+export type ConsoleTrialBridgeActionResolution = {
+  duplicate: boolean;
+  outcome: ConsoleTrialActionOutcome;
+  result: TrialBridgeActionResultMessage;
+};
+
+export class ConsoleTrialBridgeHost {
+  private sessionId: string | null = null;
+  private responseSequence = 0;
+  private readonly actionResults = new Map<string, ConsoleTrialBridgeActionResolution>();
+
+  reset(): void {
+    this.sessionId = null;
+    this.responseSequence = 0;
+    this.actionResults.clear();
+  }
+
+  receiveReady(message: TrialBridgeMobileReadyMessage, state: TrialState): TrialBridgeStateMessage {
+    if (message.sessionId !== this.sessionId) {
+      this.sessionId = message.sessionId;
+      this.responseSequence = 0;
+      this.actionResults.clear();
+    }
+    return trialStateMessage(
+      message.sessionId,
+      this.nextResponseId("state"),
+      state,
+      message.requestId
+    );
+  }
+
+  createStateMessage(state: TrialState): TrialBridgeStateMessage | null {
+    if (!this.sessionId) return null;
+    return trialStateMessage(this.sessionId, this.nextResponseId("state"), state);
+  }
+
+  receiveAction(
+    message: TrialBridgeActionMessage,
+    state: TrialState
+  ): ConsoleTrialBridgeActionResolution | null {
+    if (message.sessionId !== this.sessionId) return null;
+    const cached = this.actionResults.get(message.requestId);
+    if (cached) return { ...cached, duplicate: true };
+
+    const outcome = applyMobileTrialBridgeAction(state, message.action);
+    const resolution = {
+      duplicate: false,
+      outcome,
+      result: createConsoleTrialActionResult(message.sessionId, message.requestId, outcome)
+    };
+    this.actionResults.set(message.requestId, resolution);
+    return resolution;
+  }
+
+  receiveHeartbeat(message: TrialBridgeHeartbeatMessage): TrialBridgeHeartbeatResultMessage | null {
+    if (message.sessionId !== this.sessionId) return null;
+    return trialHeartbeatResultMessage(message.sessionId, message.requestId);
+  }
+
+  private nextResponseId(kind: "state"): string {
+    this.responseSequence += 1;
+    return `console-${kind}-${this.responseSequence}`;
+  }
+}
+
+export function isTrustedConsoleTrialBridgeEvent(
+  event: { source: unknown; origin: string; data: unknown },
+  expectedSource: Window | null,
+  expectedOrigin: string
+) {
+  return event.source === expectedSource
+    && expectedOrigin.length > 0
+    && event.origin === expectedOrigin
+    && isTrialBridgeMessage(event.data);
+}
+
 export function App({
   initialView = "login",
   initialSection = "Today",
@@ -59,6 +193,7 @@ export function App({
   const trialStateRef = useRef(trialState);
   const mobileWindowRef = useRef<Window | null>(null);
   const mobileOriginRef = useRef("");
+  const bridgeHostRef = useRef(new ConsoleTrialBridgeHost());
   const [trialError, setTrialError] = useState("");
   const [view, setView] = useState<ConsoleView>(initialView);
   const [activeSection, setActiveSection] = useState<ConsoleSection>(initialSection);
@@ -69,44 +204,63 @@ export function App({
   const [loadState, setLoadState] = useState<ConsoleReviewLoadState>(() => trialEnabled ? trialReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
   const [reviewAttempted, setReviewAttempted] = useState(false);
 
-  const dispatchTrialAction = useCallback((action: TrialAction) => {
-    try {
-      const next = applyTrialAction(trialStateRef.current, action);
-      trialStateRef.current = next;
-      setTrialState(next);
+  const commitTrialActionOutcome = useCallback((action: TrialAction, outcome: ConsoleTrialActionOutcome) => {
+    if (outcome.accepted) {
+      trialStateRef.current = outcome.state;
+      setTrialState(outcome.state);
       if (action.type === "reset") {
         setActiveSection("Today");
         setTaskId(null);
         setTaskOrigin("Today");
       }
       setTrialError("");
-    } catch (error) {
-      setTrialError(error instanceof Error ? error.message : "The deterministic trial action could not be applied.");
+    } else {
+      setTrialError(outcome.error ?? "The deterministic trial action could not be applied.");
     }
   }, []);
 
-  const postTrialState = useCallback((state: TrialState) => {
+  const dispatchTrialAction = useCallback((action: TrialAction) => {
+    const outcome = applyConsoleTrialAction(trialStateRef.current, action);
+    commitTrialActionOutcome(action, outcome);
+    return outcome;
+  }, [commitTrialActionOutcome]);
+
+  const postTrialMessage = useCallback((message: unknown) => {
     const mobileWindow = mobileWindowRef.current;
     const targetOrigin = mobileOriginRef.current;
     if (!mobileWindow || mobileWindow.closed || !targetOrigin) return;
-    mobileWindow.postMessage(trialStateMessage(state), targetOrigin);
+    mobileWindow.postMessage(message, targetOrigin);
   }, []);
 
   useEffect(() => {
     trialStateRef.current = trialState;
-    if (trialEnabled) postTrialState(trialState);
-  }, [postTrialState, trialEnabled, trialState]);
+    if (trialEnabled) {
+      const message = bridgeHostRef.current.createStateMessage(trialState);
+      if (message) postTrialMessage(message);
+    }
+  }, [postTrialMessage, trialEnabled, trialState]);
 
   useEffect(() => {
     if (!trialEnabled) return undefined;
     function receiveMobileTrialMessage(event: MessageEvent) {
-      if (event.source !== mobileWindowRef.current || event.origin !== mobileOriginRef.current || !isTrialBridgeMessage(event.data)) return;
-      if (event.data.kind === "mobile-ready") postTrialState(trialStateRef.current);
-      if (event.data.kind === "action") dispatchTrialAction(event.data.action);
+      if (!isTrustedConsoleTrialBridgeEvent(event, mobileWindowRef.current, mobileOriginRef.current)) return;
+      if (event.data.kind === "mobile-ready") {
+        postTrialMessage(bridgeHostRef.current.receiveReady(event.data, trialStateRef.current));
+      }
+      if (event.data.kind === "action") {
+        const resolution = bridgeHostRef.current.receiveAction(event.data, trialStateRef.current);
+        if (!resolution) return;
+        if (!resolution.duplicate) commitTrialActionOutcome(event.data.action, resolution.outcome);
+        postTrialMessage(resolution.result);
+      }
+      if (event.data.kind === "heartbeat") {
+        const result = bridgeHostRef.current.receiveHeartbeat(event.data);
+        if (result) postTrialMessage(result);
+      }
     }
     window.addEventListener("message", receiveMobileTrialMessage);
     return () => window.removeEventListener("message", receiveMobileTrialMessage);
-  }, [dispatchTrialAction, postTrialState, trialEnabled]);
+  }, [commitTrialActionOutcome, postTrialMessage, trialEnabled]);
 
   const openMobileTrial = useCallback(() => {
     try {
@@ -116,6 +270,7 @@ export function App({
       mobileOriginRef.current = url.origin;
       const mobileWindow = window.open(url.toString(), "shutdown-tracker-mobile-trial");
       if (!mobileWindow) throw new Error("The Mobile trial window was blocked by the browser.");
+      bridgeHostRef.current.reset();
       mobileWindowRef.current = mobileWindow;
       setTrialError("");
     } catch (error) {

@@ -264,12 +264,14 @@ summary:focus-visible {
 }
 
 .task-title-row h3,
+.task-title-row h4,
 .task-detail-header h2 {
   margin: 4px 0;
   color: #17201a;
 }
 
-.task-title-row h3 {
+.task-title-row h3,
+.task-title-row h4 {
   font-size: 1.05rem;
 }
 
@@ -884,6 +886,35 @@ dd {
   padding: 10px 12px;
 }
 
+.critical-reporting-assignments {
+  display: grid;
+  gap: 10px;
+  border-top: 1px solid #cbd6ca;
+  padding-top: 16px;
+}
+
+.critical-reporting-assignments h3 {
+  margin: 2px 0 0;
+  color: #1d473d;
+  font-size: 1.05rem;
+}
+
+.reporting-only-scope,
+.reporting-only-note {
+  margin: 0;
+  color: #536258;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.reporting-only-card {
+  border-left: 4px solid #b7792a;
+}
+
+.reporting-only-detail .task-detail-header > .status-chip {
+  margin-top: 8px;
+}
+
 .trial-task-detail .task-detail-section p {
   overflow-wrap: anywhere;
 }
@@ -1060,6 +1091,12 @@ dd {
 .trial-obligation > header > div {
   display: grid;
   gap: 3px;
+}
+
+.trial-obligation > header h4 {
+  margin: 0;
+  color: #17201a;
+  font-size: 0.95rem;
 }
 
 .trial-obligation > header span:not(.status-chip) {
