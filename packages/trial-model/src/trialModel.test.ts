@@ -123,15 +123,29 @@ describe("deterministic operational trial model", () => {
 
   it("prevents reporting-only users from mutating task-owned problems or actions", () => {
     const initial = createInitialTrialState();
+    const withTaskRecords = applyTrialAction(initial, {
+      type: "cant-start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Scaffold access unavailable",
+      whatIsNeeded: "Access team to release the scaffold",
+      createProblem: true,
+      createAction: true
+    });
+    const problem = withTaskRecords.problems.at(-1);
+    const action = withTaskRecords.actions.at(-1);
 
-    expect(() => applyTrialAction(initial, {
+    expect(problem?.taskId).toBe("task-scaffold-access");
+    expect(action?.taskId).toBe("task-scaffold-access");
+
+    expect(() => applyTrialAction(withTaskRecords, {
       type: "resolve-problem",
-      problemId: "problem-material",
+      problemId: problem!.id,
       actorId: "tier2-avery"
     })).toThrow(/does not have task-update authority/i);
-    expect(() => applyTrialAction(initial, {
+    expect(() => applyTrialAction(withTaskRecords, {
       type: "complete-action",
-      actionId: "action-material",
+      actionId: action!.id,
       actorId: "tier2-avery"
     })).toThrow(/does not have task-update authority/i);
   });
