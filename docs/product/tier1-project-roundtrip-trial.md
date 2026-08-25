@@ -23,7 +23,7 @@ Enable the Console trial only with the exact value `true`:
 VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
 ```
 
-The existing fixed deterministic trial remains independently available through `VITE_SHUTDOWN_TRACKER_TRIAL_MODE=true`. Outside the explicit round-trip mode, ordinary Export remains not finalised.
+This is the only interactive frontend trial currently retained. Outside the explicit round-trip mode, ordinary Export remains not finalised and the ordinary Console/Mobile review shells do not gain write behaviour.
 
 ## Source import and temporary project
 

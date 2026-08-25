@@ -38,7 +38,6 @@ The six primary product-authority documents are:
 
 Supporting product contracts include:
 
-- [Deterministic Operational Trial](deterministic-operational-trial.md)
 - [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md)
 - [Project Operational Mapping](project-operational-mapping.md)
 - [Trial Foundation Retention Map](trial-foundation-retention-map.md)
@@ -80,7 +79,7 @@ A project may configure a progress method appropriate to its work:
 - work/assignment progress (`% Work Complete`) only where resource Work is genuinely maintained;
 - state-only tracking where a percentage is inappropriate.
 
-The current trial records Tracker progress in product language. It does not promise a one-to-one mapping to `% Complete`, `% Work Complete`, or `Physical % Complete`.
+The Tier 1 Project round-trip trial records Tracker progress in product language and lets a reviewer test optional field proposals. It does not promise a one-to-one mapping to `% Complete`, `% Work Complete`, or `Physical % Complete`.
 
 ## Deferred Project export
 

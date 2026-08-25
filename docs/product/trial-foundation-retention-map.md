@@ -35,7 +35,7 @@ This document records how the active product foundation treats work associated w
 
 ## Obsolete main-branch prototype removed
 
-The earlier Python XML simulation harness was removed from this foundation. It derived application actors from an imported department field, modelled supervisor/planner approvals, and directly patched a narrow set of Project XML values. That model conflicts with explicit Tier 1/Tier 2/Tier 3 assignments and with the decision to validate Tracker execution and progress before approving a replacement Project-bound contract. A future deterministic operational trial should exercise the approved frontend model and structured Tracker events without mutating raw Project XML.
+The earlier Python XML simulation harness was removed from this foundation. It derived application actors from an imported department field, modelled supervisor/planner approvals, and directly patched a narrow set of Project XML values. That model conflicts with explicit Tier 1/Tier 2/Tier 3 assignments and with the decision to validate Tracker execution and progress before approving a replacement Project-bound contract. The retained Tier 1 Project round-trip trial instead keeps the imported source immutable and applies reviewed proposals only to a separate browser-local candidate.
 
 ## Interpretation
 

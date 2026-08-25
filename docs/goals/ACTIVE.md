@@ -1,44 +1,43 @@
-# Active Goal: Tier 1 Console Project Round-Trip Trial
+# Active Goal: Remove the Fixed Synthetic Operational Trial
 
 ## Outcome
 
-Provide an opt-in, frontend-only Tier 1 Console trial that loads a disposable Microsoft Project XML/MSPDI source into browser memory, applies realistic Tracker execution/progress evidence, generates a separate complete-source experimental candidate, and supports manual Microsoft Project recalculation plus local result comparison.
+Remove the fixed fictional deterministic operational trial from the Console, Mobile App, shared trial model, tests, and documentation. Preserve the ordinary static review shells and the separate imported Tier 1 Project round-trip trial.
 
 ## Success criteria
 
-- `VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true` enables a clearly labelled browser-local/no-persistence/no-approved-contract workflow while default Export remains not finalised.
-- The exact original XML remains unchanged and drives a temporary imported hierarchy with preserved Project task UID/ID/WBS and source facts.
-- Synthetic Tier 1 has whole-project Console authority and may exercise Can't Start, Start, Pause, Resume, Finish, and field-progress observation on every executable leaf.
-- No mapping is included by default. The reviewer explicitly selects supported proposals for Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`.
-- A source-preserving browser patcher applies only selected fields to one exact task identity, fails safely on missing/duplicate/stale/unsupported targets, and creates a separate candidate with source/candidate hashes.
-- The reviewer can download the candidate, operate Microsoft Project manually, re-import a new XML result locally, conservatively compare selected inputs and other differences, and record a disposable evidence disposition.
-- Reset/discard removes generated session state without changing or overwriting the source.
-- Existing deterministic operational trial and Mobile interaction model remain intact.
+- The legacy fixed-trial and Mobile-bridge environment variables no longer enable or configure application behaviour.
+- The fixed scenario, guided checklist, synthetic personas, simulated scenario clock, and Console-Mobile trial bridge are removed.
+- Mobile remains the existing static/synthetic `Assigned Tasks -> Task Detail` visual shell; this change does not redesign its information architecture or interaction model.
+- The Console retains ordinary static review behaviour and the explicit `VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true` evidence workflow.
+- The shared TypeScript model retains only the in-memory Tier 1 execution state, action reducer, and projections required by the imported round-trip adapter.
+- Documentation and implementation status no longer present the removed fixed trial as current capability or product authority.
+- The imported Tier 1 trial remains browser-local, disposable, XML/MSPDI-only, and experimental. It does not establish production persistence or an approved export contract.
 
 ## Non-goals
 
-- Production backend, API, authentication, persistence, adoption, approval, audit, offline, or database behaviour.
-- PR #48's candidate approval, sealed preview, batch approval, review bootstrap, or mandatory acceptance workflow.
+- Mobile redesign or production Mobile execution.
+- Production backend, API, authentication, persistence, audit, offline, database, or migration work.
+- New Tracker execution, assignment, Critical reporting, or project-lifecycle product behaviour.
 - A final Tracker-to-Project mapping or export/round-trip contract.
+- PR #48's candidate approval, sealed preview, batch approval, review bootstrap, or mandatory acceptance workflow.
 - Native `.mpp`, automatic Microsoft Project operation, Project recalculation inside Shutdown Tracker, scheduling, CPM, or dependency consequences.
-- Mobile redesign or production task execution.
-- Committing real schedules or generated candidate/result artifacts.
 
 ## Required validation
 
 - Run `npm ci`, `npm test`, `npm run build`, repository-standard TypeScript checks, and `git diff --check`.
 - Validate changed Markdown links and repository paths.
-- Prove source retention, exact UID targeting, explicit mapping selection, selective complete-source patching, safe failures, result identity/input checks, conservative difference classification, and deterministic reset.
-- Confirm no backend Java, worker, migration, API-contract, auth, Mobile UI, fixture, dependency/lockfile, real Project data, generated artifact, or final export-authority change.
+- Confirm the legacy flags, fixed scenario, guided workflow, linked-window bridge, and removed trial documentation are absent.
+- Re-run the Tier 1 Project round-trip tests and confirm imported hierarchy, execution, mapping, source-preserving candidate generation, result comparison, and reset remain intact.
+- Confirm no backend Java, worker, migration, API-contract, auth, dependency/lockfile, real Project data, or generated artifact changes.
 
 ## Safety constraints
 
 - Do not merge or mark the draft pull request ready.
 - Do not modify `main` directly, rewrite history, force-push, rebase, amend, squash, or use destructive cleanup commands.
-- Do not modify Issue #57.
 - Keep Microsoft Project as schedule calculation and master-file authority.
-- Never overwrite the imported source or imply a trial disposition is production approval.
+- Never overwrite an imported source or imply a trial disposition is production approval.
 
 ## Completion conditions
 
-The slice is complete when implementation, tests, and documentation agree; required validation passes; the complete diff is frontend/product-documentation scoped; and a draft `frontend/tier1-console-roundtrip-trial -> main` pull request presents the evidence workflow without claiming a production backend or final Project export contract.
+The slice is complete when code, tests, and documentation agree that the fixed synthetic trial has been removed; the imported Tier 1 round-trip trial remains functional and explicitly bounded; required validation passes; and a draft `frontend/remove-synthetic-trial -> main` pull request reports the removal without claiming production behaviour or a final Project export contract.

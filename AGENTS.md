@@ -28,7 +28,7 @@ A pending manual or external gate does not justify claiming completion. Finish t
 
 Microsoft Project remains the schedule calculation and master-file authority. Shutdown Tracker owns operational execution truth, task assignments, task-owned records, Critical reporting, imported-snapshot provenance, and audit.
 
-The current product priority is deterministic frontend trial and validation of Today, Tasks, assignments, task execution, progress observations, Critical reporting, and task-centred workflows. The exact Project export, approval, candidate, adoption, and round-trip design is deferred until that trial produces evidence. PR #48 and candidate/export code already present on main are technical history or experimental infrastructure, not active product authority or delivery prerequisites.
+The current bounded frontend evidence capability is the imported Tier 1 Project round-trip trial. It uses browser-local, disposable state to investigate Tracker execution/progress inputs and Project-field proposals without approving a production export contract. The exact Project export, approval, candidate, adoption, and round-trip design remains deferred until evidence supports a separate decision. PR #48 and candidate/export code already present on main are technical history or experimental infrastructure, not active product authority or delivery prerequisites.
 
 Shutdown Tracker must not:
 
@@ -44,7 +44,7 @@ Shutdown Tracker may:
 - import, hash, parse, inspect, and retain immutable Project source/snapshot facts;
 - use imported dates, hierarchy, assignments, progress, and Project Critical values as read-only source context;
 - capture audited Tracker execution events and field progress observations separately from imported state;
-- trial product workflows with synthetic/static frontend state; and
+- run explicitly authorized browser-local product trials over disposable imported source data; and
 - retain bounded export code as explicitly labelled experimental infrastructure while the final contract is reconsidered.
 
 Other non-negotiable rules:
@@ -78,7 +78,7 @@ The six product documents listed first are primary authority. No old named-role 
 - Do not infer that a documented target workflow already exists in runtime code.
 - Do not describe existing export preview, approval, MSPDI writer, or review-bootstrap code as the approved product workflow.
 - Do not reintroduce PR #48's exact candidate approval, sealed preview, browser acceptance workspace, or manual round-trip gate as a product prerequisite without a new product decision and ADR.
-- Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist, except inside an explicitly authorized and visibly labelled frontend-only trial whose changes remain synthetic/browser-local and disposable.
+- Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist, except inside an explicitly authorized and visibly labelled frontend-only trial whose changes remain browser-local and disposable.
 - Keep the ordinary Mobile execution flow to Can't Start, Start, Pause, Resume, and Finish with system-captured action timestamps. Can't Start must leave execution Not Started; manual backdating/correction requires a separately reviewed audited workflow.
 - Keep Critical reporting policy versioned per item, configurable from supported timing/trigger mechanisms and a controlled content catalogue. Reuse known task facts and do not introduce a generic form builder or a second execution-state model.
 - Keep the Console top-level structure fixed to Today, Tasks, Critical, Import / Export, and Project Settings.
