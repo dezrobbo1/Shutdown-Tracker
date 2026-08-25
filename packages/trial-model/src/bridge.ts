@@ -427,13 +427,18 @@ function isCriticalObligation(value: unknown): boolean {
     || !isArrayOf(value.mechanisms, isReportingObligationMechanism)
     || value.mechanisms.length === 0
     || !value.mechanisms.includes(value.mechanism)
-    || (value.triggerEventId !== undefined && !isIdentifier(value.triggerEventId))
+    || !isUniqueIdentifierArray(value.triggerEventIds)
     || !isOptionalString(value.requestedReason)
-    || (value.satisfiedByEventId !== undefined && !isIdentifier(value.satisfiedByEventId))
+    || !isUniqueIdentifierArray(value.satisfiedByEventIds)
+    || !value.satisfiedByEventIds.every((eventId) => value.triggerEventIds.includes(eventId))
     || !isOptionalInteger(value.supersededAt)
     || (value.supersededByPolicyVersionId !== undefined && !isIdentifier(value.supersededByPolicyVersionId))
   ) return false;
   return (value.supersededAt === undefined) === (value.supersededByPolicyVersionId === undefined);
+}
+
+function isUniqueIdentifierArray(value: unknown): value is string[] {
+  return isArrayOf(value, isIdentifier) && new Set(value).size === value.length;
 }
 
 function isCriticalReport(value: unknown): boolean {

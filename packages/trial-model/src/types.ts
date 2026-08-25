@@ -179,9 +179,9 @@ export type CriticalObligation = {
   dueAt: number;
   mechanism: Exclude<ReportingMechanism, "none">;
   mechanisms: Array<Exclude<ReportingMechanism, "none">>;
-  triggerEventId?: string;
+  triggerEventIds: string[];
   requestedReason?: string;
-  satisfiedByEventId?: string;
+  satisfiedByEventIds: string[];
   supersededAt?: number;
   supersededByPolicyVersionId?: string;
 };

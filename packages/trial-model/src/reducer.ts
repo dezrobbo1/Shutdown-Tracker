@@ -225,7 +225,7 @@ function submitCriticalReport(state: TrialState, obligationId: string, actorId: 
   if (!projection) throw new Error("The reporting obligation is not available yet.");
   if (projection.owner.id !== actorId) throw new Error("Only the assigned Tier 2 reporting owner can submit this report.");
   if (projection.obligation.supersededByPolicyVersionId) throw new Error("The reporting obligation was superseded by a newer Critical policy version.");
-  if (projection.obligation.satisfiedByEventId) throw new Error("Known structured task facts already satisfied this event-triggered reporting obligation.");
+  if (projection.obligation.satisfiedByEventIds.length > 0) throw new Error("Known structured task facts already satisfied this event-triggered reporting obligation.");
   if (projection.currentReport) throw new Error("The immutable report already exists; use a superseding correction.");
   for (const field of projection.requiredInputFields) requireNonBlank(values[field], `Critical report field ${field}`);
   const reportId = nextId(state, "report");
@@ -250,7 +250,7 @@ function processReportDueEvents(state: TrialState, previousMinute: number, targe
     if (obligation.dueAt > previousMinute && obligation.dueAt <= targetMinute && !state.processedClockEvents.includes(key)) {
       state.processedClockEvents.push(key);
       const alreadyReported = state.criticalReports.some((report) => report.obligationId === obligation.id);
-      if (alreadyReported || obligation.satisfiedByEventId || obligation.supersededByPolicyVersionId) continue;
+      if (alreadyReported || obligation.satisfiedByEventIds.length > 0 || obligation.supersededByPolicyVersionId) continue;
       const item = requireCriticalItem(state, obligation.criticalItemId);
       appendHistoryAt(state, "report-due", obligation.dueAt, TRIAL_SYSTEM_ACTOR_ID, `Critical report became due for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
     }
@@ -308,15 +308,17 @@ function createEventObligations(state: TrialState, taskId: string, trigger: Repo
         createdAt: eventAt,
         dueAt,
         mechanism: "event" as const,
-        mechanisms: ["event" as const]
+        mechanisms: ["event" as const],
+        triggerEventIds: [],
+        satisfiedByEventIds: []
       };
     if (!state.criticalObligations.includes(obligation)) state.criticalObligations.push(obligation);
     if (!obligation.mechanisms.includes("event")) obligation.mechanisms.push("event");
-    obligation.triggerEventId ??= triggerEventId;
+    if (!obligation.triggerEventIds.includes(triggerEventId)) obligation.triggerEventIds.push(triggerEventId);
     const projection = selectCriticalObligationProjections({ ...state, now: eventAt })
       .find((candidate) => candidate.obligation.id === obligation.id);
     const satisfied = policy.requiredFields.every((field) => projection?.prepopulatedFacts[field] !== undefined);
-    if (satisfied) obligation.satisfiedByEventId = triggerEventId;
+    if (satisfied && !obligation.satisfiedByEventIds.includes(triggerEventId)) obligation.satisfiedByEventIds.push(triggerEventId);
     appendHistoryAt(state, "report-obligation", eventAt, TRIAL_SYSTEM_ACTOR_ID, satisfied ? `Event-triggered reporting obligation for ${requireTask(state, item.sourceTaskId).name} was satisfied by known structured task facts.` : `Event-triggered Critical report requested for ${requireTask(state, item.sourceTaskId).name}.`, item.sourceTaskId, item.id, obligation.id);
   }
 }
@@ -344,7 +346,18 @@ function schedulePolicyObligations(state: TrialState, item: CriticalItem, policy
   }
   for (const [dueAt, mechanismSet] of [...candidates.entries()].sort(([left], [right]) => left - right)) {
     const mechanisms = [...mechanismSet];
-    const obligation: CriticalObligation = { id: nextId(state, "obligation"), criticalItemId: item.id, policyVersionId: policy.id, ownerUserId: policy.ownerUserId, createdAt: state.now, dueAt, mechanism: mechanisms[0], mechanisms };
+    const obligation: CriticalObligation = {
+      id: nextId(state, "obligation"),
+      criticalItemId: item.id,
+      policyVersionId: policy.id,
+      ownerUserId: policy.ownerUserId,
+      createdAt: state.now,
+      dueAt,
+      mechanism: mechanisms[0],
+      mechanisms,
+      triggerEventIds: [],
+      satisfiedByEventIds: []
+    };
     state.criticalObligations.push(obligation);
   }
 }
@@ -358,7 +371,7 @@ function supersedeFuturePolicyObligations(state: TrialState, criticalItemId: str
       || obligation.policyVersionId === supersedingPolicyVersionId
       || obligation.dueAt <= state.now
       || reportedObligationIds.has(obligation.id)
-      || obligation.satisfiedByEventId
+      || obligation.satisfiedByEventIds.length > 0
       || obligation.supersededByPolicyVersionId
     ) continue;
     obligation.supersededAt = state.now;

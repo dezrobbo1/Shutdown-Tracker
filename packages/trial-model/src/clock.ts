@@ -31,7 +31,7 @@ export function nextReportDueMinute(state: TrialState) {
   const submittedObligationIds = new Set(state.criticalReports.map((report) => report.obligationId));
   let next: number | null = null;
   for (const obligation of state.criticalObligations) {
-    if (submittedObligationIds.has(obligation.id) || obligation.satisfiedByEventId || obligation.supersededByPolicyVersionId) continue;
+    if (submittedObligationIds.has(obligation.id) || obligation.satisfiedByEventIds.length > 0 || obligation.supersededByPolicyVersionId) continue;
     if (obligation.dueAt <= state.now) continue;
     if (next === null || obligation.dueAt < next) next = obligation.dueAt;
   }

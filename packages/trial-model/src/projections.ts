@@ -64,7 +64,7 @@ export function selectTaskProgress(state: TrialState, taskId: string): number {
   if (selectExecutionState(state, taskId) === "Completed") return 100;
   const observation = state.progressObservations
     .filter((item) => item.taskId === taskId && item.at <= state.now)
-    .sort(byNewestAt)[0];
+    .sort(byNewestAtThenId)[0];
   if (observation) return observation.completionPercent;
   return task.importedProgress;
 }
@@ -328,11 +328,11 @@ function selectPrepopulatedFacts(state: TrialState, item: CriticalItem, fields: 
 function selectLatestFieldProgressObservation(state: TrialState, taskId: string) {
   return state.progressObservations
     .filter((observation) => observation.taskId === taskId && observation.at <= state.now)
-    .sort(byNewestAt)[0] ?? null;
+    .sort(byNewestAtThenId)[0] ?? null;
 }
 
 function obligationState(state: TrialState, obligation: CriticalObligationProjection["obligation"], report: CriticalReport | null): ObligationState {
-  if (report || obligation.satisfiedByEventId) return "submitted";
+  if (report || obligation.satisfiedByEventIds.length > 0) return "submitted";
   if (obligation.supersededByPolicyVersionId) return "superseded";
   if (state.now < obligation.dueAt) return "upcoming";
   if (state.now === obligation.dueAt) return "due";
@@ -368,10 +368,6 @@ function timeOnly(minute: number) {
   return `${Math.floor(inDay / 60).toString().padStart(2, "0")}:${(inDay % 60).toString().padStart(2, "0")}`;
 }
 
-function byNewestAt<T extends { at: number }>(left: T, right: T) {
-  return right.at - left.at;
-}
-
-function byNewestAtThenId(left: TrialHistoryEvent, right: TrialHistoryEvent) {
+function byNewestAtThenId<T extends { at: number; id: string }>(left: T, right: T) {
   return right.at - left.at || right.id.localeCompare(left.id);
 }

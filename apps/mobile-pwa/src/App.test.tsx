@@ -2,7 +2,11 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { applyTrialAction, createInitialTrialState } from "@shutdown-tracker/trial-model";
 import { App } from "./App";
-import { TrialMobileApp } from "./TrialMobileApp";
+import {
+  TrialMobileApp,
+  shouldResetMobilePresentation,
+  shouldResetMobilePresentationLocally
+} from "./TrialMobileApp";
 import { normalizeTrialHostOrigin } from "./trialBridgeClient";
 
 describe("mobile PWA assigned-task shell", () => {
@@ -214,6 +218,32 @@ describe("mobile PWA assigned-task shell", () => {
 });
 
 describe("mobile deterministic operational trial", () => {
+  it("resets presentation only for an accepted reset acknowledgement", () => {
+    expect(shouldResetMobilePresentation({ cause: "handshake" })).toBe(false);
+    expect(shouldResetMobilePresentation({ cause: "sync" })).toBe(false);
+    expect(shouldResetMobilePresentation({
+      cause: "action-result",
+      action: { type: "reset" },
+      accepted: false
+    })).toBe(false);
+    expect(shouldResetMobilePresentation({
+      cause: "action-result",
+      action: { type: "advance-minutes", minutes: 15 },
+      accepted: true
+    })).toBe(false);
+    expect(shouldResetMobilePresentation({
+      cause: "action-result",
+      action: { type: "reset" },
+      accepted: true
+    })).toBe(true);
+    expect(shouldResetMobilePresentationLocally({ type: "reset" }, { status: "local-only" })).toBe(true);
+    expect(shouldResetMobilePresentationLocally({ type: "reset" }, { status: "sent", requestId: "reset-1" })).toBe(false);
+    expect(shouldResetMobilePresentationLocally(
+      { type: "advance-minutes", minutes: 15 },
+      { status: "local-only" }
+    )).toBe(false);
+  });
+
   it("activates an explicitly bounded deterministic trial without changing ordinary mode", () => {
     const ordinary = renderToString(<App />);
     const trial = renderToString(<App trialMode />);

@@ -5,7 +5,6 @@ import {
   REPORTING_FIELD_LABELS,
   REPORTING_MECHANISM_LABELS,
   TRIAL_DAY_END_MINUTE,
-  TRIAL_START_MINUTE,
   applyTrialAction,
   createInitialTrialState,
   formatTrialDateTime,
@@ -28,7 +27,11 @@ import {
   type TrialState,
   type TrialUser
 } from "@shutdown-tracker/trial-model";
-import { useTrialBridge } from "./trialBridgeClient";
+import {
+  useTrialBridge,
+  type TrialBridgeDelivery,
+  type TrialBridgeStateDeliveryContext
+} from "./trialBridgeClient";
 
 type TrialMobileAppProps = {
   initialState?: TrialState;
@@ -43,6 +46,16 @@ type ReportingOnlyContext = {
   obligations: CriticalObligationProjection[];
 };
 
+export function shouldResetMobilePresentation(context: TrialBridgeStateDeliveryContext) {
+  return context.cause === "action-result"
+    && context.accepted
+    && context.action.type === "reset";
+}
+
+export function shouldResetMobilePresentationLocally(action: TrialAction, delivery: TrialBridgeDelivery) {
+  return action.type === "reset" && delivery.status === "local-only";
+}
+
 export function TrialMobileApp({
   initialState,
   initialTaskId,
@@ -52,9 +65,9 @@ export function TrialMobileApp({
   const [userId, setUserId] = useState(initialUserId);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
   const [actionError, setActionError] = useState<string | null>(null);
-  const acceptHostState = useCallback((nextState: TrialState) => {
+  const acceptHostState = useCallback((nextState: TrialState, context: TrialBridgeStateDeliveryContext) => {
     setState(nextState);
-    if (isCanonicalResetState(nextState)) {
+    if (shouldResetMobilePresentation(context)) {
       setUserId(DEFAULT_USER_ID);
       setSelectedTaskId(null);
     }
@@ -85,8 +98,8 @@ export function TrialMobileApp({
     try {
       const nextState = applyTrialAction(state, action);
       setActionError(null);
-      sendAction(action, nextState);
-      if (action.type === "reset") {
+      const delivery = sendAction(action, nextState);
+      if (shouldResetMobilePresentationLocally(action, delivery)) {
         setUserId(DEFAULT_USER_ID);
         setSelectedTaskId(null);
       }
@@ -752,8 +765,8 @@ function CriticalObligationCard({ projection, user, dispatch }: { projection: Cr
         <div><dt>Mechanism</dt><dd>{projection.obligation.mechanisms.map((mechanism) => REPORTING_MECHANISM_LABELS[mechanism]).join(" + ")}</dd></div>
       </dl>
       {prepopulated.length > 0 ? <div className="known-facts"><strong>Known execution facts</strong><ul>{prepopulated.map(([field, value]) => <li key={field}>{REPORTING_FIELD_LABELS[field]}: {value}</li>)}</ul></div> : null}
-      {projection.obligation.satisfiedByEventId ? <p className="completed-copy">Required structured facts were already supplied by the execution event; no duplicate report entry is required.</p> : null}
-      {!report && !projection.obligation.satisfiedByEventId ? (
+      {projection.obligation.satisfiedByEventIds.length > 0 ? <p className="completed-copy">Required structured facts were already supplied by the execution event; no duplicate report entry is required.</p> : null}
+      {!report && projection.obligation.satisfiedByEventIds.length === 0 ? (
         <form className="trial-form critical-report-form" onSubmit={(event) => {
           const data = formData(event);
           const values: Partial<Record<ReportingField, string>> = {};
@@ -881,8 +894,4 @@ function requiredString(data: FormData, name: string) {
 function optionalString(data: FormData, name: string) {
   const value = requiredString(data, name);
   return value || undefined;
-}
-
-function isCanonicalResetState(state: TrialState) {
-  return state.now === TRIAL_START_MINUTE && state.nextSequence === 1000;
 }

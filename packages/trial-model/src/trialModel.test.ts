@@ -203,9 +203,9 @@ describe("deterministic operational trial model", () => {
     const withoutLinkedRecords = recordCantStart(configure(createInitialTrialState()), false);
     const eventId = withoutLinkedRecords.executionEvents.at(-1)!.id;
     const actionable = selectCriticalObligationProjections(withoutLinkedRecords)
-      .find((projection) => projection.obligation.triggerEventId === eventId)!;
+      .find((projection) => projection.obligation.triggerEventIds.includes(eventId))!;
 
-    expect(actionable.obligation.satisfiedByEventId).toBeUndefined();
+    expect(actionable.obligation.satisfiedByEventIds).toEqual([]);
     expect(actionable.prepopulatedFacts).toMatchObject({ progress: "0% · Not Started", condition: "Not Started" });
     expect(actionable.requiredInputFields).toEqual(["constraint", "recovery"]);
     expect(actionable.state).toBe("upcoming");
@@ -213,9 +213,9 @@ describe("deterministic operational trial model", () => {
     const withLinkedRecords = recordCantStart(configure(createInitialTrialState()), true);
     const linkedEventId = withLinkedRecords.executionEvents.at(-1)!.id;
     const satisfied = selectCriticalObligationProjections(withLinkedRecords)
-      .find((projection) => projection.obligation.triggerEventId === linkedEventId)!;
+      .find((projection) => projection.obligation.triggerEventIds.includes(linkedEventId))!;
 
-    expect(satisfied.obligation.satisfiedByEventId).toBe(linkedEventId);
+    expect(satisfied.obligation.satisfiedByEventIds).toEqual([linkedEventId]);
     expect(satisfied.requiredInputFields).toEqual([]);
     expect(satisfied.prepopulatedFacts.constraint).toContain("Scaffold access unavailable");
     expect(satisfied.prepopulatedFacts.recovery).toContain("Access team to release the scaffold");
@@ -314,9 +314,9 @@ describe("deterministic operational trial model", () => {
     });
     const eventId = state.executionEvents.at(-1)!.id;
     const obligation = selectCriticalObligationProjections(state)
-      .find((projection) => projection.obligation.triggerEventId === eventId)!;
+      .find((projection) => projection.obligation.triggerEventIds.includes(eventId))!;
 
-    expect(obligation.obligation.satisfiedByEventId).toBeUndefined();
+    expect(obligation.obligation.satisfiedByEventIds).toEqual([]);
     expect(obligation.prepopulatedFacts).toMatchObject({ progress: "0% · Paused", condition: "Paused" });
     expect(obligation.requiredInputFields).toEqual(["constraint", "recovery"]);
   });
@@ -556,7 +556,7 @@ describe("deterministic operational trial model", () => {
 
     expect(atEight).toHaveLength(1);
     expect(atEight[0]?.mechanisms).toEqual(["fixed-time", "event"]);
-    expect(atEight[0]?.triggerEventId).toBe(state.executionEvents.at(-1)?.id);
+    expect(atEight[0]?.triggerEventIds).toEqual([state.executionEvents.at(-1)?.id]);
     expect(selectCriticalObligationProjections(state).find((projection) => projection.obligation.id === atEight[0]?.id)?.requiredInputFields).toEqual(["constraint", "recovery"]);
   });
 
@@ -634,7 +634,10 @@ describe("deterministic operational trial model", () => {
       lateCause: "Access released late",
       actionStillNeeded: "None"
     });
-    const satisfiedObligation = satisfied.criticalObligations.find((obligation) => obligation.policyVersionId === satisfiedPolicyId && obligation.satisfiedByEventId && obligation.triggerEventId === satisfied.executionEvents.at(-1)?.id)!;
+    const satisfiedEventId = satisfied.executionEvents.at(-1)!.id;
+    const satisfiedObligation = satisfied.criticalObligations.find((obligation) => obligation.policyVersionId === satisfiedPolicyId
+      && obligation.satisfiedByEventIds.includes(satisfiedEventId)
+      && obligation.triggerEventIds.includes(satisfiedEventId))!;
     satisfied = applyTrialAction(satisfied, { type: "advance-to", minute: satisfiedObligation.dueAt });
     expect(satisfied.processedClockEvents).toContain(`report-due:${satisfiedObligation.id}`);
     expect(satisfied.history.some((event) => event.type === "report-due" && event.obligationId === satisfiedObligation.id)).toBe(false);
@@ -672,7 +675,8 @@ describe("deterministic operational trial model", () => {
       lateCause: "Late access release",
       actionStillNeeded: "None"
     });
-    expect(selectCriticalObligationProjections(started).some((item) => item.obligation.mechanism === "event" && item.obligation.triggerEventId?.startsWith("event-"))).toBe(true);
+    expect(selectCriticalObligationProjections(started).some((item) => item.obligation.mechanism === "event"
+      && item.obligation.triggerEventIds.some((eventId) => eventId.startsWith("event-")))).toBe(true);
   });
 
   it("keeps submitted reports immutable and corrects by supersession", () => {

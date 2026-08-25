@@ -234,7 +234,9 @@ function OverviewPanel({ projection }: { projection: TaskProjection }) {
 }
 
 function ExecutionPanel({ state, taskId }: { state: TrialState; taskId: string }) {
-  const events = state.executionEvents.filter((event) => event.taskId === taskId && event.at <= state.now).sort((left, right) => right.at - left.at);
+  const events = state.executionEvents
+    .filter((event) => event.taskId === taskId && event.at <= state.now)
+    .sort((left, right) => right.at - left.at || right.id.localeCompare(left.id));
   return <><PanelHeading title="Execution" detail="Mobile actions use the simulated clock; Tier 1 observes the same truth." /><ol className="activity-list trial-record-list">{events.length === 0 ? <li>No Tracker execution event yet.</li> : events.map((event) => <li key={event.id}><strong>{formatTrialTime(event.at)} · {executionEventLabel(event.type)}</strong><span>{event.reason ?? event.lateCause ?? "System-captured action time"}</span></li>)}</ol></>;
 }
 

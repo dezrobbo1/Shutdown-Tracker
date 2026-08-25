@@ -17,6 +17,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TrialBridgeClient,
   type TrialBridgeConnectionState,
+  type TrialBridgeStateDeliveryContext,
   type TrialBridgeTarget
 } from "./trialBridgeClient";
 
@@ -33,6 +34,10 @@ describe("Mobile deterministic trial bridge client", () => {
     expect(harness.client.sendAction({ type: "advance-minutes", minutes: 15 }, localState)).toEqual({ status: "local-only" });
     expect(harness.connectionStates).toEqual(["standalone"]);
     expect(harness.states.at(-1)).toEqual(localState);
+    expect(harness.stateDeliveries.at(-1)?.context).toEqual({
+      cause: "local-action",
+      action: { type: "advance-minutes", minutes: 15 }
+    });
   });
 
   it("connects only from the exact source, origin, session, and ready request", () => {
@@ -61,6 +66,58 @@ describe("Mobile deterministic trial bridge client", () => {
     harness.client.receive({ source: harness.source, origin: harness.target!.origin, data: readyState(harness, ready) });
     expect(harness.client.getConnectionState()).toBe("connected");
     expect(harness.states.at(-1)).toEqual(harness.initialState);
+    expect(harness.stateDeliveries.at(-1)?.context).toEqual({ cause: "handshake" });
+  });
+
+  it("labels a normal canonical-state sync separately from a reset action result", () => {
+    vi.useFakeTimers();
+    const harness = createConnectedHarness();
+
+    harness.client.receive({
+      source: harness.source,
+      origin: harness.target!.origin,
+      data: trialStateMessage(SESSION_ID, "console-state-sync", harness.initialState)
+    });
+    expect(harness.stateDeliveries.at(-1)).toEqual({
+      state: harness.initialState,
+      context: { cause: "sync" }
+    });
+
+    const delivery = harness.client.sendAction({ type: "reset" }, harness.initialState);
+    if (delivery.status !== "sent") throw new Error("Expected sent reset action");
+    expect(harness.stateDeliveries.at(-1)?.context).toEqual({
+      cause: "local-action",
+      action: { type: "reset" }
+    });
+
+    harness.client.receive({
+      source: harness.source,
+      origin: harness.target!.origin,
+      data: trialActionResultMessage(SESSION_ID, delivery.requestId, true, harness.initialState)
+    });
+    expect(harness.stateDeliveries.at(-1)).toEqual({
+      state: harness.initialState,
+      context: { cause: "action-result", action: { type: "reset" }, accepted: true }
+    });
+  });
+
+  it("does not label a rejected reset acknowledgement as accepted", () => {
+    vi.useFakeTimers();
+    const harness = createConnectedHarness();
+    const delivery = harness.client.sendAction({ type: "reset" }, harness.initialState);
+    if (delivery.status !== "sent") throw new Error("Expected sent reset action");
+
+    harness.client.receive({
+      source: harness.source,
+      origin: harness.target!.origin,
+      data: trialActionResultMessage(SESSION_ID, delivery.requestId, false, harness.initialState, "Reset rejected")
+    });
+    expect(harness.stateDeliveries.at(-1)?.context).toEqual({
+      cause: "action-result",
+      action: { type: "reset" },
+      accepted: false
+    });
+    expect(harness.errors.at(-1)).toBe("Reset rejected");
   });
 
   it("keeps a connecting action local and terminally ignores the late handshake", () => {
@@ -196,6 +253,7 @@ type Harness = {
   target: TrialBridgeTarget | null;
   posted: Array<{ message: TrialBridgeMessage; origin: string }>;
   states: TrialState[];
+  stateDeliveries: Array<{ state: TrialState; context: TrialBridgeStateDeliveryContext }>;
   connectionStates: TrialBridgeConnectionState[];
   errors: string[];
 };
@@ -204,6 +262,7 @@ function createHarness(withTarget: object | null = {}): Harness {
   const initialState = createInitialTrialState();
   const posted: Harness["posted"] = [];
   const states: TrialState[] = [];
+  const stateDeliveries: Harness["stateDeliveries"] = [];
   const connectionStates: TrialBridgeConnectionState[] = [];
   const errors: string[] = [];
   const source: HarnessSource = {
@@ -221,10 +280,13 @@ function createHarness(withTarget: object | null = {}): Harness {
     target,
     sessionId: SESSION_ID,
     onConnectionState: (state) => connectionStates.push(state),
-    onState: (state) => states.push(state),
+    onState: (state, context) => {
+      states.push(state);
+      stateDeliveries.push({ state, context });
+    },
     onError: (message) => errors.push(message)
   });
-  return { client, initialState, source, target, posted, states, connectionStates, errors };
+  return { client, initialState, source, target, posted, states, stateDeliveries, connectionStates, errors };
 }
 
 function createConnectedHarness(): Harness {

@@ -284,7 +284,18 @@ function obligation(
   dueAt: number,
   mechanism: CriticalObligation["mechanism"]
 ): CriticalObligation {
-  return { id, criticalItemId, policyVersionId, ownerUserId, createdAt, dueAt, mechanism, mechanisms: [mechanism] };
+  return {
+    id,
+    criticalItemId,
+    policyVersionId,
+    ownerUserId,
+    createdAt,
+    dueAt,
+    mechanism,
+    mechanisms: [mechanism],
+    triggerEventIds: [],
+    satisfiedByEventIds: []
+  };
 }
 
 function historyEvent(

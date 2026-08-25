@@ -19,6 +19,12 @@ export type TrialBridgeDelivery =
   | { status: "local-only" }
   | { status: "sent"; requestId: string };
 
+export type TrialBridgeStateDeliveryContext =
+  | { cause: "local-action"; action: TrialAction }
+  | { cause: "handshake" }
+  | { cause: "sync" }
+  | { cause: "action-result"; action: TrialAction; accepted: boolean };
+
 export type TrialBridgeTarget = {
   origin: string;
   source: Pick<Window, "postMessage" | "closed">;
@@ -34,13 +40,17 @@ export type TrialBridgeClientOptions = {
   target: TrialBridgeTarget | null;
   sessionId?: string;
   onConnectionState: (state: TrialBridgeConnectionState) => void;
-  onState: (state: TrialState) => void;
+  onState: (state: TrialState, context: TrialBridgeStateDeliveryContext) => void;
   onError: (message: string) => void;
 };
 
 type PendingRequest = {
   requestId: string;
   timeout: ReturnType<typeof setTimeout>;
+};
+
+type PendingActionRequest = PendingRequest & {
+  action: TrialAction;
 };
 
 export function normalizeTrialHostOrigin(value: string | null): string | null {
@@ -71,7 +81,7 @@ export class TrialBridgeClient {
   private readonly target: TrialBridgeTarget | null;
   private readonly sessionId: string;
   private readonly onConnectionState: (state: TrialBridgeConnectionState) => void;
-  private readonly onState: (state: TrialState) => void;
+  private readonly onState: (state: TrialState, context: TrialBridgeStateDeliveryContext) => void;
   private readonly onError: (message: string) => void;
   private connectionState: TrialBridgeConnectionState;
   private requestSequence = 0;
@@ -80,7 +90,7 @@ export class TrialBridgeClient {
   private targetCheckInterval: ReturnType<typeof setInterval> | null = null;
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private pendingHeartbeat: PendingRequest | null = null;
-  private pendingAction: PendingRequest | null = null;
+  private pendingAction: PendingActionRequest | null = null;
   private started = false;
   private terminallyDisconnected = false;
 
@@ -153,7 +163,7 @@ export class TrialBridgeClient {
   sendAction(action: TrialAction, locallyValidatedState: TrialState): TrialBridgeDelivery {
     // Validated Mobile state is always applied first. Transport failure cannot
     // erase the field user's latest local trial observation.
-    this.onState(locallyValidatedState);
+    this.onState(locallyValidatedState, { cause: "local-action", action });
 
     if (!this.target || this.connectionState === "standalone" || this.terminallyDisconnected) {
       return { status: "local-only" };
@@ -175,6 +185,7 @@ export class TrialBridgeClient {
     if (!this.postMessage(trialActionMessage(this.sessionId, requestId, action))) return { status: "local-only" };
     this.pendingAction = {
       requestId,
+      action,
       timeout: setTimeout(() => {
         this.pendingAction = null;
         this.disconnect("The Console trial host did not acknowledge the action. The validated action remains in this local trial session.");
@@ -184,8 +195,9 @@ export class TrialBridgeClient {
   }
 
   private receiveState(message: TrialBridgeStateMessage): void {
+    const isHandshake = this.connectionState === "connecting";
     if (
-      this.connectionState === "connecting"
+      isHandshake
       && message.responseToRequestId !== this.handshakeRequestId
     ) return;
     if (this.pendingAction) return;
@@ -195,15 +207,16 @@ export class TrialBridgeClient {
     this.handshakeRequestId = null;
     this.transitionTo("connected");
     this.startHeartbeat();
-    this.onState(message.state);
+    this.onState(message.state, { cause: isHandshake ? "handshake" : "sync" });
   }
 
   private receiveActionResult(message: TrialBridgeActionResultMessage): void {
     if (!this.pendingAction || message.requestId !== this.pendingAction.requestId) return;
+    const action = this.pendingAction.action;
     this.recordHostActivity();
     this.clearPendingAction();
     this.transitionTo("connected");
-    this.onState(message.state);
+    this.onState(message.state, { cause: "action-result", action, accepted: message.accepted });
     if (!message.accepted) {
       this.onError(message.error ?? "The Console trial host rejected the action and restored its canonical trial state.");
     }
@@ -298,7 +311,7 @@ export class TrialBridgeClient {
 }
 
 export function useTrialBridge(
-  onState: (state: TrialState) => void,
+  onState: (state: TrialState, context: TrialBridgeStateDeliveryContext) => void,
   onError: (message: string) => void = () => undefined
 ) {
   const [target] = useState<TrialBridgeTarget | null>(() => {
@@ -321,7 +334,7 @@ export function useTrialBridge(
     const client = new TrialBridgeClient({
       target,
       onConnectionState: setConnectionState,
-      onState: (state) => onStateRef.current(state),
+      onState: (state, context) => onStateRef.current(state, context),
       onError: (message) => onErrorRef.current(message)
     });
     clientRef.current = client;
@@ -342,7 +355,7 @@ export function useTrialBridge(
   const sendAction = useCallback((action: TrialAction, locallyValidatedState: TrialState) => {
     const client = clientRef.current;
     if (client) return client.sendAction(action, locallyValidatedState);
-    onStateRef.current(locallyValidatedState);
+    onStateRef.current(locallyValidatedState, { cause: "local-action", action });
     return { status: "local-only" } as const;
   }, []);
 

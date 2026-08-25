@@ -215,6 +215,35 @@ describe("deterministic Console operational trial", () => {
     expect(history).toContain("Expansion-joint work paused");
   });
 
+  it("shows same-minute execution events newest first", () => {
+    let state = applyTrialAction(createInitialTrialState(), {
+      type: "cant-start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Scaffold access unavailable",
+      whatIsNeeded: "Release the scaffold access point",
+      createProblem: false,
+      createAction: false
+    });
+    state = applyTrialAction(state, {
+      type: "start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley"
+    });
+
+    const html = renderToString(<TrialTaskDashboard
+      state={state}
+      taskId="task-scaffold-access"
+      backLabel="Tasks"
+      onBack={() => undefined}
+      onAction={() => undefined}
+      initialSection="Execution"
+    />);
+
+    expect(state.executionEvents.at(-2)?.at).toBe(state.executionEvents.at(-1)?.at);
+    expect(html.indexOf("· Start")).toBeLessThan(html.indexOf("· Can&#x27;t Start"));
+  });
+
   it("renders configurable, controlled, versioned Critical policy trial controls", () => {
     const html = renderToString(<App initialView="console" initialSection="Critical" trialMode />).replaceAll("<!-- -->", "");
     expect(html).toContain("Tier 1 deterministic configuration");
