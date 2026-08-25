@@ -306,7 +306,7 @@ describe("Tier 1 Project round-trip comparison", () => {
     });
 
     expect(differences).toHaveLength(1);
-    expect(differences[0].path).toBe("Complete Project XML document");
+    expect(differences[0].path).toBe("Complete Project XML residual review");
     expect(differences[0].candidateValue).not.toBe(differences[0].resultValue);
     expect(() => compareProjectRoundTrip({
       source: samePreview,
@@ -329,7 +329,24 @@ describe("Tier 1 Project round-trip comparison", () => {
     });
 
     expect(differences).toHaveLength(1);
-    expect(differences[0].path).toBe("Complete Project XML document");
+    expect(differences[0].path).toBe("Complete Project XML residual review");
+  });
+
+  it("keeps a residual manual-review row beside parsed schedule differences", () => {
+    const candidate = preview([task({ finish: "2026-08-24T10:00:00" })]);
+    const projectResult = preview([task({ finish: "2026-08-24T10:30:00" })]);
+    const differences = buildConservativeProjectDifferences({
+      candidateXml: "<Project><Tasks /><Resources><Name>A</Name></Resources></Project>",
+      resultXml: "<Project><Tasks /><Resources><Name>B</Name></Resources></Project>",
+      selectedChanges: [],
+      candidate,
+      projectResult
+    });
+
+    expect(differences).toEqual(expect.arrayContaining([
+      expect.objectContaining({ path: "Task UID task-uid-2 / Finish" }),
+      expect.objectContaining({ path: "Complete Project XML residual review" })
+    ]));
   });
 
   it("verifies candidate parsing preserved imported identity, hierarchy, and planned context", () => {

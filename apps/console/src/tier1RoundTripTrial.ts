@@ -182,6 +182,9 @@ export function recordTier1RoundTripProgress(
   const nextState = structuredClone(session.trialState);
   const task = requiredTask(nextState, input.taskId);
   if (task.summary) throw new Error("Progress observations apply to executable leaf tasks.");
+  if (selectExecutionState(nextState, task.id) === "Completed") {
+    throw new Error("Completed tasks cannot receive an unfinished-progress observation in this trial.");
+  }
   if (!Number.isFinite(input.completionPercent)
     || input.completionPercent < 0
     || input.completionPercent > 100) {

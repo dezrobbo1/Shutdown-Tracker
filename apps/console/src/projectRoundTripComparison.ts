@@ -308,15 +308,17 @@ export function buildConservativeProjectDifferences(input: {
     }
   }
 
-  if (differences.length === 0) {
-    const index = firstDifferentCodeUnit(candidateXml, resultXml);
-    differences.push({
-      id: "result-document-change",
-      path: "Complete Project XML document",
-      candidateValue: documentDifferenceDescription(candidateXml, index),
-      resultValue: documentDifferenceDescription(resultXml, index)
-    });
-  }
+  // The bounded preview does not parse every MSPDI field. Always retain one
+  // residual raw-document review row when the XML strings differ; known rows
+  // above cannot prove that every resource, assignment, timephased, extension,
+  // or formatting delta has been explained.
+  const index = firstDifferentCodeUnit(candidateXml, resultXml);
+  differences.push({
+    id: "result-document-change",
+    path: "Complete Project XML residual review",
+    candidateValue: documentDifferenceDescription(candidateXml, index),
+    resultValue: documentDifferenceDescription(resultXml, index)
+  });
   return differences;
 }
 

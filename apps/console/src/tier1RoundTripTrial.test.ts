@@ -248,6 +248,28 @@ describe("Tier 1 imported Project round-trip session", () => {
     })).toThrow("What remains is required");
   });
 
+  it("rejects contradictory unfinished-progress observations after completion", () => {
+    const taskId = "project-task-uid:11";
+    let session = jumpTier1RoundTripClockToTaskStart(createSession(), taskId);
+    session = applyTier1RoundTripExecutionAction(session, {
+      type: "start",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID
+    });
+    session = applyTier1RoundTripExecutionAction(session, {
+      type: "finish",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID
+    });
+
+    expect(() => recordTier1RoundTripProgress(session, {
+      taskId,
+      completionPercent: 40,
+      remainingWork: "Contradictory remaining work",
+      nextIssue: "None"
+    })).toThrow("Completed tasks cannot receive an unfinished-progress observation");
+  });
+
   it("derives unresolved experimental mappings excluded by default and preserves explicit reviewer choices", () => {
     const taskId = "project-task-uid:11";
     let session = jumpTier1RoundTripClockToTaskStart(createSession(), taskId);
