@@ -427,12 +427,15 @@ function isCriticalObligation(value: unknown): boolean {
     || !isArrayOf(value.mechanisms, isReportingObligationMechanism)
     || value.mechanisms.length === 0
     || !value.mechanisms.includes(value.mechanism)
-    || !isUniqueIdentifierArray(value.triggerEventIds)
     || !isOptionalString(value.requestedReason)
-    || !isUniqueIdentifierArray(value.satisfiedByEventIds)
-    || !value.satisfiedByEventIds.every((eventId) => value.triggerEventIds.includes(eventId))
     || !isOptionalInteger(value.supersededAt)
     || (value.supersededByPolicyVersionId !== undefined && !isIdentifier(value.supersededByPolicyVersionId))
+  ) return false;
+  const triggerEventIds = value.triggerEventIds;
+  const satisfiedByEventIds = value.satisfiedByEventIds;
+  if (!isUniqueIdentifierArray(triggerEventIds)
+    || !isUniqueIdentifierArray(satisfiedByEventIds)
+    || !satisfiedByEventIds.every((eventId) => triggerEventIds.includes(eventId))
   ) return false;
   return (value.supersededAt === undefined) === (value.supersededByPolicyVersionId === undefined);
 }
