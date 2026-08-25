@@ -1,5 +1,5 @@
 import { createShutdownTrackerApiClient } from "@shutdown-tracker/api-client";
-import { createInitialTrialState } from "@shutdown-tracker/trial-model";
+import { applyTrialAction, createInitialTrialState } from "@shutdown-tracker/trial-model";
 import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
@@ -47,6 +47,9 @@ describe("approved Master Console information architecture", () => {
     expect(html).toContain("A passed planned start never creates In Progress");
     expect(html).toContain("Critical reports due / overdue");
     expect(html).toContain("Active delays / problems");
+    const statusStrip = html.match(/<section class="status-strip"[\s\S]*?<\/section>/)?.[0] ?? "";
+    expect(statusStrip).not.toContain("status-label");
+    expect(html).toContain('status-label status-neutral">Not Started');
   });
 
   it("renders the Project-like Tasks explorer without schedule editing", () => {
@@ -71,6 +74,7 @@ describe("approved Master Console information architecture", () => {
     for (const action of ["Can't Start", "Start", "Pause", "Resume", "Finish"]) expect(normalizedHtml).toContain(`>${action}<`);
     expect(html).toContain("action times recorded automatically");
     expect(html).toContain("Not yet implemented");
+    expect(html).toContain('aria-current="page"');
   });
 
   it("renders configurable versioned Critical policy without calculation or form-building claims", () => {
@@ -174,7 +178,28 @@ describe("deterministic Console operational trial", () => {
     expect(dashboard).toContain("Paused");
     expect(dashboard).toContain("Reassign Tier 2 tracking responsibility");
     expect(dashboard).toContain("Updates the shared Tier 2 Mobile projection immediately");
+    const dashboardTabs = dashboard.match(/<nav class="section-tabs"[\s\S]*?<\/nav>/)?.[0] ?? "";
+    expect(dashboardTabs.match(/aria-current="page"/g)).toHaveLength(1);
     for (const section of taskDashboardSections) expect(dashboard).toContain(section);
+  });
+
+  it("labels a field observation without changing Not Started execution", () => {
+    let state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 1080 });
+    const need = state.shiftProgressNeeds.find((candidate) => candidate.taskId === "task-night-handover" && candidate.userId === "tier3-casey")!;
+    state = applyTrialAction(state, {
+      type: "end-shift-progress",
+      needId: need.id,
+      actorId: "tier3-casey",
+      completionPercent: 45,
+      remainingWork: "Complete liner reinstatement and inspection",
+      nextShiftIssue: "Await final liner set"
+    });
+    const html = renderToString(<TrialTaskDashboard state={state} taskId="task-night-handover" backLabel="Tasks" onBack={() => undefined} onAction={() => undefined} />).replaceAll("<!-- -->", "");
+
+    expect(html).toContain("Not Started");
+    expect(html).toContain("Tracker field observation");
+    expect(html).toContain("45% · 18:00");
+    expect(html).toContain("Field progress does not establish Start");
   });
 
   it("makes problem resolution, action completion, and shared task history exercisable", () => {
@@ -188,6 +213,39 @@ describe("deterministic Console operational trial", () => {
     expect(actions).toContain("Complete action in trial");
     expect(actions).toContain("Deliver verified expansion-joint material");
     expect(history).toContain("Expansion-joint work paused");
+  });
+
+  it("shows same-minute execution events newest first", () => {
+    let state = applyTrialAction(createInitialTrialState(), {
+      type: "cant-start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley",
+      reason: "Scaffold access unavailable",
+      whatIsNeeded: "Release the scaffold access point",
+      createProblem: false,
+      createAction: false
+    });
+    state = applyTrialAction(state, {
+      type: "start",
+      taskId: "task-scaffold-access",
+      actorId: "tier3-riley"
+    });
+
+    const html = renderToString(<TrialTaskDashboard
+      state={state}
+      taskId="task-scaffold-access"
+      backLabel="Tasks"
+      onBack={() => undefined}
+      onAction={() => undefined}
+      initialSection="Execution"
+    />).replaceAll("<!-- -->", "").replaceAll("&#x27;", "'");
+
+    expect(state.executionEvents.at(-2)?.at).toBe(state.executionEvents.at(-1)?.at);
+    const startIndex = html.indexOf("· Start");
+    const cantStartIndex = html.indexOf("· Can't Start");
+    expect(startIndex).toBeGreaterThanOrEqual(0);
+    expect(cantStartIndex).toBeGreaterThanOrEqual(0);
+    expect(startIndex).toBeLessThan(cantStartIndex);
   });
 
   it("renders configurable, controlled, versioned Critical policy trial controls", () => {

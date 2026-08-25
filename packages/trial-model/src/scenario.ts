@@ -18,6 +18,7 @@ import type {
 export const TRIAL_START_MINUTE = 6 * 60;
 export const TRIAL_DAY_END_MINUTE = 30 * 60;
 export const TRIAL_SCENARIO_VERSION = "shutdown-trial-v1";
+export const TRIAL_SYSTEM_ACTOR_ID = "system:simulation-clock";
 
 export const REPORTING_FIELD_LABELS = {
   progress: "Completion / progress",
@@ -195,7 +196,7 @@ const history: TrialHistoryEvent[] = [
   historyEvent("history-release-problem", "problem-created", 350, "tier3-casey", "Operations-release problem recorded before work started.", "task-permit-release", true),
   historyEvent("history-cant-start", "cant-start", 350, "tier3-casey", "Can't Start recorded; permit-release work remains Not Started.", "task-permit-release", true),
   historyEvent("history-report", "report-submitted", 350, "tier2-morgan", "Opening Critical Work Pack report submitted under Policy v1.", undefined, true, "critical-cyclone-pack", "obligation-baseline", "report-baseline"),
-  ...criticalObligations.filter((item) => item.id !== "obligation-baseline").map((item, index) => historyEvent(`history-obligation-${index + 1}`, "report-obligation", item.createdAt, "tier1-dana", `Critical reporting obligation scheduled for ${minuteLabel(item.dueAt)}.`, undefined, true, item.criticalItemId, item.id))
+  historyEvent("history-requested-report", "report-obligation", 350, "tier1-dana", "Requested Critical recovery update created for the expansion-joint task.", "task-expansion-joint", true, "critical-expansion", "obligation-expansion-request")
 ];
 
 export function createInitialTrialState(): TrialState {
@@ -283,7 +284,18 @@ function obligation(
   dueAt: number,
   mechanism: CriticalObligation["mechanism"]
 ): CriticalObligation {
-  return { id, criticalItemId, policyVersionId, ownerUserId, createdAt, dueAt, mechanism };
+  return {
+    id,
+    criticalItemId,
+    policyVersionId,
+    ownerUserId,
+    createdAt,
+    dueAt,
+    mechanism,
+    mechanisms: [mechanism],
+    triggerEventIds: [],
+    satisfiedByEventIds: []
+  };
 }
 
 function historyEvent(
@@ -299,10 +311,4 @@ function historyEvent(
   reportId?: string
 ): TrialHistoryEvent {
   return { id, type, at, actorId, summary, taskId, baseline, criticalItemId, obligationId, reportId };
-}
-
-function minuteLabel(minute: number) {
-  const hour = Math.floor((minute % 1440) / 60).toString().padStart(2, "0");
-  const value = (minute % 60).toString().padStart(2, "0");
-  return `${hour}:${value}`;
 }

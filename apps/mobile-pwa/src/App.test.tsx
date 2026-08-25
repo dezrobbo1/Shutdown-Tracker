@@ -2,7 +2,11 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { applyTrialAction, createInitialTrialState } from "@shutdown-tracker/trial-model";
 import { App } from "./App";
-import { TrialMobileApp } from "./TrialMobileApp";
+import {
+  TrialMobileApp,
+  shouldResetMobilePresentation,
+  shouldResetMobilePresentationLocally
+} from "./TrialMobileApp";
 import { normalizeTrialHostOrigin } from "./trialBridgeClient";
 
 describe("mobile PWA assigned-task shell", () => {
@@ -214,6 +218,32 @@ describe("mobile PWA assigned-task shell", () => {
 });
 
 describe("mobile deterministic operational trial", () => {
+  it("resets presentation only for an accepted reset acknowledgement", () => {
+    expect(shouldResetMobilePresentation({ cause: "handshake" })).toBe(false);
+    expect(shouldResetMobilePresentation({ cause: "sync" })).toBe(false);
+    expect(shouldResetMobilePresentation({
+      cause: "action-result",
+      action: { type: "reset" },
+      accepted: false
+    })).toBe(false);
+    expect(shouldResetMobilePresentation({
+      cause: "action-result",
+      action: { type: "advance-minutes", minutes: 15 },
+      accepted: true
+    })).toBe(false);
+    expect(shouldResetMobilePresentation({
+      cause: "action-result",
+      action: { type: "reset" },
+      accepted: true
+    })).toBe(true);
+    expect(shouldResetMobilePresentationLocally({ type: "reset" }, { status: "local-only" })).toBe(true);
+    expect(shouldResetMobilePresentationLocally({ type: "reset" }, { status: "sent", requestId: "reset-1" })).toBe(false);
+    expect(shouldResetMobilePresentationLocally(
+      { type: "advance-minutes", minutes: 15 },
+      { status: "local-only" }
+    )).toBe(false);
+  });
+
   it("activates an explicitly bounded deterministic trial without changing ordinary mode", () => {
     const ordinary = renderToString(<App />);
     const trial = renderToString(<App trialMode />);
@@ -247,6 +277,15 @@ describe("mobile deterministic operational trial", () => {
     }
   });
 
+  it("places assigned work before secondary trial diagnostics", () => {
+    const html = normalizeMarkup(renderToString(<App trialMode />));
+
+    expect(html.indexOf("Assigned work")).toBeGreaterThan(-1);
+    expect(html.indexOf("Trial controls and guided review")).toBeGreaterThan(html.indexOf("Assigned work"));
+    expect(html).toContain("<details class=\"trial-tools\"");
+    expect(html).not.toContain("trial-transport-strip");
+  });
+
   it("renders Tier 3 Can't Start and Start without manual execution time fields", () => {
     const html = normalizeMarkup(renderToString(
       <App
@@ -275,9 +314,9 @@ describe("mobile deterministic operational trial", () => {
       createProblem: true,
       createAction: true
     });
-    const html = renderToString(
+    const html = normalizeMarkup(renderToString(
       <TrialMobileApp initialState={state} initialUserId="tier3-riley" initialTaskId="task-scaffold-access" />
-    ).replaceAll("&#x27;", "'");
+    ));
 
     expect(html).toContain("Not Started");
     expect(html).toContain("Late to Start");
@@ -285,6 +324,10 @@ describe("mobile deterministic operational trial", () => {
     expect(html).toContain("This start is late against the accepted planned start.");
     expect(html).toContain("What caused the late start?");
     expect(html).toContain("Access or scaffold unavailable");
+    expect(html).toContain("Can't Start recorded at 07:00");
+    expect(html).toContain("Advance the simulated time before recording another distinct Can't Start observation.");
+    expect(html).not.toContain("Record Can't Start at 07:00");
+    expect(html).toContain("Start at 07:00");
   });
 
   it("renders Pause, Resume, and Finish according to the derived execution state", () => {
@@ -333,13 +376,15 @@ describe("mobile deterministic operational trial", () => {
       <App trialMode initialTrialUserId="tier2-avery" initialTaskId="task-permit-release" />
     );
 
-    expect(morgan).toContain("Assign direct-report Tier 3");
+    expect(morgan).toContain("Assign or update direct-report Tier 3");
     expect(morgan).toContain("Riley Jones");
     expect(morgan).toContain("Sam Patel");
     expect(morgan).toContain("Jamie Chen");
     expect(morgan).not.toContain(">Drew Wilson</option>");
     expect(morgan).toContain("WORKING_ON");
     expect(morgan).toContain("FIELD_CONTROL");
+    expect(morgan).toContain("This exact field assignment is already active.");
+    expect(morgan).toMatch(/<button type="submit" disabled="">Assign field work<\/button>/);
     expect(morgan).toContain("retains Tier 2 tracking responsibility");
     expect(avery).toContain("Casey Brown");
     expect(avery).toContain("Drew Wilson");
@@ -358,6 +403,85 @@ describe("mobile deterministic operational trial", () => {
     expect(html).toContain("Next target");
     expect(html).toContain("Forecast completion");
     expect(html).not.toMatch(/custom field|form builder/i);
+  });
+
+  it("shows a non-tracking Critical owner one bounded reporting-only assignment without duplicating tracked work", () => {
+    const state = scaffoldReportingOwnedByAvery();
+    const tracker = state.trackingAssignments.find((assignment) => assignment.taskId === "task-scaffold-access" && assignment.active);
+    const avery = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier2-avery" />
+    ));
+    const morgan = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={createInitialTrialState()} initialUserId="tier2-morgan" />
+    ));
+
+    expect(tracker?.tier2UserId).toBe("tier2-morgan");
+    expect(avery).toContain("Critical reporting assignments");
+    expect(avery).toContain("Reporting-only access");
+    expect(avery).toContain('aria-label="Open Critical reporting for D2 Stack — scaffold access release"');
+    expect(countOccurrences(avery, 'class="work-card reporting-only-card"')).toBe(1);
+    expect(avery).not.toContain('aria-label="Open Critical reporting for Outlet duct — replace expansion joint"');
+    expect(morgan).not.toContain('class="work-card reporting-only-card"');
+    expect(countOccurrences(morgan, 'aria-label="Open D2 Stack — scaffold access release"')).toBe(1);
+  });
+
+  it("limits reporting-only detail to report submit and correction without wider task controls", () => {
+    const state = scaffoldReportingOwnedByAvery();
+    const detail = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier2-avery" initialTaskId="task-scaffold-access" />
+    )).split('<details class="trial-tools">')[0];
+
+    expect(detail).toContain("Critical reporting · reporting-only context");
+    expect(detail).toContain("Bounded reporting assignment.");
+    expect(detail).toContain("Submit immutable Critical report");
+    expect(detail).toContain("Fixed interval + Fixed times");
+    expect(detail).toContain('aria-labelledby="critical-obligation-');
+    expect(detail).toContain("<h4 id=\"critical-obligation-");
+    for (const restrictedSection of ["Execution", "End-of-shift progress", "People", "Discussion", "Delays / Problems", "Actions", "Evidence", "History"]) {
+      expect(detail).not.toContain(`>${restrictedSection}<`);
+    }
+    for (const restrictedControl of ["Can't Start", "Start at", "Pause at", "Resume at", "Finish at", "Assign or update direct-report Tier 3", "Record end-of-shift progress", "Resolve problem", "Complete action"]) {
+      expect(detail).not.toContain(restrictedControl);
+    }
+
+    const obligation = state.criticalObligations.find((candidate) => candidate.criticalItemId === "critical-scaffold"
+      && candidate.ownerUserId === "tier2-avery"
+      && candidate.supersededByPolicyVersionId === undefined)!;
+    const submitted = applyTrialAction(state, {
+      type: "submit-critical-report",
+      obligationId: obligation.id,
+      actorId: "tier2-avery",
+      values: {
+        progress: "Known Tracker position reviewed",
+        condition: "At risk",
+        constraint: "Access release pending",
+        recovery: "Scaffold team responding",
+        "next-target": "Release access",
+        "forecast-completion": "10:00 simulated"
+      }
+    });
+    const report = submitted.criticalReports.find((candidate) => candidate.obligationId === obligation.id)!;
+    const corrected = applyTrialAction(submitted, {
+      type: "correct-critical-report",
+      reportId: report.id,
+      actorId: "tier2-avery",
+      values: {
+        progress: "Known Tracker position reviewed",
+        condition: "Recovering",
+        constraint: "Access release pending",
+        recovery: "Scaffold team responding",
+        "next-target": "Release access",
+        "forecast-completion": "09:45 simulated"
+      }
+    });
+    const correction = corrected.criticalReports.find((candidate) => candidate.supersedesReportId === report.id);
+    const correctedDetail = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={corrected} initialUserId="tier2-avery" initialTaskId="task-scaffold-access" />
+    ));
+
+    expect(correction).toBeDefined();
+    expect(correctedDetail).toContain("Submitted report · immutable");
+    expect(correctedDetail).toContain("Submit superseding correction");
   });
 
   it("shows immutable submitted Critical reports and superseding correction controls", () => {
@@ -389,6 +513,28 @@ describe("mobile deterministic operational trial", () => {
     expect(shifted).not.toMatch(/% Work Complete|Physical % Complete/i);
   });
 
+  it("shows a submitted field observation without changing Not Started execution", () => {
+    let state = applyTrialAction(createInitialTrialState(), { type: "advance-to", minute: 1080 });
+    const need = state.shiftProgressNeeds.find((candidate) => candidate.taskId === "task-night-handover" && candidate.userId === "tier3-casey")!;
+    state = applyTrialAction(state, {
+      type: "end-shift-progress",
+      needId: need.id,
+      actorId: "tier3-casey",
+      completionPercent: 45,
+      remainingWork: "Complete liner reinstatement and inspection",
+      nextShiftIssue: "Await final liner set"
+    });
+    const html = normalizeMarkup(renderToString(
+      <TrialMobileApp initialState={state} initialUserId="tier3-casey" initialTaskId="task-night-handover" />
+    ));
+
+    expect(html).toContain("Not Started");
+    expect(html).toContain("Tracker field observation · 45% complete");
+    expect(html).toContain("Complete liner reinstatement and inspection");
+    expect(html).toContain("This field observation does not establish Start; execution remains Not Started.");
+    expect(html).not.toContain("How much of the task is complete?");
+  });
+
   it("normalizes only HTTP(S) Console host origins for the optional bridge", () => {
     expect(normalizeTrialHostOrigin("https://console.example.test/review?x=1")).toBe("https://console.example.test");
     expect(normalizeTrialHostOrigin("http://127.0.0.1:5173/path")).toBe("http://127.0.0.1:5173");
@@ -400,4 +546,26 @@ describe("mobile deterministic operational trial", () => {
 
 function normalizeMarkup(html: string) {
   return html.replaceAll("<!-- -->", "").replaceAll("&#x27;", "'");
+}
+
+function scaffoldReportingOwnedByAvery() {
+  const state = createInitialTrialState();
+  return applyTrialAction(state, {
+    type: "configure-critical",
+    criticalItemId: "critical-scaffold",
+    actorId: "tier1-dana",
+    policy: {
+      ownerUserId: "tier2-avery",
+      templateId: "template-two-hour-task",
+      mechanisms: ["interval", "fixed-time"],
+      intervalMinutes: 120,
+      fixedTimes: [480],
+      triggers: [],
+      requiredFields: ["progress", "condition", "constraint", "recovery", "next-target", "forecast-completion"]
+    }
+  });
+}
+
+function countOccurrences(value: string, expected: string) {
+  return value.split(expected).length - 1;
 }

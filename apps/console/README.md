@@ -39,6 +39,8 @@ The Console trial provides:
 - Tier 2 reporting-owner, template, supported timing/trigger, controlled-content, and policy-version configuration; and
 - an optional guided checklist that does not advance time automatically or prevent free interaction.
 
+Review refinements keep the Task Dashboard section controls wrapped at normal desktop widths, reduce future-obligation activity noise without removing obligation records, label field-observation progress separately from execution state, and return Reset to Today with no task selected.
+
 Every generated assignment, execution fact, problem/action, Critical policy, obligation, report, correction, and history entry is synthetic and discarded on Reset or reload. None is sent to the production API.
 
 For an optional linked review session, configure:
@@ -47,7 +49,7 @@ For an optional linked review session, configure:
 VITE_SHUTDOWN_TRACKER_MOBILE_TRIAL_URL=<mobile-trial-origin-and-url>
 ```
 
-The Console opens the separate Mobile application and remains the canonical in-memory host while the windows are linked. The bridge validates the expected window, exact origin, and versioned message channel. It uses no backend write, `localStorage`, IndexedDB, or production transport contract. Without that URL, Console and Mobile run independent deterministic local trials.
+The Console opens the separate Mobile application and remains the canonical in-memory host while the windows are linked. The bridge validates the expected window, exact origin, versioned message channel, ephemeral session, and correlated requests. Console action results are acknowledged and duplicate requests are not reapplied; a real-time heartbeat lets Mobile leave connected mode when a reload or closed host stops responding. Mobile bridge messages cannot invoke Tier 1-only Console actions, and the shared trial reducer enforces current task-assignment authority for execution and task-owned record updates. It uses no backend write, `localStorage`, IndexedDB, or production transport contract. Without that URL, Console and Mobile run independent deterministic local trials.
 
 See [Deterministic Operational Trial](../../docs/product/deterministic-operational-trial.md) for the fixed scenario, personas, guided sequence, reset boundary, and product-review questions.
 

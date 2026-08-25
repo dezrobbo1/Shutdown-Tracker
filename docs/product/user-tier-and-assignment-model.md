@@ -36,6 +36,8 @@ Tier 2:
 
 A Tier 2 assignment means **tracking responsibility**. Assigning a task onward does not transfer or end that responsibility.
 
+A formal Critical reporting assignment may have a different Tier 2 owner from the task's tracking owner. In that case, the reporting assignment grants only the bounded Mobile context needed to identify the Critical source, understand the applicable policy and due state, reuse known execution facts, and submit or correct the assigned report. It does not grant ordinary task execution, Tier 3 delegation, end-of-shift progress entry, access to other task-owned records, or whole-project browsing.
+
 ### Tier 3
 
 Tier 3:

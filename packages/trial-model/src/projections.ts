@@ -1,4 +1,5 @@
 import { operationalDayWindow } from "./clock";
+import { TRIAL_SYSTEM_ACTOR_ID } from "./scenario";
 import type {
   CriticalItem,
   CriticalObligationProjection,
@@ -59,21 +60,27 @@ export function selectStateBasis(state: TrialState, taskId: string) {
 
 export function selectTaskProgress(state: TrialState, taskId: string): number {
   const task = requiredTask(state, taskId);
-  if (task.summary) {
-    const leaves = selectDescendantTasks(state, taskId).filter((candidate) => !candidate.summary);
-    if (leaves.length === 0) return 0;
-    return Math.round(leaves.reduce((total, leaf) => total + selectTaskProgress(state, leaf.id), 0) / leaves.length);
-  }
+  if (task.summary) return task.importedProgress;
+  if (selectExecutionState(state, taskId) === "Completed") return 100;
   const observation = state.progressObservations
     .filter((item) => item.taskId === taskId && item.at <= state.now)
-    .sort(byNewestAt)[0];
+    .sort(byNewestAtThenId)[0];
   if (observation) return observation.completionPercent;
-  if (selectExecutionState(state, taskId) === "Completed") return 100;
   return task.importedProgress;
+}
+
+export function selectTaskProgressBasis(state: TrialState, taskId: string): string {
+  const task = requiredTask(state, taskId);
+  if (task.summary) return "Imported Microsoft Project summary progress; Shutdown Tracker does not calculate a descendant progress roll-up.";
+  const executionState = selectExecutionState(state, taskId);
+  if (executionState === "Completed") return "Current completion projection; earlier field progress observations remain in history.";
+  if (selectLatestFieldProgressObservation(state, taskId)) return "Latest Tracker field progress observation.";
+  return "Imported Microsoft Project progress context.";
 }
 
 export function selectTaskProjection(state: TrialState, taskId: string): TaskProjection {
   const task = requiredTask(state, taskId);
+  const latestFieldProgressObservation = task.summary ? null : selectLatestFieldProgressObservation(state, taskId);
   const tracking = state.trackingAssignments
     .filter((assignment) => assignment.taskId === taskId && assignment.active && assignment.assignedAt <= state.now)
     .sort((left, right) => right.assignedAt - left.assignedAt)[0];
@@ -84,10 +91,11 @@ export function selectTaskProjection(state: TrialState, taskId: string): TaskPro
   const openActions = state.actions.filter((action) => action.taskId === taskId && action.createdAt <= state.now && action.status === "open");
   const executionState = selectExecutionState(state, taskId);
   const lastActivityAt = selectLastTaskActivityAt(state, taskId);
+  const hasActiveCantStart = executionState === "Not Started" && state.executionEvents.some((event) => event.taskId === taskId && event.type === "cant-start" && event.at <= state.now);
   const attention: string[] = [];
 
   if (!task.summary && executionState === "Not Started" && state.now > task.plannedStart) attention.push("Late to Start");
-  if (activeProblems.length > 0 && executionState === "Not Started") attention.push("Delayed / blocked before start");
+  if ((activeProblems.length > 0 || hasActiveCantStart) && executionState === "Not Started") attention.push("Delayed / blocked before start");
   if (activeProblems.length > 0 && executionState !== "Not Started") attention.push("Active delay / problem");
   if (!task.summary && executionState !== "Completed" && state.now > task.plannedFinish) attention.push("Running beyond planned finish");
   if ((executionState === "In Progress" || executionState === "Paused") && lastActivityAt !== null && state.now - lastActivityAt > 60) attention.push("No recent update");
@@ -102,6 +110,8 @@ export function selectTaskProjection(state: TrialState, taskId: string): TaskPro
     executionState,
     stateBasis: selectStateBasis(state, taskId),
     progressPercent: selectTaskProgress(state, taskId),
+    progressBasis: selectTaskProgressBasis(state, taskId),
+    latestFieldProgressObservation,
     trackingOwner: tracking ? requiredUser(state, tracking.tier2UserId) : null,
     fieldAssignments,
     attention,
@@ -126,14 +136,14 @@ export function selectTodayProjection(state: TrialState): TodayProjection {
     tasks,
     counts,
     lateStarts: tasks.filter((task) => task.attention.includes("Late to Start")).length,
-    blocked: tasks.filter((task) => task.activeProblems.length > 0).length,
+    blocked: tasks.filter((task) => task.attention.includes("Delayed / blocked before start") || task.attention.includes("Active delay / problem")).length,
     runningBeyondFinish: tasks.filter((task) => task.attention.includes("Running beyond planned finish")).length,
     noRecentUpdate: tasks.filter((task) => task.attention.includes("No recent update")).length,
     criticalDue: obligationProjections.filter((item) => item.state === "due").length,
     criticalOverdue: obligationProjections.filter((item) => item.state === "overdue").length,
     activeProblems: state.problems.filter((problem) => problem.status === "open" && problem.createdAt <= state.now).length,
     dueActions: state.actions.filter((action) => action.status === "open" && action.createdAt <= state.now && action.dueAt !== undefined && action.dueAt <= state.now).length,
-    recentActivity: selectRecentActivity(state, 10)
+    recentActivity: selectRecentActivity(state, 6)
   };
 }
 
@@ -189,7 +199,7 @@ export function selectCriticalObligationProjections(state: TrialState): Critical
         policy,
         sourceTask,
         owner: requiredUser(state, obligation.ownerUserId),
-        state: obligationState(state, obligation.dueAt, currentReport, obligation.satisfiedByEventId),
+        state: obligationState(state, obligation, currentReport),
         currentReport,
         reportHistory,
         prepopulatedFacts,
@@ -276,7 +286,9 @@ function selectLastTaskActivityAt(state: TrialState, taskId: string) {
   const values = [
     ...state.executionEvents.filter((event) => event.taskId === taskId && event.at <= state.now).map((event) => event.at),
     ...state.progressObservations.filter((item) => item.taskId === taskId && item.at <= state.now).map((item) => item.at),
-    ...state.history.filter((item) => item.taskId === taskId && item.at <= state.now).map((item) => item.at)
+    ...state.history
+      .filter((item) => item.taskId === taskId && item.at <= state.now && item.actorId !== TRIAL_SYSTEM_ACTOR_ID)
+      .map((item) => item.at)
   ];
   return values.length > 0 ? Math.max(...values) : null;
 }
@@ -285,11 +297,27 @@ function selectPrepopulatedFacts(state: TrialState, item: CriticalItem, fields: 
   const task = requiredTask(state, item.sourceTaskId);
   const executionState = selectExecutionState(state, item.sourceTaskId);
   const progressPercent = selectTaskProgress(state, item.sourceTaskId);
+  const latestFieldProgressObservation = task.summary ? null : selectLatestFieldProgressObservation(state, item.sourceTaskId);
   const taskIds = new Set([item.sourceTaskId, ...(task.summary ? selectDescendantTasks(state, item.sourceTaskId).map((candidate) => candidate.id) : [])]);
   const activeProblems = state.problems.filter((problem) => taskIds.has(problem.taskId) && problem.createdAt <= state.now && problem.status === "open");
   const openActions = state.actions.filter((action) => taskIds.has(action.taskId) && action.createdAt <= state.now && action.status === "open");
   const values: Partial<Record<ReportingField, string>> = {};
-  if (fields.includes("progress")) values.progress = `${progressPercent}% · ${executionState}`;
+  if (fields.includes("progress")) {
+    if (task.summary) {
+      const leafStates = selectDescendantTasks(state, task.id)
+        .filter((candidate) => !candidate.summary)
+        .map((candidate) => selectExecutionState(state, candidate.id));
+      const counts: Record<ExecutionState, number> = { "Not Started": 0, "In Progress": 0, Paused: 0, Completed: 0 };
+      for (const stateValue of leafStates) counts[stateValue] += 1;
+      values.progress = `Known Tracker descendant execution; no work-pack percentage calculated: ${counts.Completed} completed · ${counts["In Progress"]} in progress · ${counts.Paused} paused · ${counts["Not Started"]} not started.`;
+    } else if (executionState === "Completed" && latestFieldProgressObservation) {
+      values.progress = `100% · Completed execution; earlier ${latestFieldProgressObservation.completionPercent}% field observation remains in history.`;
+    } else {
+      values.progress = latestFieldProgressObservation
+        ? `${progressPercent}% field observation · ${executionState} execution`
+        : `${progressPercent}% · ${executionState}`;
+    }
+  }
   if (fields.includes("condition")) values.condition = activeProblems.length > 0 ? "Constraint active" : executionState;
   if (fields.includes("constraint") && activeProblems.length > 0) values.constraint = activeProblems.map((problem) => problem.reason).join("; ");
   if (fields.includes("recovery") && openActions.length > 0) values.recovery = openActions.map((action) => action.description).join("; ");
@@ -297,10 +325,17 @@ function selectPrepopulatedFacts(state: TrialState, item: CriticalItem, fields: 
   return values;
 }
 
-function obligationState(state: TrialState, dueAt: number, report: CriticalReport | null, satisfiedByEventId?: string): ObligationState {
-  if (report || satisfiedByEventId) return "submitted";
-  if (state.now < dueAt) return "upcoming";
-  if (state.now === dueAt) return "due";
+function selectLatestFieldProgressObservation(state: TrialState, taskId: string) {
+  return state.progressObservations
+    .filter((observation) => observation.taskId === taskId && observation.at <= state.now)
+    .sort(byNewestAtThenId)[0] ?? null;
+}
+
+function obligationState(state: TrialState, obligation: CriticalObligationProjection["obligation"], report: CriticalReport | null): ObligationState {
+  if (report || obligation.satisfiedByEventIds.length > 0) return "submitted";
+  if (obligation.supersededByPolicyVersionId) return "superseded";
+  if (state.now < obligation.dueAt) return "upcoming";
+  if (state.now === obligation.dueAt) return "due";
   return "overdue";
 }
 
@@ -333,10 +368,6 @@ function timeOnly(minute: number) {
   return `${Math.floor(inDay / 60).toString().padStart(2, "0")}:${(inDay % 60).toString().padStart(2, "0")}`;
 }
 
-function byNewestAt<T extends { at: number }>(left: T, right: T) {
-  return right.at - left.at;
-}
-
-function byNewestAtThenId(left: TrialHistoryEvent, right: TrialHistoryEvent) {
+function byNewestAtThenId<T extends { at: number; id: string }>(left: T, right: T) {
   return right.at - left.at || right.id.localeCompare(left.id);
 }
