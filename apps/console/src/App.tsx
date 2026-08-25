@@ -43,7 +43,15 @@ import {
   TrialTasksView,
   TrialTodayView
 } from "./TrialConsoleViews";
+import {
+  Tier1RoundTripClock,
+  Tier1RoundTripTaskDashboard,
+  Tier1RoundTripTasksView,
+  Tier1RoundTripTodayView,
+  type Tier1RoundTripWorkspaceState
+} from "./Tier1RoundTripTrialViews";
 import { trialConsoleRuntimeConfig } from "./trialMode";
+import { formatRoundTripMinute } from "./tier1RoundTripTrial";
 
 export type ConsoleView = "login" | "projects" | "console";
 
@@ -52,6 +60,7 @@ export type AppProps = {
   initialSection?: ConsoleSection;
   initialTaskId?: string | null;
   trialMode?: boolean;
+  roundTripTrialMode?: boolean;
 };
 
 export type ConsoleTrialActionOutcome = {
@@ -184,9 +193,11 @@ export function App({
   initialView = "login",
   initialSection = "Today",
   initialTaskId = null,
-  trialMode
+  trialMode,
+  roundTripTrialMode
 }: AppProps) {
-  const trialEnabled = trialMode ?? trialConsoleRuntimeConfig.enabled;
+  const roundTripEnabled = roundTripTrialMode ?? trialConsoleRuntimeConfig.tier1RoundTripEnabled;
+  const trialEnabled = (trialMode ?? trialConsoleRuntimeConfig.enabled) && !roundTripEnabled;
   const initialTrialState = useRef<TrialState | null>(null);
   if (initialTrialState.current === null) initialTrialState.current = createInitialTrialState();
   const [trialState, setTrialState] = useState<TrialState>(initialTrialState.current);
@@ -195,13 +206,18 @@ export function App({
   const mobileOriginRef = useRef("");
   const bridgeHostRef = useRef(new ConsoleTrialBridgeHost());
   const [trialError, setTrialError] = useState("");
+  const [roundTripState, setRoundTripState] = useState<Tier1RoundTripWorkspaceState | null>(null);
   const [view, setView] = useState<ConsoleView>(initialView);
-  const [activeSection, setActiveSection] = useState<ConsoleSection>(initialSection);
+  const [activeSection, setActiveSection] = useState<ConsoleSection>(
+    roundTripEnabled && initialSection === "Today" ? "Import / Export" : initialSection
+  );
   const [taskId, setTaskId] = useState<string | null>(initialTaskId);
   const [taskOrigin, setTaskOrigin] = useState<"Today" | "Tasks">(initialSection === "Today" ? "Today" : "Tasks");
-  const [projectId, setProjectId] = useState(trialEnabled ? initialTrialState.current.project.id : "calciner-2026");
+  const [projectId, setProjectId] = useState(
+    roundTripEnabled ? "roundtrip-empty" : trialEnabled ? initialTrialState.current.project.id : "calciner-2026"
+  );
   const [reviewData, setReviewData] = useState<ConsoleReviewData | null>(null);
-  const [loadState, setLoadState] = useState<ConsoleReviewLoadState>(() => trialEnabled ? trialReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
+  const [loadState, setLoadState] = useState<ConsoleReviewLoadState>(() => trialEnabled ? trialReviewLoadState() : roundTripEnabled ? roundTripReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
   const [reviewAttempted, setReviewAttempted] = useState(false);
 
   const commitTrialActionOutcome = useCallback((action: TrialAction, outcome: ConsoleTrialActionOutcome) => {
@@ -285,6 +301,11 @@ export function App({
       setLoadState(trialReviewLoadState());
       return;
     }
+    if (roundTripEnabled) {
+      setReviewData(null);
+      setLoadState(roundTripReviewLoadState());
+      return;
+    }
     if (reviewApiRuntimeConfig.liveEnabled) setLoadState({ status: "loading", message: "Fetching read-only import snapshot data." });
     try {
       const next = await loadConsoleReviewData();
@@ -293,7 +314,7 @@ export function App({
     } catch (error) {
       setLoadState({ status: "error", message: formatConsoleReviewError(error) });
     }
-  }, [trialEnabled]);
+  }, [roundTripEnabled, trialEnabled]);
 
   useEffect(() => {
     if (view === "console" && activeSection === "Import / Export" && !reviewAttempted) void refreshReviewData();
@@ -302,29 +323,37 @@ export function App({
   function resetProjectScopedState() {
     setTaskId(null);
     setReviewData(null);
-    setLoadState(trialEnabled ? trialReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
+    setLoadState(trialEnabled ? trialReviewLoadState() : roundTripEnabled ? roundTripReviewLoadState() : initialConsoleReviewLoadState(reviewApiRuntimeConfig));
     setReviewAttempted(false);
   }
 
   function openProject(nextProjectId: string) {
     resetProjectScopedState();
+    if (roundTripState && nextProjectId !== roundTripState.session.trialState.project.id) {
+      setRoundTripState(null);
+    }
     setProjectId(nextProjectId);
-    setActiveSection("Today");
+    setActiveSection(roundTripEnabled && !roundTripState ? "Import / Export" : "Today");
     setTaskOrigin("Today");
     setView("console");
   }
 
   function leaveProject(nextView: "login" | "projects") {
     resetProjectScopedState();
+    if (nextView === "login" && roundTripEnabled) setRoundTripState(null);
     setView(nextView);
   }
 
-  if (view === "login") return <LoginView trialMode={trialEnabled} onContinue={() => setView("projects")} />;
+  if (view === "login") return <LoginView trialMode={trialEnabled} roundTripMode={roundTripEnabled} onContinue={() => setView("projects")} />;
   if (view === "projects") {
-    return <ProjectsHome trialProject={trialEnabled ? trialState.project : undefined} onOpenProject={openProject} />;
+    return <ProjectsHome roundTripMode={roundTripEnabled} trialProject={roundTripState?.session.trialState.project ?? (trialEnabled ? trialState.project : undefined)} onOpenProject={openProject} />;
   }
 
-  const selectedProject = trialEnabled
+  const selectedProject = roundTripEnabled
+    ? roundTripState
+      ? { id: roundTripState.session.trialState.project.id, name: roundTripState.session.trialState.project.name, code: roundTripState.session.trialState.project.code, site: roundTripState.session.trialState.project.site, status: "Temporary trial" as const }
+      : { id: "roundtrip-empty", name: "No source selected", code: "LOCAL-XML-TRIAL", site: "Browser-local", status: "Temporary trial" as const }
+    : trialEnabled
     ? { id: trialState.project.id, name: trialState.project.name, code: trialState.project.code, site: trialState.project.site, status: "Active" as const }
     : projects.find((project) => project.id === projectId) ?? projects[0];
 
@@ -351,27 +380,32 @@ export function App({
             return <button className={active ? "nav-item active" : "nav-item"} type="button" key={item.label} aria-current={active ? "page" : undefined} onClick={() => navigate(item.label)}><item.icon size={18} aria-hidden="true" /><span>{item.label}</span></button>;
           })}
         </nav>
-        <div className="sidebar-footer"><span>{trialEnabled ? "Synthetic operational trial" : "Static product shell"}</span>{trialEnabled && <small>Deterministic local state<br />No production persistence</small>}<button type="button" onClick={() => leaveProject("login")}><LogOut size={15} aria-hidden="true" /> Exit review</button></div>
+        <div className="sidebar-footer"><span>{roundTripEnabled ? "Tier 1 Project round-trip trial" : trialEnabled ? "Synthetic operational trial" : "Static product shell"}</span>{(trialEnabled || roundTripEnabled) && <small>{roundTripEnabled ? "Browser-local experimental workflow" : "Deterministic local state"}<br />No production persistence</small>}<button type="button" onClick={() => leaveProject("login")}><LogOut size={15} aria-hidden="true" /> Exit review</button></div>
       </aside>
 
       <main className="workspace">
         <header className="workspace-bar">
           <div><span>{selectedProject.site}</span><strong>{selectedProject.code}</strong></div>
-          <div><span>{trialEnabled ? `Simulated time · ${formatTrialTime(trialState.now)}` : "Operational day · 06:00"}</span><button type="button" disabled aria-label="Refresh project data"><RefreshCw size={16} aria-hidden="true" /> {trialEnabled ? "No backend connection" : "Live refresh not implemented"}</button></div>
+          <div><span>{roundTripState ? `Trial time · ${formatRoundTripMinute(roundTripState.session.trialState.now).replace("T", " ")}` : trialEnabled ? `Simulated time · ${formatTrialTime(trialState.now)}` : roundTripEnabled ? "Choose a disposable XML source" : "Operational day · 06:00"}</span><button type="button" disabled aria-label="Refresh project data"><RefreshCw size={16} aria-hidden="true" /> {trialEnabled || roundTripEnabled ? "No backend connection" : "Live refresh not implemented"}</button></div>
         </header>
 
         <div className="workspace-content">
           {trialEnabled && <TrialClock state={trialState} onAction={dispatchTrialAction} onOpenMobile={openMobileTrial} mobileConfigured={trialConsoleRuntimeConfig.mobileTrialUrl.length > 0} />}
+          {roundTripEnabled && roundTripState ? <Tier1RoundTripClock state={roundTripState} onChange={setRoundTripState} /> : null}
           {trialError && <p className="trial-form-error trial-global-error" role="alert">{trialError}</p>}
-          {taskId ? trialEnabled
+          {taskId ? roundTripEnabled && !roundTripState
+            ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
+            : roundTripState
+            ? <Tier1RoundTripTaskDashboard state={roundTripState} taskId={taskId} onBack={() => setTaskId(null)} onChange={setRoundTripState} />
+            : trialEnabled
             ? <TrialTaskDashboard state={trialState} taskId={taskId} backLabel={taskOrigin} onBack={() => setTaskId(null)} onAction={dispatchTrialAction} />
             : <TaskDashboard taskId={taskId} backLabel={taskOrigin} onBack={() => setTaskId(null)} /> : (
             <>
-              {activeSection === "Today" && (trialEnabled ? <TrialTodayView state={trialState} onOpenTask={openTask} onAction={dispatchTrialAction} /> : <TodayView onOpenTask={openTask} />)}
-              {activeSection === "Tasks" && (trialEnabled ? <TrialTasksView state={trialState} onOpenTask={openTask} /> : <TasksView onOpenTask={openTask} />)}
-              {activeSection === "Critical" && (trialEnabled ? <TrialCriticalView state={trialState} onAction={dispatchTrialAction} /> : <CriticalView />)}
-              {activeSection === "Import / Export" && <ImportExportView trialMode={trialEnabled} shellProjectLabel={`${selectedProject.name} (${selectedProject.code})`} reviewData={reviewData} loadState={loadState} onRefresh={() => void refreshReviewData()} />}
-              {activeSection === "Project Settings" && <ProjectSettingsView />}
+              {activeSection === "Today" && (roundTripState ? <Tier1RoundTripTodayView state={roundTripState} onOpenTask={openTask} /> : roundTripEnabled ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} /> : trialEnabled ? <TrialTodayView state={trialState} onOpenTask={openTask} onAction={dispatchTrialAction} /> : <TodayView onOpenTask={openTask} />)}
+              {activeSection === "Tasks" && (roundTripState ? <Tier1RoundTripTasksView state={roundTripState} onOpenTask={openTask} /> : roundTripEnabled ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} /> : trialEnabled ? <TrialTasksView state={trialState} onOpenTask={openTask} /> : <TasksView onOpenTask={openTask} />)}
+              {activeSection === "Critical" && (roundTripEnabled ? <RoundTripCriticalBoundary state={roundTripState} onOpenImport={() => navigate("Import / Export")} /> : trialEnabled ? <TrialCriticalView state={trialState} onAction={dispatchTrialAction} /> : <CriticalView />)}
+              {activeSection === "Import / Export" && <ImportExportView trialMode={trialEnabled} roundTripTrialMode={roundTripEnabled} roundTripState={roundTripState} onRoundTripChange={(next) => { setRoundTripState(next); setTaskId(null); }} shellProjectLabel={`${selectedProject.name} (${selectedProject.code})`} reviewData={reviewData} loadState={loadState} onRefresh={() => void refreshReviewData()} />}
+              {activeSection === "Project Settings" && (roundTripEnabled ? <RoundTripSettingsBoundary state={roundTripState} onOpenImport={() => navigate("Import / Export")} /> : <ProjectSettingsView />)}
             </>
           )}
         </div>
@@ -383,4 +417,53 @@ export function App({
 
 function trialReviewLoadState(): ConsoleReviewLoadState {
   return { status: "synthetic", message: "Deterministic trial mode does not load backend snapshot data." };
+}
+
+function roundTripReviewLoadState(): ConsoleReviewLoadState {
+  return { status: "synthetic", message: "Tier 1 round-trip trial keeps source and result XML in browser memory only." };
+}
+
+export function RoundTripNoScheduleView({ onOpenImport }: { onOpenImport: () => void }) {
+  return (
+    <section className="detail-panel roundtrip-empty-project">
+      <h1>Tier 1 Project round-trip trial</h1>
+      <p>Choose a disposable Microsoft Project XML/MSPDI source before using this schedule view. No fixed fictional task list is active in round-trip mode.</p>
+      <button className="button-primary" type="button" onClick={onOpenImport}>Open local Project XML import</button>
+      <span>Browser-local experimental workflow · No production persistence · No approved export contract</span>
+    </section>
+  );
+}
+
+export function RoundTripCriticalBoundary({ state, onOpenImport }: { state: Tier1RoundTripWorkspaceState | null; onOpenImport: () => void }) {
+  if (!state) return <RoundTripNoScheduleView onOpenImport={onOpenImport} />;
+  const flagged = state.session.sourceTasks.filter((task) => task.critical).length;
+  return (
+    <section className="detail-panel roundtrip-context-boundary">
+      <h1>Critical · imported Project context</h1>
+      <p>{flagged} imported task{flagged === 1 ? " is" : "s are"} marked Critical in the selected source. This schedule fact never limits Tier 1 authority or creates Critical ownership.</p>
+      <dl className="detail-list">
+        <div><dt>Tier 1 authority</dt><dd>Every executable leaf, regardless of Critical membership</dd></div>
+        <div><dt>Trial configuration</dt><dd>No Critical reporting policy is invented from Project data</dd></div>
+        <div><dt>Persistence</dt><dd>None; no production Critical record is created</dd></div>
+      </dl>
+    </section>
+  );
+}
+
+export function RoundTripSettingsBoundary({ state, onOpenImport }: { state: Tier1RoundTripWorkspaceState | null; onOpenImport: () => void }) {
+  if (!state) return <RoundTripNoScheduleView onOpenImport={onOpenImport} />;
+  return (
+    <section className="detail-panel roundtrip-context-boundary">
+      <h1>Project Settings · temporary trial context</h1>
+      <dl className="detail-list">
+        <div><dt>Project</dt><dd>{state.session.source.preview.projectName}</dd></div>
+        <div><dt>Project UID</dt><dd>{state.session.source.preview.projectUid ?? "Not supplied"}</dd></div>
+        <div><dt>Source</dt><dd>{state.session.source.fileName}</dd></div>
+        <div><dt>Initial time basis</dt><dd>{state.session.initialTimeSource}</dd></div>
+        <div><dt>Authority</dt><dd>Synthetic Tier 1 reviewer · whole temporary imported project</dd></div>
+        <div><dt>Persistence</dt><dd>Browser memory only · resettable and disposable</dd></div>
+      </dl>
+      <p>Production settings, users, mapping, lifecycle, and persistence are not changed in this experimental mode.</p>
+    </section>
+  );
 }

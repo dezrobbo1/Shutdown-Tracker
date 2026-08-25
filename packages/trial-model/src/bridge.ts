@@ -289,8 +289,8 @@ function isTrialTask(value: unknown): boolean {
     && isString(value.workPackage)
     && typeof value.summary === "boolean"
     && isInteger(value.depth)
-    && isInteger(value.plannedStart)
-    && isInteger(value.plannedFinish)
+    && (value.plannedStart === null || isInteger(value.plannedStart))
+    && (value.plannedFinish === null || isInteger(value.plannedFinish))
     && isOptionalInteger(value.importedActualStart)
     && isOptionalInteger(value.importedActualFinish)
     && isFiniteNumber(value.importedProgress)

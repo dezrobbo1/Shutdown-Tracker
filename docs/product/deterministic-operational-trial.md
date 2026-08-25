@@ -55,6 +55,16 @@ VITE_SHUTDOWN_TRACKER_TRIAL_MODE=true npm run dev --workspace @shutdown-tracker/
 
 Outside trial mode, the existing static review shells and bounded read-only Console import wiring retain their existing behaviour. Trial mode does not enable any backend write.
 
+## Separate Tier 1 Project round-trip trial
+
+The imported-schedule evidence workflow is independently opt-in:
+
+```text
+VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
+```
+
+It does not change this document's fixed fictional scenario, shared Console/Mobile trial, or deterministic reset contract. It retains a selected Project XML source in browser memory, lets synthetic Tier 1 execution create proposed optional mappings, generates a separate source-preserving experimental candidate, and supports manual Microsoft Project recalculation plus local result comparison. It remains frontend-only and does not approve a final export contract or restore PR #48's approval lifecycle. See [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md).
+
 ## Optional linked Console and Mobile session
 
 The trial can run independently in either client. For linked review, set the Console's Mobile trial URL:

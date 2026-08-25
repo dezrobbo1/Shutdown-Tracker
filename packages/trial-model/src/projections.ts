@@ -94,10 +94,10 @@ export function selectTaskProjection(state: TrialState, taskId: string): TaskPro
   const hasActiveCantStart = executionState === "Not Started" && state.executionEvents.some((event) => event.taskId === taskId && event.type === "cant-start" && event.at <= state.now);
   const attention: string[] = [];
 
-  if (!task.summary && executionState === "Not Started" && state.now > task.plannedStart) attention.push("Late to Start");
+  if (!task.summary && task.plannedStart !== null && executionState === "Not Started" && state.now > task.plannedStart) attention.push("Late to Start");
   if ((activeProblems.length > 0 || hasActiveCantStart) && executionState === "Not Started") attention.push("Delayed / blocked before start");
   if (activeProblems.length > 0 && executionState !== "Not Started") attention.push("Active delay / problem");
-  if (!task.summary && executionState !== "Completed" && state.now > task.plannedFinish) attention.push("Running beyond planned finish");
+  if (!task.summary && task.plannedFinish !== null && executionState !== "Completed" && state.now > task.plannedFinish) attention.push("Running beyond planned finish");
   if ((executionState === "In Progress" || executionState === "Paused") && lastActivityAt !== null && state.now - lastActivityAt > 60) attention.push("No recent update");
 
   const criticalItems = selectCriticalItemsForTask(state, taskId);
@@ -125,7 +125,7 @@ export function selectTaskProjection(state: TrialState, taskId: string): TaskPro
 export function selectTodayProjection(state: TrialState): TodayProjection {
   const { start, end } = operationalDayWindow(state);
   const tasks = state.tasks
-    .filter((task) => !task.summary && task.plannedStart < end && task.plannedFinish > start)
+    .filter((task) => !task.summary && task.plannedStart !== null && task.plannedFinish !== null && task.plannedStart < end && task.plannedFinish > start)
     .map((task) => selectTaskProjection(state, task.id));
   const counts: Record<ExecutionState, number> = { "Not Started": 0, "In Progress": 0, Paused: 0, Completed: 0 };
   for (const task of tasks) counts[task.executionState] += 1;
@@ -162,7 +162,7 @@ export function selectTasksForUser(state: TrialState, userId: string): TaskProje
   }
   return [...new Set(taskIds)]
     .map((taskId) => selectTaskProjection(state, taskId))
-    .sort((left, right) => left.task.plannedStart - right.task.plannedStart || left.task.wbs.localeCompare(right.task.wbs));
+    .sort((left, right) => (left.task.plannedStart ?? Number.POSITIVE_INFINITY) - (right.task.plannedStart ?? Number.POSITIVE_INFINITY) || left.task.wbs.localeCompare(right.task.wbs));
 }
 
 export function selectTaskHistory(state: TrialState, taskId: string): TrialHistoryEvent[] {

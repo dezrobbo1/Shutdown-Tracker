@@ -94,12 +94,14 @@ Operational trials must first establish:
 - how Project recalculation consequences should be reviewed; and
 - how a later Project result should return as a new immutable snapshot.
 
+The explicitly flagged [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md) gathers evidence for those decisions without changing this authority. It retains the original UTF-8 source bytes and losslessly decoded text in browser memory, lets Tier 1 review optional Tracker-to-Project field proposals, creates a separate source-preserving experimental XML candidate, and guides a manual Microsoft Project step plus conservative local result comparison. It has no production approval/adoption lifecycle, backend persistence, native `.mpp`, or automatic Project recalculation.
+
 Existing export preview, approval, review-bootstrap, and minimal MSPDI writer code on `main` is experimental technical infrastructure. It does not establish exact candidate-bound approval, sealed preview, a narrow direct-input product policy, complete-source generation, or a mandatory manual round-trip gate as current requirements.
 
 Until a replacement contract is approved:
 
 - Export remains visibly **not finalised** in the Console;
-- no production-looking candidate or approval controls are enabled;
+- no production-looking candidate or approval controls are enabled outside an explicitly labelled browser-local evidence trial;
 - Microsoft Project remains schedule calculation and master-file authority;
 - Shutdown Tracker does not calculate CPM or write native `.mpp`; and
 - Shutdown Tracker never silently saves, overwrites, or merges into a master schedule.

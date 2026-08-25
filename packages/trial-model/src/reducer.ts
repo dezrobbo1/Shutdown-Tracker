@@ -112,10 +112,11 @@ function recordStart(state: TrialState, action: Extract<TrialAction, { type: "st
   const task = requireExecutableTask(state, action.taskId);
   requireTaskUpdateAuthority(state, task.id, action.actorId);
   if (selectExecutionState(state, action.taskId) !== "Not Started") throw new Error("Start is available only for Not Started work.");
-  if (state.now > task.plannedStart) requireNonBlank(action.lateCause, "Late-start cause");
+  const late = task.plannedStart !== null && state.now > task.plannedStart;
+  if (late) requireNonBlank(action.lateCause, "Late-start cause");
   const event: ExecutionEvent = { id: nextId(state, "event"), taskId: action.taskId, actorId: action.actorId, type: "start", at: state.now, lateCause: action.lateCause?.trim(), actionStillNeeded: action.actionStillNeeded?.trim() };
   state.executionEvents.push(event);
-  appendHistory(state, "start", action.actorId, `${task.name} started${state.now > task.plannedStart ? ` late: ${action.lateCause?.trim()}` : ""}.`, task.id);
+  appendHistory(state, "start", action.actorId, `${task.name} started${late ? ` late: ${action.lateCause?.trim()}` : ""}.`, task.id);
   createEventObligations(state, task.id, "start", event.id);
 }
 
@@ -264,7 +265,7 @@ function processShiftBoundaries(state: TrialState, previousMinute: number, targe
     if (state.processedClockEvents.includes(key)) continue;
     state.processedClockEvents.push(key);
     const stateAtBoundary = { ...state, now: boundary };
-    for (const task of state.tasks.filter((candidate) => !candidate.summary && candidate.plannedStart < boundary)) {
+    for (const task of state.tasks.filter((candidate) => !candidate.summary && candidate.plannedStart !== null && candidate.plannedStart < boundary)) {
       if (selectExecutionState(stateAtBoundary, task.id) === "Completed") continue;
       const fieldUsers = state.fieldAssignments.filter((assignment) => assignment.taskId === task.id && assignment.active && assignment.assignedAt <= boundary).map((assignment) => assignment.tier3UserId);
       const users = fieldUsers.length > 0 ? fieldUsers : state.trackingAssignments.filter((assignment) => assignment.taskId === task.id && assignment.active && assignment.assignedAt <= boundary).map((assignment) => assignment.tier2UserId);
@@ -278,12 +279,14 @@ function processShiftBoundaries(state: TrialState, previousMinute: number, targe
 }
 
 function processPlannedFinishTriggers(state: TrialState, previousMinute: number, targetMinute: number) {
-  for (const task of state.tasks.filter((candidate) => !candidate.summary && candidate.plannedFinish > previousMinute && candidate.plannedFinish <= targetMinute)) {
-    const key = `planned-finish:${task.id}:${task.plannedFinish}`;
+  for (const task of state.tasks) {
+    const plannedFinish = task.plannedFinish;
+    if (task.summary || plannedFinish === null || plannedFinish <= previousMinute || plannedFinish > targetMinute) continue;
+    const key = `planned-finish:${task.id}:${plannedFinish}`;
     if (state.processedClockEvents.includes(key)) continue;
     state.processedClockEvents.push(key);
-    const stateAtFinish = { ...state, now: task.plannedFinish };
-    if (selectExecutionState(stateAtFinish, task.id) !== "Completed") createEventObligations(state, task.id, "planned-finish-exceeded", key, task.plannedFinish);
+    const stateAtFinish = { ...state, now: plannedFinish };
+    if (selectExecutionState(stateAtFinish, task.id) !== "Completed") createEventObligations(state, task.id, "planned-finish-exceeded", key, plannedFinish);
   }
 }
 

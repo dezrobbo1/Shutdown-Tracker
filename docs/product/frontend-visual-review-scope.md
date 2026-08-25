@@ -1,6 +1,6 @@
 # Frontend Visual Review Scope
 
-This document defines how frontend visual-review and deterministic operational-trial work relate to the approved two-application product foundation. See [Deterministic Operational Trial](deterministic-operational-trial.md) for the opt-in scenario, clock, personas, replay boundary, and review questions.
+This document defines how frontend visual-review and deterministic operational-trial work relate to the approved two-application product foundation. See [Deterministic Operational Trial](deterministic-operational-trial.md) for the opt-in scenario, clock, personas, replay boundary, and review questions, and [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md) for the separate imported-schedule evidence workflow.
 
 ## Current implementation boundary
 
@@ -8,7 +8,7 @@ The Master Console and Mobile App are separate React clients. Their approved pro
 
 The Console can read configured import snapshot list/detail data through `apps/console/src/apiReviewClient.ts`. `apps/console/src/projectXmlPreview.ts` also provides standalone local browser inspection of valid Microsoft Project MSPDI/XML. Neither capability authenticates a user, activates a project, changes a snapshot, or updates a Microsoft Project file.
 
-The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, complete-source generation, Project-open verification controls, or manual Microsoft Project acceptance gate. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until after operational frontend trials.
+The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, Project-open verification controls, or mandatory Microsoft Project acceptance gate. The separately flagged Tier 1 evidence trial has an independent source-preserving browser patcher and optional manual Project review; it has no approval lifecycle and does not make that workflow product authority. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until after operational trials.
 
 Neither the default visual shells nor the deterministic local trial implement:
 
@@ -112,6 +112,7 @@ There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / 
 | Ephemeral Console-Mobile trial bridge | Verified in repository | Optional linked-window transport validates window, origin, trial channel, ephemeral session, and correlated requests. Action acknowledgements, duplicate-request handling, heartbeat detection, and explicit local-only fallback protect synthetic trial state. It is not persistence, offline sync, or a production client protocol. |
 | Import snapshot list/detail | Read-only API-wired | GET-only ordinary Console wiring when an API project is explicitly configured. |
 | Local MSPDI/XML inspection | Verified in repository | Browser-only XML namespace/content inspection; no `.mpp`, persistence, or activation. |
+| Tier 1 Project round-trip trial | Verified in repository | Explicit flag only; temporary imported XML schedule, unrestricted synthetic Tier 1 leaf execution, reviewed optional mappings, separate source-preserving candidate, manual Project step, local result comparison, and reset/discard. Browser-memory evidence only; no approved contract or backend workflow. |
 | Export | Static visual only | Direction is deliberately not finalised; experimental main compatibility code is not presented as product authority. |
 
 ## Execution visual rules
@@ -150,6 +151,8 @@ Import / Export
 Import should lead with source selection, browser inspection, admission validation, parse summary, task/snapshot review, mapping validation, comparison/reconciliation, and activation as each capability becomes available. Clearly distinguish the verified local XML inspector, read-only snapshot GET wiring, and unimplemented write steps.
 
 Export must say that the final product workflow is not finalised. Do not present candidate-bound approval, sealed previews, batch approval, a required browser acceptance harness, or a real-human Microsoft Project gate as settled product architecture. Do not imply that main's patch-shaped compatibility writer updates or represents the master Project schedule.
+
+When `VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true`, Import and Export may expose the separately documented evidence workflow. It must show browser-local/no-persistence/no-approved-contract boundaries, preserve the exact source, default mappings to excluded, create a separate candidate, and require manual classification of unexplained result differences. Its manual Project step and in-memory disposition are not production approval or adoption.
 
 Use this current high-risk copy:
 
@@ -244,9 +247,9 @@ Revise a visual PR if it:
 - hides queued, failed, or server-received sync state;
 - implies a disabled control is live;
 - presents PR #48 or main's compatibility exporter as current product authority;
-- implies Project write-back or a completed round trip;
+- implies production Project write-back, master-schedule adoption, or an approved completed round trip;
 - introduces scheduler-like editing;
 - uses colour as the only state signal;
 - infers authority from category, discipline, contractor, work group, area, WBS, Resource `Group`, saved view, or Critical membership.
 
-The deterministic frontend operational trial is the current bounded product-validation surface. Its human review results should determine the next product slice. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.
+The deterministic frontend operational trial and the separately flagged Tier 1 Project round-trip evidence trial are the current bounded product-validation surfaces. Their human review results should determine the next product slice. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.

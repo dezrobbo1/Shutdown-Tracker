@@ -87,6 +87,22 @@ describe("deterministic operational trial model", () => {
     expect(selectTaskProjection(state, "task-scaffold-access").attention).toContain("Late to Start");
   });
 
+  it("supports an imported leaf with no planned dates without inventing schedule attention", () => {
+    const initial = createInitialTrialState();
+    const withoutPlannedDates = {
+      ...initial,
+      now: initial.now + 10_000,
+      tasks: initial.tasks.map((task) => task.id === "task-scaffold-access"
+        ? { ...task, plannedStart: null, plannedFinish: null }
+        : task)
+    };
+
+    const projection = selectTaskProjection(withoutPlannedDates, "task-scaffold-access");
+    expect(projection.executionState).toBe("Not Started");
+    expect(projection.attention).not.toContain("Late to Start");
+    expect(() => selectTodayProjection(withoutPlannedDates)).not.toThrow();
+  });
+
   it("keeps Can't Start distinct from execution start", () => {
     const state = applyTrialAction(createInitialTrialState(), {
       type: "cant-start",

@@ -16,7 +16,12 @@ export function formatTrialDateTime(minute: number) {
   return `${day} ${MONTH} ${YEAR} · ${formatTrialTime(minute)}`;
 }
 
-export function formatTrialWindow(start: number, finish: number) {
+export function formatTrialWindow(start: number | null, finish: number | null) {
+  if (start === null) {
+    if (finish === null) return "Not supplied";
+    return `Start not supplied · finish ${formatTrialDateTime(finish)}`;
+  }
+  if (finish === null) return `${formatTrialDateTime(start)} · finish not supplied`;
   const startDay = 24 + Math.floor(start / 1440);
   const finishDay = 24 + Math.floor(finish / 1440);
   if (startDay === finishDay) return `${startDay} ${MONTH} · ${formatTrialTime(start)}–${formatTrialTime(finish)}`;

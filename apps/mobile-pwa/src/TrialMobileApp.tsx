@@ -524,7 +524,7 @@ function TrialExecutionControls({
 }) {
   const [openAction, setOpenAction] = useState<string | null>(null);
   const task = projection.task;
-  const late = state.now > task.plannedStart;
+  const late = task.plannedStart !== null && state.now > task.plannedStart;
   const cantStartRecordedAtCurrentTime = state.executionEvents
     .filter((event) => event.taskId === task.id && event.type === "cant-start" && event.at === state.now)
     .sort((left, right) => right.id.localeCompare(left.id))[0];
@@ -861,7 +861,7 @@ function buildReportingOnlyContexts(state: TrialState, user: TrialUser, trackedT
       obligations: compactMobileObligations(obligations)
     }))
     .filter((context) => context.obligations.length > 0)
-    .sort((left, right) => left.sourceTask.plannedStart - right.sourceTask.plannedStart || left.sourceTask.wbs.localeCompare(right.sourceTask.wbs));
+    .sort((left, right) => (left.sourceTask.plannedStart ?? Number.POSITIVE_INFINITY) - (right.sourceTask.plannedStart ?? Number.POSITIVE_INFINITY) || left.sourceTask.wbs.localeCompare(right.sourceTask.wbs));
 }
 
 function compactMobileObligations(obligations: CriticalObligationProjection[]) {

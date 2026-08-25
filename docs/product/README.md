@@ -39,6 +39,7 @@ The six primary product-authority documents are:
 Supporting product contracts include:
 
 - [Deterministic Operational Trial](deterministic-operational-trial.md)
+- [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md)
 - [Project Operational Mapping](project-operational-mapping.md)
 - [Trial Foundation Retention Map](trial-foundation-retention-map.md)
 - [Communications Layer](communications-layer.md)
@@ -64,6 +65,8 @@ The active priority is to validate the operating product before locking a Projec
 
 Imported Project sources and snapshots remain immutable. The final Project-bound input, review, candidate, recalculation, adoption, merge, and re-import design will be reconsidered after operational trials. Existing export code is experimental technical infrastructure only. See [ADR-012](../adr/ADR-012-product-trial-foundation-and-export-deferral.md).
 
+The opt-in [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md) gathers evidence within that deferred boundary. Its browser-local source-preserving candidate, manual Project step, and conservative comparison do not establish approval, adoption, or final mapping authority.
+
 ## Task execution and progress
 
 Ordinary Mobile field actions are Can't Start, Start, Pause, Resume, and Finish. Their event timestamps are system-captured; Tier 2/Tier 3 users do not ordinarily type execution dates/times. Can't Start leaves the task Not Started, and a pause interval remains distinct from any linked adverse delay/problem. These Tracker facts do not map one-to-one to Project fields automatically.
@@ -81,7 +84,7 @@ The current trial records Tracker progress in product language. It does not prom
 
 ## Deferred Project export
 
-Import / Export remains a Console section, but Export is explicitly not finalised. No exact approval pipeline, sealed preview, candidate generator, manual gate, or Project adoption workflow is current product authority. A future decision may reuse technical code only after the product contract is approved independently.
+Import / Export remains a Console section, but Export is explicitly not finalised. No exact approval pipeline, sealed preview, production candidate generator, mandatory manual gate, or Project adoption workflow is current product authority. The separately flagged browser-local trial may generate an experimental complete-source candidate solely to gather evidence. A future decision may reuse technical code only after the product contract is approved independently.
 
 ## Project Operational Mapping
 
@@ -139,4 +142,4 @@ Shutdown Tracker does not:
 - infer permissions from Project categories;
 - use generic chat as the source of operational truth.
 
-Any future Microsoft Project recalculation workflow requires a new approved contract. It must remain separate from Shutdown Tracker's execution truth and must never silently overwrite the master schedule.
+Any production or durable Microsoft Project recalculation workflow requires a new approved contract. The explicitly flagged browser-local evidence trial is not that contract. A future production workflow must remain separate from Shutdown Tracker's execution truth and must never silently overwrite the master schedule.

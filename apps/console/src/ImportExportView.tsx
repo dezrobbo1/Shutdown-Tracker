@@ -9,6 +9,14 @@ import {
   type ProjectXmlPreview,
   type ProjectXmlTaskPreview
 } from "./projectXmlPreview";
+import {
+  Tier1RoundTripBoundary,
+  Tier1RoundTripExportPanel,
+  Tier1RoundTripHistoryPanel,
+  Tier1RoundTripImportPanel,
+  type Tier1RoundTripChangeHandler,
+  type Tier1RoundTripWorkspaceState
+} from "./Tier1RoundTripTrialViews";
 
 type ImportExportSection = (typeof importExportSections)[number];
 
@@ -18,7 +26,10 @@ export function ImportExportView({
   loadState,
   onRefresh,
   initialSection = "Current Schedule",
-  trialMode = false
+  trialMode = false,
+  roundTripTrialMode = false,
+  roundTripState = null,
+  onRoundTripChange = () => undefined
 }: {
   shellProjectLabel: string;
   reviewData: ConsoleReviewData | null;
@@ -26,24 +37,28 @@ export function ImportExportView({
   onRefresh: () => void;
   initialSection?: ImportExportSection;
   trialMode?: boolean;
+  roundTripTrialMode?: boolean;
+  roundTripState?: Tier1RoundTripWorkspaceState | null;
+  onRoundTripChange?: Tier1RoundTripChangeHandler;
 }) {
   const [active, setActive] = useState<ImportExportSection>(initialSection);
   const reviewRows = useMemo(() => buildReviewRows(reviewData), [reviewData]);
-  const liveEnabled = !trialMode && reviewApiRuntimeConfig.liveEnabled;
-  const ordinaryMode = trialMode ? "Synthetic operational trial" : liveEnabled ? "Read-only API-wired" : "Static visual only";
+  const liveEnabled = !trialMode && !roundTripTrialMode && reviewApiRuntimeConfig.liveEnabled;
+  const ordinaryMode = roundTripTrialMode ? "Browser-local experimental trial" : trialMode ? "Synthetic operational trial" : liveEnabled ? "Read-only API-wired" : "Static visual only";
   const selectedSnapshot = reviewData?.snapshotDetail?.snapshot ?? null;
 
   return (
     <>
       <PageHeading
-        eyebrow="Import / Export · product-trial foundation"
+        eyebrow={roundTripTrialMode ? "Import / Export · Tier 1 Project round-trip trial" : "Import / Export · product-trial foundation"}
         title="Project schedule exchange"
-        description="Review incoming Microsoft Project schedule sources. The final export and round-trip contract is intentionally deferred until after operational trials."
+        description={roundTripTrialMode ? "Exercise a temporary Project XML schedule and gather evidence for the deferred export contract." : "Review incoming Microsoft Project schedule sources. The final export and round-trip contract is intentionally deferred until after operational trials."}
         status={ordinaryMode}
       />
+      {roundTripTrialMode ? <Tier1RoundTripBoundary /> : null}
       <div className="handoff-boundary">
         <strong>Current direction</strong>
-        <span>Import inspection remains useful for the product trial. Export is not finalised and no candidate, approval, or Microsoft Project acceptance workflow is presented as required product behaviour.</span>
+        <span>{roundTripTrialMode ? "This opt-in browser-local trial generates an experimental complete-source candidate for evidence only. It is not production export authority and adds no approval lifecycle." : "Import inspection remains useful for the product trial. Export is not finalised and no candidate, approval, or Microsoft Project acceptance workflow is presented as required product behaviour."}</span>
       </div>
       {liveEnabled && (
         <div className="review-context-warning" role="note">
@@ -67,46 +82,60 @@ export function ImportExportView({
       {active === "Current Schedule" && (
         <section className="schedule-grid">
           <article className="detail-panel">
-            <PanelHeading title="Current Schedule" detail="Configured import snapshot or static product-trial context." />
+            <PanelHeading title="Current Schedule" detail={roundTripTrialMode ? "Temporary browser-memory source context." : "Configured import snapshot or static product-trial context."} />
             <dl className="detail-list">
               <div><dt>Mode</dt><dd>{ordinaryMode}</dd></div>
-              <div><dt>Static shell project</dt><dd>{shellProjectLabel}</dd></div>
-              <div><dt>Configured import project</dt><dd>{reviewData?.projectId ?? "No backend project configured"}</dd></div>
-              <div><dt>Snapshots returned</dt><dd>{reviewData?.snapshots.length ?? 0}</dd></div>
-              <div><dt>Selected snapshot</dt><dd>{selectedSnapshot ? `v${selectedSnapshot.snapshotVersion} · ${selectedSnapshot.status}` : "No imported snapshot selected"}</dd></div>
+              {roundTripTrialMode ? <>
+                <div><dt>Temporary project</dt><dd>{roundTripState?.session.source.preview.projectName ?? "No source selected"}</dd></div>
+                <div><dt>Source</dt><dd>{roundTripState?.session.source.fileName ?? "Choose Project XML/MSPDI in Import"}</dd></div>
+                <div><dt>Project UID</dt><dd>{roundTripState?.session.source.preview.projectUid ?? "Not supplied"}</dd></div>
+                <div><dt>Source-file SHA-256</dt><dd>{roundTripState?.session.source.hash ? <code>{roundTripState.session.source.hash}</code> : "Unavailable until a source is selected"}</dd></div>
+                <div><dt>Persistence</dt><dd>Browser memory only</dd></div>
+              </> : <>
+                <div><dt>Static shell project</dt><dd>{shellProjectLabel}</dd></div>
+                <div><dt>Configured import project</dt><dd>{reviewData?.projectId ?? "No backend project configured"}</dd></div>
+                <div><dt>Snapshots returned</dt><dd>{reviewData?.snapshots.length ?? 0}</dd></div>
+                <div><dt>Selected snapshot</dt><dd>{selectedSnapshot ? `v${selectedSnapshot.snapshotVersion} · ${selectedSnapshot.status}` : "No imported snapshot selected"}</dd></div>
+              </>}
               <div><dt>Read state</dt><dd>{loadState.message}</dd></div>
             </dl>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={!liveEnabled || loadState.status === "loading"}
-            >
-              <RefreshCw size={16} aria-hidden="true" /> Refresh imported schedule
-            </button>
+            {roundTripTrialMode
+              ? <p className="surface-caption">Choose or replace the local XML source from Import. Nothing is refreshed from a backend.</p>
+              : <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={!liveEnabled || loadState.status === "loading"}
+                >
+                  <RefreshCw size={16} aria-hidden="true" /> Refresh imported schedule
+                </button>}
           </article>
           <article className="detail-panel">
             <PanelHeading title="Trial boundary" detail="Schedule-source context supports operational trial review." />
             <ol className="sequence-list">
               <li>Choose a Project XML/MSPDI source.</li>
               <li>Inspect its identity and task structure.</li>
-              <li>Validate the source and operational mapping in a future production import flow.</li>
-              <li>Activate or simulate the imported schedule only through a separately implemented workflow.</li>
-              <li>Revisit export after task execution, progress, assignment, Today, and Critical trials.</li>
+              <li>{roundTripTrialMode ? "Start a temporary browser-memory schedule from the inspected hierarchy." : "Validate the source and operational mapping in a future production import flow."}</li>
+              <li>{roundTripTrialMode ? "Exercise Tier 1 execution and review only explicitly selected experimental field mappings." : "Activate or simulate the imported schedule only through a separately implemented workflow."}</li>
+              <li>{roundTripTrialMode ? "Use Microsoft Project manually, then re-import a new result XML for conservative comparison." : "Revisit export after task execution, progress, assignment, Today, and Critical trials."}</li>
             </ol>
           </article>
         </section>
       )}
 
-      {active === "Import" && (
+      {active === "Import" && (roundTripTrialMode ? (
+        <Tier1RoundTripImportPanel state={roundTripState} onChange={onRoundTripChange} />
+      ) : (
         <ImportReview
           reviewRows={reviewRows}
           loadState={loadState}
           liveEnabled={liveEnabled}
           onRefresh={onRefresh}
         />
-      )}
+      ))}
 
-      {active === "Export" && (
+      {active === "Export" && (roundTripTrialMode ? (
+        <Tier1RoundTripExportPanel state={roundTripState} onChange={onRoundTripChange} />
+      ) : (
         <section className="detail-panel export-deferred-panel">
           <PanelHeading title="Export design not finalised" detail="Designed, not built · intentionally deferred." />
           <div className="implementation-note">
@@ -119,15 +148,17 @@ export function ImportExportView({
             <span>No production export action is enabled.</span>
           </div>
         </section>
-      )}
+      ))}
 
-      {active === "History" && (
+      {active === "History" && (roundTripTrialMode ? (
+        <Tier1RoundTripHistoryPanel state={roundTripState} />
+      ) : (
         <section className="table-panel">
           <PanelHeading title="Import history" detail="Existing configured snapshot records are shown read-only where available." />
           <ReviewRows rows={reviewRows} />
           <p className="surface-caption">Production project history, activation decisions, and export disposition are not implemented in this visual shell.</p>
         </section>
-      )}
+      ))}
     </>
   );
 }
