@@ -247,9 +247,9 @@ Revise a visual PR if it:
 - hides queued, failed, or server-received sync state;
 - implies a disabled control is live;
 - presents PR #48 or main's compatibility exporter as current product authority;
-- implies Project write-back or a completed round trip;
+- implies production Project write-back, master-schedule adoption, or an approved completed round trip;
 - introduces scheduler-like editing;
 - uses colour as the only state signal;
 - infers authority from category, discipline, contractor, work group, area, WBS, Resource `Group`, saved view, or Critical membership.
 
-The deterministic frontend operational trial is the current bounded product-validation surface. Its human review results should determine the next product slice. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.
+The deterministic frontend operational trial and the separately flagged Tier 1 Project round-trip evidence trial are the current bounded product-validation surfaces. Their human review results should determine the next product slice. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.

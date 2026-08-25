@@ -61,9 +61,9 @@ Enable the separate browser-local evidence trial with:
 VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
 ```
 
-Import / Export can then retain the decoded UTF-8 text of a Microsoft Project XML/MSPDI source in memory, adapt its hierarchy into a temporary Tier 1 schedule, capture local Can't Start / Start / Pause / Resume / Finish and progress facts, and offer reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. No mapping is included by default.
+Import / Export can then retain the original UTF-8 bytes and losslessly decoded text of a Microsoft Project XML/MSPDI source in memory, adapt its hierarchy into a temporary Tier 1 schedule, capture local Can't Start / Start / Pause / Resume / Finish and progress facts, and offer reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. Invalid or non-UTF-8 input fails closed, and no mapping is included by default.
 
-The source-preserving browser patcher creates a separate complete-source candidate from only the selected fields, with identity/source-value checks and source/candidate hashes. The reviewer downloads it, opens/recalculates it manually in Microsoft Project, exports a new result XML, and re-imports that result for conservative local comparison and an in-memory disposition. Reset/discard removes generated session state without changing the retained source.
+The source-preserving browser patcher creates a separate complete-source candidate from only the selected fields, with identity/source-value checks and source/candidate hashes. The reviewer downloads it, opens/recalculates it manually in Microsoft Project, exports a new result XML, and re-imports that result for conservative local comparison and an in-memory disposition. Reset retains the immutable source and removes generated session state; discard or reload disposes of the complete browser-memory trial.
 
 This is an experimental product trial, not PR #48's approval workflow or a final export contract. It has no backend/API persistence, approval lifecycle, native `.mpp`, automatic Project operation, CPM, or Mobile redesign. Ordinary Export remains not finalised outside this flag. See [Tier 1 Project Round-Trip Trial](../../docs/product/tier1-project-roundtrip-trial.md).
 

@@ -27,11 +27,11 @@ The existing fixed deterministic trial remains independently available through `
 
 ## Source import and temporary project
 
-The Import view accepts Microsoft Project XML/MSPDI only. Native `.mpp` is unsupported. The selected file is read locally and its exact XML text is retained unchanged in browser memory; it is not uploaded or persisted.
+The Import view accepts Microsoft Project XML/MSPDI only. Native `.mpp` is unsupported. The selected file is read locally as bytes, decoded with fatal UTF-8 handling, and both the original bytes and exact losslessly decoded XML text are retained unchanged in browser memory. A UTF-8 byte-order mark is retained; invalid or non-UTF-8 bytes fail closed. Nothing is uploaded or persisted.
 
 The inspector extracts the bounded source facts it can support safely, including project identity/status date and task UID, ID, WBS/outline, summary status, planned dates, imported Actual Start/Finish, `% Complete`, `Physical % Complete`, and Project Critical context where supplied. Starting the trial adapts those facts into a temporary schedule while preserving source identity and hierarchy. Project resources never create application authority. A clearly synthetic Tier 1 reviewer may operate every executable leaf task.
 
-This first adapter requires every imported task row used by the temporary hierarchy to have one unique UID, a valid Outline Level, and planned Start/Finish values. Unsupported, incomplete, duplicate, or discontinuous hierarchy facts stop the trial with an explicit error rather than being inferred. That bounded admission rule is not a claim of complete MSPDI semantic support.
+This first adapter requires every imported task row used by the temporary hierarchy to have one unique UID and a valid, continuous Outline Level. Planned Start and Finish remain nullable imported facts; the adapter does not invent them. Contradictory supplied dates, unsupported values, duplicate identity, or discontinuous hierarchy stop the trial with an explicit error rather than being inferred. That bounded admission rule is not a claim of complete MSPDI semantic support.
 
 The controllable clock starts from Project Status Date where present, otherwise the earliest supported planned start, otherwise a labelled synthetic fallback. All generated Tracker events use that trial time.
 
@@ -53,7 +53,7 @@ The mapping view shows the source value, proposed value, exact task identity, pr
 
 ## Complete-source candidate
 
-The browser patcher starts from the complete decoded UTF-8 XML string and creates a separate candidate. It targets one exact Task UID, checks optional ID/name/WBS/summary identity and expected source values, and applies only explicitly selected supported fields. Untouched XML text is copied verbatim from the retained source string. A missing, duplicate, summary, stale, or unsafe target fails closed rather than guessing. SHA-256 values over the decoded source text and UTF-8 candidate text support integrity review; they are not a claim about any pre-decoding file-byte representation.
+The browser patcher starts from the complete losslessly decoded UTF-8 XML string and creates a separate candidate. It targets one exact Task UID, checks optional ID/name/WBS/summary identity and expected source values, and applies only explicitly selected supported fields. Untouched XML text is copied verbatim from the retained source string. Existing scalar-field attributes are retained. An absent field is inserted only at supported adjacent MSPDI Task-order anchors; a missing, duplicate, summary, stale, or unsafe target fails closed rather than guessing. SHA-256 values cover the original source bytes and the UTF-8 candidate bytes.
 
 This source-preserving browser patcher does not use the retained patch-shaped backend compatibility writer and does not calculate Project consequences.
 

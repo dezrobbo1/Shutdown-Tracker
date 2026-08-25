@@ -142,4 +142,4 @@ Shutdown Tracker does not:
 - infer permissions from Project categories;
 - use generic chat as the source of operational truth.
 
-Any future Microsoft Project recalculation workflow requires a new approved contract. It must remain separate from Shutdown Tracker's execution truth and must never silently overwrite the master schedule.
+Any production or durable Microsoft Project recalculation workflow requires a new approved contract. The explicitly flagged browser-local evidence trial is not that contract. A future production workflow must remain separate from Shutdown Tracker's execution truth and must never silently overwrite the master schedule.
