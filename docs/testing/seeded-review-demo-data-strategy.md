@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Seeded review/demo data should make local and review-environment workflows easier to inspect without using real shutdown schedules, real Project files, customer data, or production-like seed data. The active priority is deterministic operational frontend trials and import review. Export-oriented examples below describe existing experimental compatibility infrastructure, not the current product contract. This document defines the strategy only. It does not add seed data, migrations, app code, source files, generated artifacts, or runtime seeding behavior.
+Seeded review/demo data should make local and review-environment workflows easier to inspect without using real shutdown schedules, real Project files, customer data, or production-like seed data. The active frontend evidence work is browser-local imported-schedule review; it does not require a fixed seeded operational scenario. Export-oriented examples below describe existing experimental compatibility infrastructure, not the current product contract. This document defines the strategy only. It does not add seed data, migrations, app code, source files, generated artifacts, or runtime seeding behavior.
 
 Microsoft Project remains the schedule authority. Seeded data may support import review and operational product trials; it must not introduce scheduler logic, CPM, critical path, float calculation, resource levelling, recovery scheduling, automatic date movement, a live Project feed, or uncontrolled Project write-back.
 

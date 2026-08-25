@@ -12,7 +12,7 @@ The active product path is:
 import immutable Project schedule
 -> validate product structure and operational mappings
 -> assign tracking responsibility
--> trial Tier 1, Tier 2, and Tier 3 workflows
+-> validate Tier 1, Tier 2, and Tier 3 workflows
 -> validate execution, progress, Today, task, and Critical reporting behaviour
 -> revisit the Project export/round-trip contract with trial evidence
 ```

@@ -2,7 +2,7 @@
 
 Purpose: React/Vite mobile-first PWA satellite for Tier 2 and Tier 3 assigned work.
 
-Current status: static/synthetic `Assigned Tasks -> Task Detail` visual shell by default, with an opt-in deterministic operational trial. The trial makes the approved assignment, execution, end-of-shift progress, and contextual Critical reporting flows locally interactive without production persistence or API writes.
+Current status: static/synthetic `Assigned Tasks -> Task Detail` visual shell. It does not enable assignment, execution, end-of-shift progress, or Critical reporting writes.
 
 ## Approved application target
 
@@ -22,31 +22,6 @@ Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical
 
 Sync is a compact, persistent transport/recovery state. Queued, sending, server-received, failed, and conflict states must remain visible without becoming an operational page.
 
-## Deterministic operational trial
-
-Set the flag to the exact value `true`:
-
-```text
-VITE_SHUTDOWN_TRACKER_TRIAL_MODE=true
-```
-
-Trial mode is labelled `Synthetic operational trial`, `Deterministic local state`, and `No production persistence`. It uses the same shared fixed scenario and reducer as the Console.
-
-The named persona selector is a product-review tool:
-
-- Tier 2 personas see only tasks/work packs for which they hold tracking responsibility. They can delegate work to a direct-report Tier 3 user as `WORKING_ON` or `FIELD_CONTROL` while retaining tracking responsibility.
-- Tier 2 reporting owners see contextual Critical obligations, pre-populated known execution facts, controlled judgement fields, immutable report submission, and correction by supersession. When the reporting owner is not the tracking owner, Assigned Tasks exposes a separate reporting-only context without execution, delegation, end-of-shift, or wider task-record controls.
-- Tier 3 personas see only explicitly delegated tasks. They can exercise Can't Start, Start, Pause, Resume, Finish, and end-of-shift unfinished progress with simulated system-captured times.
-- Assigned Tier 2/Tier 3 personas can resolve a task-owned trial problem or complete a task-owned trial action; those changes use the same event history as Task Detail and Console Today.
-
-The Mobile trial also provides compact simulated-clock controls and the optional guided checklist. Reset restores the exact fixed state and removes generated actions, assignments, execution events, progress observations, policy changes, obligations, reports, corrections, problems, and history.
-
-Assigned work is presented before the collapsed trial controls. The trial rejects same-minute duplicate `Can't Start` observations and identical active Tier 3 assignment no-ops, then closes successful action disclosures. Submitted field progress remains explicitly identified as a Tracker observation and does not establish Start when execution evidence is absent. Reset also restores the default Tier 2 persona and Assigned Tasks list.
-
-When Console opens Mobile as a linked trial window, Mobile receives the Console's canonical in-memory state and sends typed trial actions back through a strictly validated `window.opener`/`postMessage` bridge. The Console origin is carried in the `trialHostOrigin` query parameter. Ephemeral session/request identifiers, action acknowledgements, duplicate-request handling, and a real-time heartbeat make connection loss explicit. The bridge rejects Tier 1-only Console actions, while the shared reducer enforces current tracking/field assignment for execution and task-owned record updates—including reporting-only personas. A validated Mobile action is retained in local trial state if the host cannot confirm it; the UI then identifies the session as disconnected/local-only. This bridge uses no browser or server persistence and is not a production sync/API design. Standalone Mobile trial mode applies the same shared reducer locally.
-
-See [Deterministic Operational Trial](../../docs/product/deterministic-operational-trial.md) for the scenario, clock, guided sequence, and review questions.
-
 ## Default visual shell
 
 - `Assigned Tasks` is the only top-level operational destination.
@@ -59,11 +34,11 @@ See [Deterministic Operational Trial](../../docs/product/deterministic-operation
 - End-of-shift unfinished work is represented as a Tracker field observation asking how much is complete, what remains, what may affect the next shift, and for optional note/evidence.
 - Ordinary progress is separate from formal Critical reporting. The Tier 2 example shows a contextual policy version/template, due state, controlled required content, pre-populated task facts, judgement inputs, and history. Tier 3 sees context only.
 - Sync is a compact status with embedded recovery examples, not a navigation destination.
-- All write-like controls are disabled outside trial mode. Only visual persona selection and local list/detail navigation are interactive in the default shell.
+- All write-like controls are disabled. Only visual persona selection and local list/detail navigation are interactive.
 
 ## Implementation boundary
 
-The current Mobile App does not implement these production capabilities, including when the deterministic local trial is enabled:
+The current Mobile App does not implement these production capabilities:
 
 - OIDC/login;
 - Tier 2/Tier 3 project membership;
@@ -105,7 +80,6 @@ Use `Thread may be out of date. Last synced at [time].` only for future Task Det
 - `docs/product/critical-reporting-model.md`
 - `docs/product/implementation-status-map.md`
 - `docs/product/frontend-visual-review-scope.md`
-- `docs/product/deterministic-operational-trial.md`
 - `docs/product/offline-audit-sync-rules.md`
 - `docs/product/ux-anti-slop-rules.md`
 - `docs/product/design-language-and-status-semantics.md`
@@ -116,10 +90,4 @@ Use `Thread may be out of date. Last synced at [time].` only for future Task Det
 npm run dev
 npm test
 npm run build
-```
-
-From the repository root, trial mode can be started with:
-
-```text
-VITE_SHUTDOWN_TRACKER_TRIAL_MODE=true npm run dev --workspace @shutdown-tracker/mobile-pwa
 ```

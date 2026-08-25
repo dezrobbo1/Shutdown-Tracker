@@ -2,7 +2,7 @@ import { selectExecutionState, selectTaskProgress } from "@shutdown-tracker/tria
 import { describe, expect, it } from "vitest";
 import type { ProjectXmlPreview, ProjectXmlTaskPreview } from "./projectXmlPreview";
 import {
-  SYNTHETIC_ROUNDTRIP_INITIAL_TIME,
+  ROUNDTRIP_FALLBACK_INITIAL_TIME,
   TIER1_ROUNDTRIP_ACTOR_ID,
   advanceTier1RoundTripClock,
   applyTier1RoundTripExecutionAction,
@@ -20,14 +20,14 @@ import {
   type Tier1RoundTripSession
 } from "./tier1RoundTripTrial";
 
-const SOURCE_XML = "<?xml version=\"1.0\"?><Project xmlns=\"http://schemas.microsoft.com/project\"><Name>Synthetic imported schedule</Name><Tasks /></Project>";
+const SOURCE_XML = "<?xml version=\"1.0\"?><Project xmlns=\"http://schemas.microsoft.com/project\"><Name>Test imported schedule</Name><Tasks /></Project>";
 
 describe("Tier 1 imported Project round-trip session", () => {
   it("retains the exact source and adapts identity, hierarchy, planned facts, and Critical context", () => {
     const session = createSession();
 
     expect(session.source.xml).toBe(SOURCE_XML);
-    expect(session.source.fileName).toBe("synthetic-source.xml");
+    expect(session.source.fileName).toBe("test-source.xml");
     expect(session.source.hash).toBe("source-sha256");
     expect(session.initialTimeSource).toBe("Project StatusDate");
     expect(formatRoundTripMinute(session.trialState.now)).toBe("2026-01-05T06:00:00");
@@ -36,10 +36,6 @@ describe("Tier 1 imported Project round-trip session", () => {
       name: "Tier 1 round-trip reviewer",
       tier: "Tier 1"
     }]);
-    expect(session.trialState.trackingAssignments).toEqual([]);
-    expect(session.trialState.fieldAssignments).toEqual([]);
-    expect(session.trialState.criticalItems).toEqual([]);
-
     const summary = session.trialState.tasks[0];
     const leaf = session.trialState.tasks[1];
     expect(summary).toMatchObject({ id: "project-task-uid:10", parentId: null, summary: true, depth: 0 });
@@ -85,7 +81,7 @@ describe("Tier 1 imported Project round-trip session", () => {
     })).toThrow("do not match the inspected XML text");
   });
 
-  it("uses StatusDate, then earliest planned start, then the explicit synthetic fallback", () => {
+  it("uses StatusDate, then earliest planned start, then the explicit fixed fallback", () => {
     expect(createSession().initialTimeSource).toBe("Project StatusDate");
 
     const earliest = createTier1RoundTripSession({
@@ -96,13 +92,13 @@ describe("Tier 1 imported Project round-trip session", () => {
     expect(earliest.initialTimeSource).toBe("Earliest task planned start");
     expect(formatRoundTripMinute(earliest.trialState.now)).toBe("2026-01-05T06:00:00");
 
-    expect(formatRoundTripMinute(parseProjectIsoMinute(SYNTHETIC_ROUNDTRIP_INITIAL_TIME, "fallback")))
+    expect(formatRoundTripMinute(parseProjectIsoMinute(ROUNDTRIP_FALLBACK_INITIAL_TIME, "fallback")))
       .toBe("2026-01-01T06:00:00");
     const fallback = chooseTier1RoundTripInitialClock(preview({
       statusDate: null,
       tasks: [task({ start: null, finish: null })]
     }));
-    expect(fallback.source).toBe("Synthetic fallback");
+    expect(fallback.source).toBe("Fixed fallback");
     expect(formatRoundTripMinute(fallback.minute)).toBe("2026-01-01T06:00:00");
 
     const fallbackSession = createTier1RoundTripSession({
@@ -110,7 +106,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       sourceXml: SOURCE_XML,
       preview: preview({ statusDate: null, tasks: [task({ start: null, finish: null })] })
     });
-    expect(fallbackSession.initialTimeSource).toBe("Synthetic fallback");
+    expect(fallbackSession.initialTimeSource).toBe("Fixed fallback");
     expect(fallbackSession.trialState.tasks[0]).toMatchObject({ plannedStart: null, plannedFinish: null });
     expect(() => jumpTier1RoundTripClockToTaskStart(fallbackSession, "project-task-uid:1"))
       .toThrow("has no imported planned Start");
@@ -145,7 +141,7 @@ describe("Tier 1 imported Project round-trip session", () => {
     expect(() => jumpTier1RoundTripClockToTaskStart(session, leafId)).toThrow("only forward");
   });
 
-  it("lets the synthetic Tier 1 identity execute any imported leaf without an assignment", () => {
+  it("lets the browser-local Tier 1 identity execute any imported leaf without an assignment", () => {
     let session = createSession();
     const taskId = "project-task-uid:11";
     session = jumpTier1RoundTripClockToTaskStart(session, taskId);
@@ -211,7 +207,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       type: "pause",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID,
-      reason: "Synthetic material constraint",
+      reason: "Material constraint",
       adverseDelay: true,
       whatIsNeeded: "Deliver replacement material",
       createAction: true
@@ -260,7 +256,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       type: "complete-action",
       actionId,
       actorId: "tier2-not-allowed"
-    })).toThrow("synthetic Tier 1 trial identity");
+    })).toThrow("browser-local Tier 1 trial identity");
   });
 
   it("rejects summary execution and any non-Tier-1 trial actor", () => {
@@ -274,7 +270,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       type: "start",
       taskId: "project-task-uid:11",
       actorId: "tier2-not-allowed"
-    })).toThrow("synthetic Tier 1 trial identity");
+    })).toThrow("browser-local Tier 1 trial identity");
   });
 
   it("records validated Tier 1 progress without silently establishing Start", () => {
@@ -421,7 +417,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       .toThrow("Unknown experimental mapping");
   });
 
-  it("resets deterministically without changing the imported source", () => {
+  it("resets repeatably without changing the imported source", () => {
     const taskId = "project-task-uid:11";
     let session = createSession();
     session = jumpTier1RoundTripClockToTaskStart(session, taskId);
@@ -532,7 +528,7 @@ describe("Tier 1 imported Project round-trip session", () => {
 
 function createSession(): Tier1RoundTripSession {
   return createTier1RoundTripSession({
-    fileName: "synthetic-source.xml",
+    fileName: "test-source.xml",
     sourceXml: SOURCE_XML,
     sourceHash: "source-sha256",
     preview: preview()
@@ -541,7 +537,7 @@ function createSession(): Tier1RoundTripSession {
 
 function preview(overrides: Partial<ProjectXmlPreview> = {}): ProjectXmlPreview {
   return {
-    projectName: "Synthetic imported schedule",
+    projectName: "Test imported schedule",
     projectUid: "11111111-1111-1111-1111-111111111111",
     statusDate: "2026-01-05T06:00:00",
     taskCount: 2,

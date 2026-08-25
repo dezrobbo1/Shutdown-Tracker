@@ -176,4 +176,4 @@ notes:
 
 The manual diagnostics performed during export-handoff investigation showed that minimal field-isolated MSPDI patches do not reliably reproduce the same tracking transaction as entering the fact through Microsoft Project. Those diagnostics are useful evidence against the sparse patch mechanism. They are not a permanent prohibition on the execution facts themselves and they do not test the full earlier candidate concept described above.
 
-If a future approved export design reuses this mechanism, its own ADR and validation plan must decide which synthetic Microsoft Project checks are required. This historical manual procedure is not a current product gate and does not block the deterministic frontend operational trial.
+If a future approved export design reuses this mechanism, its own ADR and validation plan must decide which synthetic Microsoft Project checks are required. This historical manual procedure is not a current product gate and does not define or block the browser-local Tier 1 Project round-trip evidence workflow.

@@ -1,16 +1,16 @@
 # Frontend Visual Review Scope
 
-This document defines how frontend visual-review and deterministic operational-trial work relate to the approved two-application product foundation. See [Deterministic Operational Trial](deterministic-operational-trial.md) for the opt-in scenario, clock, personas, replay boundary, and review questions, and [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md) for the separate imported-schedule evidence workflow.
+This document defines how frontend visual-review work and the imported [Tier 1 Project Round-Trip Trial](tier1-project-roundtrip-trial.md) relate to the approved two-application product foundation.
 
 ## Current implementation boundary
 
-The Master Console and Mobile App are separate React clients. Their approved product shells remain static by default. When `VITE_SHUTDOWN_TRACKER_TRIAL_MODE=true`, a shared deterministic frontend model makes bounded assignment, execution, progress, Critical reporting, clock, and history interactions available over synthetic in-memory state. These interactions are product-review evidence, not production behaviour or persistence.
+The Master Console and Mobile App are separate React clients. Their approved product shells remain static by default. The fixed fictional Console/Mobile operational trial, shared scenario, guided workflow, and linked-window bridge are not current capabilities.
 
 The Console can read configured import snapshot list/detail data through `apps/console/src/apiReviewClient.ts`. `apps/console/src/projectXmlPreview.ts` also provides standalone local browser inspection of valid Microsoft Project MSPDI/XML. Neither capability authenticates a user, activates a project, changes a snapshot, or updates a Microsoft Project file.
 
-The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, Project-open verification controls, or mandatory Microsoft Project acceptance gate. The separately flagged Tier 1 evidence trial has an independent source-preserving browser patcher and optional manual Project review; it has no approval lifecycle and does not make that workflow product authority. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until after operational trials.
+The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, Project-open verification controls, or mandatory Microsoft Project acceptance gate. The explicitly flagged Tier 1 evidence trial has an independent source-preserving browser patcher and optional manual Project review; it has no approval lifecycle and does not make that workflow product authority. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until evidence supports a separate product decision.
 
-Neither the default visual shells nor the deterministic local trial implement:
+Neither the default visual shells nor the imported Tier 1 round-trip trial implement:
 
 - OIDC/login sessions or tier authorization;
 - production Projects Home data, project creation, or project lifecycle writes;
@@ -27,7 +27,7 @@ Neither the default visual shells nor the deterministic local trial implement:
 
 See [Implementation Status Map](implementation-status-map.md) for the evidence-based classification.
 
-The trial does implement a bounded, deterministic in-memory reducer and projections for the corresponding synthetic workflows. It must never be described as an API, offline queue, durable event store, authenticated session, or production data model.
+The Tier 1 round-trip trial implements only the bounded in-memory execution reducer and projections required to operate imported executable leaves. It must never be described as an API, offline queue, durable event store, authenticated session, or production data model.
 
 ## Required status labels
 
@@ -104,15 +104,13 @@ There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / 
 | Frontend area | Current label | Limit |
 | --- | --- | --- |
 | Login and Projects Home | Static visual only | Review-only transitions with synthetic projects; no identity or project API. |
-| Deterministic trial model, clock, reset, and history | Verified in repository | Shared pure TypeScript state/reducer/projections over one fixed fictional scenario. In-memory only; no production persistence or API contract. |
-| Today, Tasks, Task Dashboard | Verified in repository | Trial mode derives these views from the shared state. Outside trial mode they remain static; there is no production query or write API. |
-| Critical | Verified in repository | Trial mode supports local item selection/configuration, policy versions, obligations, immutable submission, and superseding correction. No production Critical API or persistence exists. |
+| Today, Tasks, Task Dashboard | Verified in repository | The Tier 1 round-trip trial derives these views from an imported XML schedule and browser-memory execution state. Ordinary views remain static; there is no production query or write API. |
+| Critical | Static visual only | Selected items/work packs, ownership, policies, reports, and history are review examples with disabled writes. Imported Project Critical may appear as read-only round-trip context; there is no production Critical API or persistence. |
 | Project Settings | Static visual only | General, Users, Operational Mapping, Project History, and Lifecycle are review shells with disabled writes. |
-| Mobile Assigned Tasks and Task Detail | Verified in repository | Trial mode provides assignment-bounded projections and local execution, progress, delegation, and reporting interactions. Outside trial mode controls remain static/disabled; there is no Mobile API or offline queue. |
-| Ephemeral Console-Mobile trial bridge | Verified in repository | Optional linked-window transport validates window, origin, trial channel, ephemeral session, and correlated requests. Action acknowledgements, duplicate-request handling, heartbeat detection, and explicit local-only fallback protect synthetic trial state. It is not persistence, offline sync, or a production client protocol. |
+| Mobile Assigned Tasks and Task Detail | Static visual only | Persona selection and list/detail navigation use local static data; execution, progress, delegation, reporting, and sync controls do not write. There is no Mobile API or offline queue. |
 | Import snapshot list/detail | Read-only API-wired | GET-only ordinary Console wiring when an API project is explicitly configured. |
 | Local MSPDI/XML inspection | Verified in repository | Browser-only XML namespace/content inspection; no `.mpp`, persistence, or activation. |
-| Tier 1 Project round-trip trial | Verified in repository | Explicit flag only; temporary imported XML schedule, unrestricted synthetic Tier 1 leaf execution, reviewed optional mappings, separate source-preserving candidate, manual Project step, local result comparison, and reset/discard. Browser-memory evidence only; no approved contract or backend workflow. |
+| Tier 1 Project round-trip trial | Verified in repository | Explicit flag only; temporary imported XML schedule, unrestricted browser-local Tier 1 leaf execution, reviewed optional mappings, separate source-preserving candidate, manual Project step, local result comparison, and reset/discard. Browser-memory evidence only; no approved contract or backend workflow. |
 | Export | Static visual only | Direction is deliberately not finalised; experimental main compatibility code is not presented as product authority. |
 
 ## Execution visual rules
@@ -134,7 +132,7 @@ There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / 
 - Supported timing examples may include no routine reporting, request/ad hoc, interval, fixed time, shift, event/exception, and supported combinations.
 - Use a controlled content catalogue and pre-populate known execution facts. Do not introduce a generic report/form builder or a second execution-state model.
 - Tier 3 may see Critical context but does not configure it or own the formal Tier 2 obligation by default.
-- Keep Critical configuration/submission controls disabled outside explicit trial mode. Trial controls must remain labelled synthetic/local and must not call production APIs. Production controls remain unavailable until APIs, authorization, audit, and offline behaviour exist.
+- Keep Critical configuration/submission controls disabled until APIs, authorization, audit, and offline behaviour exist. Imported Project Critical values in the Tier 1 round-trip trial remain read-only schedule context.
 
 ## Import / Export visual rules
 
@@ -168,12 +166,13 @@ Use one global visual-shell statement:
 Visual review shell. Static/synthetic data. No production write workflow.
 ```
 
-Use all three statements in deterministic trial mode:
+Use all four statements in the Tier 1 Project round-trip trial:
 
 ```text
-Synthetic operational trial
-Deterministic local state
+Tier 1 Project round-trip trial
+Browser-local experimental workflow
 No production persistence
+No approved export contract
 ```
 
 Required offline copy:
@@ -252,4 +251,4 @@ Revise a visual PR if it:
 - uses colour as the only state signal;
 - infers authority from category, discipline, contractor, work group, area, WBS, Resource `Group`, saved view, or Critical membership.
 
-The deterministic frontend operational trial and the separately flagged Tier 1 Project round-trip evidence trial are the current bounded product-validation surfaces. Their human review results should determine the next product slice. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.
+The explicitly flagged Tier 1 Project round-trip evidence trial is the current bounded interactive product-validation surface. Its human review results may inform a later product slice but do not approve one. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.

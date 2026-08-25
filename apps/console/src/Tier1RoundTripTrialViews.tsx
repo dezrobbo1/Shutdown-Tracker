@@ -171,9 +171,9 @@ export function Tier1RoundTripClock({ state, onChange }: { state: Tier1RoundTrip
     }
   }
   return (
-    <section className="trial-control-bar roundtrip-clock" aria-label="Tier 1 round-trip trial clock">
-      <div className="trial-clock-readout"><span>Round-trip trial time</span><strong>{formatRoundTripMinute(state.session.trialState.now).replace("T", " ")}</strong><small>{state.session.initialTimeSource}</small></div>
-      <div className="trial-clock-actions">
+    <section className="roundtrip-clock" aria-label="Tier 1 round-trip trial clock">
+      <div className="roundtrip-clock-readout"><span>Round-trip trial time</span><strong>{formatRoundTripMinute(state.session.trialState.now).replace("T", " ")}</strong><small>{state.session.initialTimeSource}</small></div>
+      <div className="roundtrip-clock-actions">
         <button type="button" onClick={() => apply(() => advanceTier1RoundTripClock(state.session, 15))}>+15 minutes</button>
         <button type="button" onClick={() => apply(() => advanceTier1RoundTripClock(state.session, 60))}>+1 hour</button>
         <button type="button" onClick={() => apply(() => resetTier1RoundTripSession(state.session))}><RotateCcw size={15} aria-hidden="true" /> Reset trial</button>
@@ -511,7 +511,7 @@ function Tier1ExecutionPanel({ state, taskId, onChange }: { state: Tier1RoundTri
 }
 
 function RoundTripOverview({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const projection = selectTaskProjection(state.session.trialState, taskId); return <><PanelHeading title="Overview" detail="Imported Project facts and local Tracker truth." /><dl className="detail-list"><div><dt>Execution</dt><dd>{projection.executionState}</dd></div><div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div><div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div><div><dt>Active problems</dt><dd>{projection.activeProblems.length}</dd></div></dl></>; }
-function RoundTripPeople({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const task = state.session.trialState.tasks.find((item) => item.id === taskId); return <><PanelHeading title="People" detail="Authority is synthetic and explicit for this Tier 1-only trial." /><dl className="detail-list"><div><dt>Current operator</dt><dd>Tier 1 round-trip reviewer</dd></div><div><dt>Task authority</dt><dd>{task?.summary ? "Summary inspection only" : "May execute and update this leaf"}</dd></div><div><dt>Derived assignments</dt><dd>None — Project resource data never creates application authority</dd></div></dl></>; }
+function RoundTripPeople({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const task = state.session.trialState.tasks.find((item) => item.id === taskId); return <><PanelHeading title="People" detail="Authority is explicit and browser-local for this Tier 1-only trial." /><dl className="detail-list"><div><dt>Current operator</dt><dd>Tier 1 round-trip reviewer</dd></div><div><dt>Task authority</dt><dd>{task?.summary ? "Summary inspection only" : "May execute and update this leaf"}</dd></div><div><dt>Derived assignments</dt><dd>None — Project resource data never creates application authority</dd></div></dl></>; }
 function RoundTripProblems({ state, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
   const projection = selectTaskProjection(state.session.trialState, taskId);
   const [error, setError] = useState("");

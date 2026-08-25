@@ -5,7 +5,7 @@ Shared cross-application contracts and clients live here when they have a real i
 Current packages:
 
 - `api-client`: TypeScript client for current import/export review API surfaces.
-- `@shutdown-tracker/trial-model`: pure TypeScript fixed scenario, simulated clock, reducer, projections, reset/replay, and optional ephemeral bridge messages for the deterministic frontend operational trial. It has no production persistence or API-contract authority.
+- `@shutdown-tracker/trial-model`: pure TypeScript in-memory execution state, action reducer, and task projections used by the imported Tier 1 Project round-trip trial. It contains no fixed scenario, client bridge, production persistence, or API-contract authority.
 - `project-import-contract`: Java request/response records for API-to-worker Project import parse handoff.
 - `project-export-contract`: Java request/response records for API-to-worker MSPDI/XML export artifact handoff.
 
