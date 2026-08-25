@@ -53,6 +53,20 @@ The Console opens the separate Mobile application and remains the canonical in-m
 
 See [Deterministic Operational Trial](../../docs/product/deterministic-operational-trial.md) for the fixed scenario, personas, guided sequence, reset boundary, and product-review questions.
 
+## Tier 1 Project round-trip trial
+
+Enable the separate browser-local evidence trial with:
+
+```text
+VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
+```
+
+Import / Export can then retain the decoded UTF-8 text of a Microsoft Project XML/MSPDI source in memory, adapt its hierarchy into a temporary Tier 1 schedule, capture local Can't Start / Start / Pause / Resume / Finish and progress facts, and offer reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. No mapping is included by default.
+
+The source-preserving browser patcher creates a separate complete-source candidate from only the selected fields, with identity/source-value checks and source/candidate hashes. The reviewer downloads it, opens/recalculates it manually in Microsoft Project, exports a new result XML, and re-imports that result for conservative local comparison and an in-memory disposition. Reset/discard removes generated session state without changing the retained source.
+
+This is an experimental product trial, not PR #48's approval workflow or a final export contract. It has no backend/API persistence, approval lifecycle, native `.mpp`, automatic Project operation, CPM, or Mobile redesign. Ordinary Export remains not finalised outside this flag. See [Tier 1 Project Round-Trip Trial](../../docs/product/tier1-project-roundtrip-trial.md).
+
 ## Task execution and Critical reporting
 
 The Task Dashboard represents the approved Can't Start / Start / Pause / Resume / Finish action vocabulary and system-captured timestamp boundary. Trial mode derives those events from deterministic in-memory state. It does not persist them or provide ordinary manual correction/backdating.
@@ -99,6 +113,7 @@ Earlier candidate, approval, sealed-preview, generation, Project-open, and verif
 - `docs/product/implementation-status-map.md`
 - `docs/product/frontend-visual-review-scope.md`
 - `docs/product/deterministic-operational-trial.md`
+- `docs/product/tier1-project-roundtrip-trial.md`
 - `docs/product/ux-anti-slop-rules.md`
 - `docs/product/design-language-and-status-semantics.md`
 

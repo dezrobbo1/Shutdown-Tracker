@@ -64,6 +64,7 @@ Relevant authority documents include:
 - [Critical Reporting Model](docs/product/critical-reporting-model.md)
 - [Project Lifecycle and Import / Export](docs/product/project-lifecycle-and-import-export.md)
 - [Implementation Status Map](docs/product/implementation-status-map.md)
+- [Tier 1 Project Round-Trip Trial](docs/product/tier1-project-roundtrip-trial.md)
 - [ADR-012: Product Trial Foundation and Project Export Deferral](docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md)
 - [Trial Foundation Retention Map](docs/product/trial-foundation-retention-map.md)
 - [Project Operational Mapping](docs/product/project-operational-mapping.md)
@@ -77,7 +78,7 @@ The six product documents listed first are primary authority. No old named-role 
 - Do not infer that a documented target workflow already exists in runtime code.
 - Do not describe existing export preview, approval, MSPDI writer, or review-bootstrap code as the approved product workflow.
 - Do not reintroduce PR #48's exact candidate approval, sealed preview, browser acceptance workspace, or manual round-trip gate as a product prerequisite without a new product decision and ADR.
-- Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist.
+- Keep write-like frontend controls disabled until the corresponding API, authorization, audit, error, and offline behaviours exist, except inside an explicitly authorized and visibly labelled frontend-only trial whose changes remain synthetic/browser-local and disposable.
 - Keep the ordinary Mobile execution flow to Can't Start, Start, Pause, Resume, and Finish with system-captured action timestamps. Can't Start must leave execution Not Started; manual backdating/correction requires a separately reviewed audited workflow.
 - Keep Critical reporting policy versioned per item, configurable from supported timing/trigger mechanisms and a controlled content catalogue. Reuse known task facts and do not introduce a generic form builder or a second execution-state model.
 - Keep the Console top-level structure fixed to Today, Tasks, Critical, Import / Export, and Project Settings.
@@ -164,7 +165,7 @@ Use guarded scripts in `scripts/review` only when their prerequisites and explic
 
 For migration changes, prove both a clean installation and an upgrade from the previous populated baseline. Use PostgreSQL integration tests for constraints, triggers, foreign keys, row locks, concurrency, and rollback behaviour; fake repositories are not sufficient evidence for database invariants.
 
-Any future export/candidate change must first establish an approved product contract and ADR, then prove the bounded safety properties claimed by that contract. Do not infer those requirements from superseded PR #48 documents.
+Any production or durable export/candidate change must first establish an approved product contract and ADR, then prove the bounded safety properties claimed by that contract. A separately authorized browser-local evidence trial may precede that decision only when it is opt-in, source-preserving, disposable, independent of PR #48's approval lifecycle, and explicit that no mapping or export contract is approved.
 
 Before declaring completion, inspect the complete diff, confirm no temporary files remain, and verify unrelated worktrees are unchanged.
 
