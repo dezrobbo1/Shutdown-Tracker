@@ -13,6 +13,7 @@ export type ProjectXmlTaskPreview = {
   actualFinish: string | null;
   percentComplete: number | null;
   physicalPercentComplete: number | null;
+  critical: boolean | null;
 };
 
 export type ProjectXmlPreview = {
@@ -30,6 +31,13 @@ const PROJECT_NAMESPACE = "http://schemas.microsoft.com/project";
 export function parseProjectXmlPreview(xml: string): ProjectXmlPreview {
   if (!xml.trim()) {
     throw new Error("The selected XML file is empty.");
+  }
+  if (/<!DOCTYPE\s|<!ENTITY\s/i.test(xml)) {
+    throw new Error("Project XML with document type or entity declarations is not supported in the browser trial.");
+  }
+  const declaredEncoding = /^\uFEFF?\s*<\?xml\b[^>]*\bencoding\s*=\s*(["'])(.*?)\1[^>]*\?>/iu.exec(xml)?.[2];
+  if (declaredEncoding && !/^utf-?8$/iu.test(declaredEncoding.trim())) {
+    throw new Error("Only UTF-8 Microsoft Project XML can be inspected from decoded browser text in this trial.");
   }
 
   const document = new DOMParser().parseFromString(xml, "application/xml");
@@ -57,7 +65,7 @@ export function parseProjectXmlPreview(xml: string): ProjectXmlPreview {
 
   return {
     projectName: childText(project, "Name") ?? childText(project, "Title") ?? "Unnamed Project schedule",
-    projectUid: childText(project, "ProjectGUID") ?? childText(project, "GUID") ?? null,
+    projectUid: childText(project, "UID") ?? childText(project, "ProjectGUID") ?? childText(project, "GUID") ?? null,
     statusDate: childText(project, "StatusDate"),
     taskCount: tasks.length,
     summaryTaskCount,
@@ -81,7 +89,8 @@ function parseTask(task: Element): ProjectXmlTaskPreview {
     actualStart: childText(task, "ActualStart"),
     actualFinish: childText(task, "ActualFinish"),
     percentComplete: numberValue(childText(task, "PercentComplete")),
-    physicalPercentComplete: numberValue(childText(task, "PhysicalPercentComplete"))
+    physicalPercentComplete: numberValue(childText(task, "PhysicalPercentComplete")),
+    critical: optionalBooleanValue(childText(task, "Critical"))
   };
 }
 
@@ -92,7 +101,7 @@ function directChild(parent: Element, localName: string) {
 function directChildren(parent: Element, localName: string) {
   const matches: Element[] = [];
   for (const node of Array.from(parent.children)) {
-    if (node.localName === localName) {
+    if (node.localName === localName && node.namespaceURI === parent.namespaceURI) {
       matches.push(node);
     }
   }
@@ -112,4 +121,8 @@ function numberValue(value: string | null) {
 
 function booleanValue(value: string | null) {
   return value === "1" || value?.toLowerCase() === "true";
+}
+
+function optionalBooleanValue(value: string | null) {
+  return value === null ? null : booleanValue(value);
 }

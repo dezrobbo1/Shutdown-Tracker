@@ -23,7 +23,11 @@ describe("browser MSPDI inspection", () => {
       wbs: "1.1",
       outlineLevel: 2,
       summary: false,
-      percentComplete: 25
+      actualStart: "2026-08-24T07:15:00",
+      actualFinish: null,
+      percentComplete: 25,
+      physicalPercentComplete: 20,
+      critical: true
     });
   });
 
@@ -34,6 +38,33 @@ describe("browser MSPDI inspection", () => {
     installDomParser(documentResult(element("Project")));
     expect(() => parseProjectXmlPreview("<Project />"))
       .toThrow("not Microsoft Project MSPDI content");
+  });
+
+  it("rejects document type and entity declarations", () => {
+    expect(() => parseProjectXmlPreview(
+      `<!DOCTYPE Project [<!ENTITY site "synthetic">]><Project xmlns="${PROJECT_NAMESPACE}"><Name>&site;</Name></Project>`
+    )).toThrow("document type or entity declarations");
+  });
+
+  it("rejects a non-UTF-8 declaration before treating browser-decoded text as source", () => {
+    expect(() => parseProjectXmlPreview(
+      `<?xml version="1.0" encoding="UTF-16"?><Project xmlns="${PROJECT_NAMESPACE}" />`
+    )).toThrow("Only UTF-8 Microsoft Project XML");
+  });
+
+  it("ignores direct children that rebind away from the Project namespace", () => {
+    const root = element("Project", null, [
+      field("Name", "Namespace safety"),
+      element("Tasks", null, [
+        task([["UID", "1"], ["ID", "1"], ["Name", "Real Project task"]]),
+        task([["UID", "2"], ["ID", "2"], ["Name", "Foreign task"]], "urn:foreign")
+      ], PROJECT_NAMESPACE)
+    ], PROJECT_NAMESPACE);
+    installDomParser(documentResult(root));
+
+    const preview = parseProjectXmlPreview("<Project />");
+
+    expect(preview.tasks.map((item) => item.uid)).toEqual(["1"]);
   });
 });
 
@@ -56,11 +87,16 @@ function element(localName: string, textContent: string | null = null, children:
 }
 
 function field(localName: string, value: string) {
-  return element(localName, value);
+  return element(localName, value, [], PROJECT_NAMESPACE);
 }
 
-function task(values: Array<[string, string]>) {
-  return element("Task", null, values.map(([name, value]) => field(name, value)));
+function task(values: Array<[string, string]>, namespaceURI = PROJECT_NAMESPACE) {
+  return element(
+    "Task",
+    null,
+    values.map(([name, value]) => element(name, value, [], namespaceURI)),
+    namespaceURI
+  );
 }
 
 function projectDocument() {
@@ -70,8 +106,8 @@ function projectDocument() {
     field("StatusDate", "2026-08-24T06:00:00"),
     element("Tasks", null, [
       task([["UID", "1"], ["ID", "1"], ["Name", "Summary work pack"], ["WBS", "1"], ["OutlineNumber", "1"], ["OutlineLevel", "1"], ["Summary", "1"]]),
-      task([["UID", "2"], ["ID", "2"], ["Name", "Inspect synthetic equipment"], ["WBS", "1.1"], ["OutlineNumber", "1.1"], ["OutlineLevel", "2"], ["Summary", "0"], ["Start", "2026-08-24T07:00:00"], ["Finish", "2026-08-24T08:00:00"], ["PercentComplete", "25"]])
-    ])
+      task([["UID", "2"], ["ID", "2"], ["Name", "Inspect synthetic equipment"], ["WBS", "1.1"], ["OutlineNumber", "1.1"], ["OutlineLevel", "2"], ["Summary", "0"], ["Start", "2026-08-24T07:00:00"], ["Finish", "2026-08-24T08:00:00"], ["ActualStart", "2026-08-24T07:15:00"], ["PercentComplete", "25"], ["PhysicalPercentComplete", "20"], ["Critical", "1"]])
+    ], PROJECT_NAMESPACE)
   ], PROJECT_NAMESPACE);
   return documentResult(root);
 }
