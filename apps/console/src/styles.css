@@ -248,6 +248,30 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .guided-trial li.current { border-left: 4px solid #315f75; background: #eef5f8; }
 .guided-trial li.reached { color: #65727a; background: #f8f9fa; }
 
+.roundtrip-boundary { display: grid; grid-template-columns: 230px minmax(0, 1fr); gap: 16px; margin-top: 15px; padding: 11px 14px; border: 1px solid #b49a60; border-left: 4px solid #8b6727; background: #fbf7ec; color: #5d512f; font-size: 12px; line-height: 1.45; }
+.roundtrip-boundary strong { color: #443812; }
+.roundtrip-clock { border-left-color: #8b6727; }
+.roundtrip-clock .trial-form-error { grid-column: 1 / -1; margin: 0; }
+.roundtrip-status-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.roundtrip-dashboard-tabs { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.roundtrip-export-stack { display: grid; gap: 15px; }
+.roundtrip-mapping-table { min-width: 980px; }
+.roundtrip-mapping-table select { min-width: 190px; padding: 7px 8px; border: 1px solid #89969d; background: #fff; }
+.roundtrip-result-table { min-width: 980px; }
+.roundtrip-result-table td:last-child { display: grid; gap: 6px; min-width: 280px; }
+.roundtrip-result-table select, .roundtrip-result-table input { min-height: 36px; width: 100%; padding: 7px 8px; border: 1px solid #89969d; background: #fff; color: #26343c; }
+.roundtrip-execution-actions { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; border-bottom: 1px solid #dce2e5; }
+.roundtrip-execution-form, .roundtrip-progress-form, .roundtrip-disposition-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; margin: 14px; padding: 13px; border: 1px solid #c9d1d5; background: #f8fafb; }
+.roundtrip-execution-form label, .roundtrip-progress-form label, .roundtrip-disposition-form label { display: grid; gap: 5px; color: #53616a; font-size: 11px; font-weight: 700; }
+.roundtrip-execution-form input, .roundtrip-execution-form select, .roundtrip-execution-form textarea, .roundtrip-progress-form input, .roundtrip-progress-form textarea, .roundtrip-disposition-form select, .roundtrip-disposition-form textarea { min-height: 38px; width: 100%; padding: 8px 9px; border: 1px solid #89969d; background: #fff; color: #26343c; }
+.roundtrip-execution-form label:has(input[type="checkbox"]) { display: flex; align-items: center; gap: 7px; }
+.roundtrip-execution-form input[type="checkbox"] { width: auto; min-height: auto; }
+.roundtrip-execution-form p, .roundtrip-progress-form strong, .roundtrip-progress-form small, .roundtrip-disposition-form small { grid-column: 1 / -1; margin: 0; }
+.roundtrip-execution-form button, .roundtrip-progress-form button, .roundtrip-disposition-form button { width: fit-content; }
+.roundtrip-progress-form { border-left: 4px solid #54798c; }
+.roundtrip-disposition-form { border-left: 4px solid #8b6727; }
+.detail-list code, .import-summary-grid code { overflow-wrap: anywhere; font-size: 10px; font-weight: 500; }
+
 @media (max-width: 1100px) {
   .console-shell { grid-template-columns: 210px minmax(0, 1fr); }
   .status-strip { grid-template-columns: repeat(3, 1fr); }
@@ -272,7 +296,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .status-strip, .task-state-header, .critical-summary, .dashboard-grid, .schedule-grid, .form-grid, .policy-config-row, .policy-catalogue-grid { grid-template-columns: 1fr; }
   .status-strip > div + div, .task-state-header > div + div { border-left: 0; border-top: 1px solid #d7dde0; }
   .critical-summary > div { border-right: 0; border-bottom: 1px solid #d7dde0; }
-  .rule-note, .handoff-boundary, .review-context-warning, .settings-table > div, .mapping-health { grid-template-columns: 1fr; }
+  .rule-note, .handoff-boundary, .review-context-warning, .roundtrip-boundary, .settings-table > div, .mapping-health { grid-template-columns: 1fr; }
   .mapping-health > div { border-right: 0; border-bottom: 1px solid #d8dee1; }
   .import-file-zone, .import-summary-grid { grid-template-columns: 1fr; }
   .import-task-tools { align-items: stretch; flex-direction: column; }
@@ -282,4 +306,5 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .guided-trial li { grid-template-columns: 1fr; }
   .trial-action-records li { grid-template-columns: 1fr; }
   .section-tabs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .roundtrip-status-strip, .roundtrip-execution-form, .roundtrip-progress-form, .roundtrip-disposition-form { grid-template-columns: 1fr; }
 }

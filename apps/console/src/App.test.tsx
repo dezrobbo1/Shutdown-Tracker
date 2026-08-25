@@ -143,6 +143,9 @@ describe("deterministic Console operational trial", () => {
     expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: " TRUE " }).enabled).toBe(false);
     expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: "false" }).enabled).toBe(false);
     expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: "1" }).enabled).toBe(false);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL: "true" }).tier1RoundTripEnabled).toBe(true);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL: " true " }).tier1RoundTripEnabled).toBe(false);
+    expect(buildTrialConsoleConfig({ VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL: "false" }).tier1RoundTripEnabled).toBe(false);
   });
 
   it("labels deterministic local state and exposes all simulation clock controls", () => {
@@ -270,6 +273,25 @@ describe("deterministic Console operational trial", () => {
     expect(html).toContain("final export and round-trip contract is intentionally deferred");
     expect(html).toContain("Deterministic trial mode does not load backend snapshot data");
     expect(html).not.toContain("Generate candidate");
+  });
+});
+
+describe("Tier 1 Project round-trip trial boundary", () => {
+  it("is explicit, browser-local, and keeps ordinary Export deferred", () => {
+    const trial = renderToString(<App initialView="console" initialSection="Import / Export" roundTripTrialMode />);
+    const trialExport = renderToString(<ImportExportView shellProjectLabel="Temporary review" reviewData={null} loadState={{ status: "synthetic", message: "Browser memory only." }} onRefresh={() => undefined} initialSection="Export" roundTripTrialMode />);
+    const ordinaryExport = renderToString(<ImportExportView shellProjectLabel="Ordinary shell" reviewData={null} loadState={{ status: "synthetic", message: "Static." }} onRefresh={() => undefined} initialSection="Export" />);
+
+    expect(trial).toContain("Tier 1 Project round-trip trial");
+    expect(trial).toContain("Browser-local experimental workflow");
+    expect(trial).toContain("no production persistence");
+    expect(trial).toContain("no approved export contract");
+    expect(trialExport).toContain("Start with Import");
+    expect(trialExport).not.toContain("sealed preview");
+    expect(trialExport).not.toContain("batch approval");
+    expect(ordinaryExport).toContain("Export design not finalised");
+    expect(ordinaryExport).toContain("Export unavailable");
+    expect(ordinaryExport).not.toContain("Generate experimental candidate");
   });
 });
 
