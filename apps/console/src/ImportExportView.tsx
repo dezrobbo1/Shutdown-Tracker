@@ -26,7 +26,6 @@ export function ImportExportView({
   loadState,
   onRefresh,
   initialSection = "Current Schedule",
-  trialMode = false,
   roundTripTrialMode = false,
   roundTripState = null,
   onRoundTripChange = () => undefined
@@ -36,15 +35,14 @@ export function ImportExportView({
   loadState: ConsoleReviewLoadState;
   onRefresh: () => void;
   initialSection?: ImportExportSection;
-  trialMode?: boolean;
   roundTripTrialMode?: boolean;
   roundTripState?: Tier1RoundTripWorkspaceState | null;
   onRoundTripChange?: Tier1RoundTripChangeHandler;
 }) {
   const [active, setActive] = useState<ImportExportSection>(initialSection);
   const reviewRows = useMemo(() => buildReviewRows(reviewData), [reviewData]);
-  const liveEnabled = !trialMode && !roundTripTrialMode && reviewApiRuntimeConfig.liveEnabled;
-  const ordinaryMode = roundTripTrialMode ? "Browser-local experimental trial" : trialMode ? "Synthetic operational trial" : liveEnabled ? "Read-only API-wired" : "Static visual only";
+  const liveEnabled = !roundTripTrialMode && reviewApiRuntimeConfig.liveEnabled;
+  const ordinaryMode = roundTripTrialMode ? "Browser-local experimental trial" : liveEnabled ? "Read-only API-wired" : "Static visual only";
   const selectedSnapshot = reviewData?.snapshotDetail?.snapshot ?? null;
 
   return (
@@ -52,7 +50,7 @@ export function ImportExportView({
       <PageHeading
         eyebrow={roundTripTrialMode ? "Import / Export · Tier 1 Project round-trip trial" : "Import / Export · product-trial foundation"}
         title="Project schedule exchange"
-        description={roundTripTrialMode ? "Exercise a temporary Project XML schedule and gather evidence for the deferred export contract." : "Review incoming Microsoft Project schedule sources. The final export and round-trip contract is intentionally deferred until after operational trials."}
+        description={roundTripTrialMode ? "Exercise a temporary Project XML schedule and gather evidence for the deferred export contract." : "Review incoming Microsoft Project schedule sources. The final export and round-trip contract is intentionally deferred pending evidence review."}
         status={ordinaryMode}
       />
       {roundTripTrialMode ? <Tier1RoundTripBoundary /> : null}
@@ -110,13 +108,16 @@ export function ImportExportView({
                 </button>}
           </article>
           <article className="detail-panel">
-            <PanelHeading title="Trial boundary" detail="Schedule-source context supports operational trial review." />
+            <PanelHeading
+              title={roundTripTrialMode ? "Trial boundary" : "Import boundary"}
+              detail={roundTripTrialMode ? "The imported schedule is temporary browser-local evidence." : "Schedule-source inspection does not activate or persist a project."}
+            />
             <ol className="sequence-list">
               <li>Choose a Project XML/MSPDI source.</li>
               <li>Inspect its identity and task structure.</li>
               <li>{roundTripTrialMode ? "Start a temporary browser-memory schedule from the inspected hierarchy." : "Validate the source and operational mapping in a future production import flow."}</li>
               <li>{roundTripTrialMode ? "Exercise Tier 1 execution and review only explicitly selected experimental field mappings." : "Activate or simulate the imported schedule only through a separately implemented workflow."}</li>
-              <li>{roundTripTrialMode ? "Use Microsoft Project manually, then re-import a new result XML for conservative comparison." : "Revisit export after task execution, progress, assignment, Today, and Critical trials."}</li>
+              <li>{roundTripTrialMode ? "Use Microsoft Project manually, then re-import a new result XML for conservative comparison." : "Revisit export only after imported-schedule evidence supports a separately approved contract."}</li>
             </ol>
           </article>
         </section>
@@ -142,7 +143,7 @@ export function ImportExportView({
             <strong>Not current product authority</strong>
             <span>Earlier candidate and approval experiments remain technical research. They do not define the required product workflow on this branch.</span>
           </div>
-          <p>Operational trials will first validate execution events, progress observations, assignments, Today, Task Dashboard behaviour, and Critical reporting. The Project export and round-trip contract will then be reviewed against that evidence.</p>
+          <p>The Project export and round-trip contract will be reviewed only after the imported-schedule evidence is assessed. No production export action is available here.</p>
           <div className="disabled-action-row">
             <button type="button" disabled>Export unavailable</button>
             <span>No production export action is enabled.</span>

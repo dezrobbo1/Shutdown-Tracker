@@ -9,13 +9,10 @@ import {
   type StatusLabel,
   type SyncState
 } from "./mobileData";
-import { TrialMobileApp } from "./TrialMobileApp";
 
 type AppProps = {
   initialPersona?: ReviewPersona;
   initialTaskId?: string;
-  initialTrialUserId?: string;
-  trialMode?: boolean;
 };
 
 const executionActionGuidance = [
@@ -28,23 +25,8 @@ const executionActionGuidance = [
 
 export function App({
   initialPersona = "tier2",
-  initialTaskId,
-  initialTrialUserId,
-  trialMode = false
+  initialTaskId
 }: AppProps) {
-  if (trialMode) {
-    return (
-      <TrialMobileApp
-        initialTaskId={initialTaskId}
-        initialUserId={initialTrialUserId}
-      />
-    );
-  }
-
-  return <StaticMobileApp initialPersona={initialPersona} initialTaskId={initialTaskId} />;
-}
-
-function StaticMobileApp({ initialPersona, initialTaskId }: { initialPersona: ReviewPersona; initialTaskId?: string }) {
   const [persona, setPersona] = useState<ReviewPersona>(initialPersona);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(initialTaskId ?? null);
   const assignedTasks = mobileTasks.filter((task) => task.persona === persona);

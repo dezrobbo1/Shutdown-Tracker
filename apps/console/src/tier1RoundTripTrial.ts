@@ -12,8 +12,8 @@ import type {
 } from "./projectXmlPreview";
 
 export const TIER1_ROUNDTRIP_ACTOR_ID = "tier1-roundtrip-operator";
-export const TIER1_ROUNDTRIP_SCENARIO_VERSION = "tier1-project-roundtrip-trial-v1";
-export const SYNTHETIC_ROUNDTRIP_INITIAL_TIME = "2026-01-01T06:00:00";
+export const TIER1_ROUNDTRIP_MODEL_VERSION = "tier1-project-roundtrip-trial-v1";
+export const ROUNDTRIP_FALLBACK_INITIAL_TIME = "2026-01-01T06:00:00";
 
 export type ExperimentalProjectField =
   | "ActualStart"
@@ -89,7 +89,7 @@ export type Tier1RoundTripSession = {
     hash: string | null;
     preview: ProjectXmlPreview;
   };
-  initialTimeSource: "Project StatusDate" | "Earliest task planned start" | "Synthetic fallback";
+  initialTimeSource: "Project StatusDate" | "Earliest task planned start" | "Fixed fallback";
   initialTrialState: TrialState;
   trialState: TrialState;
   sourceTasks: RoundTripSourceTaskIdentity[];
@@ -178,7 +178,7 @@ export function applyTier1RoundTripExecutionAction(
   action: Tier1RoundTripExecutionAction
 ): Tier1RoundTripSession {
   if (action.actorId !== TIER1_ROUNDTRIP_ACTOR_ID) {
-    throw new Error("Round-trip execution actions must use the synthetic Tier 1 trial identity.");
+    throw new Error("Round-trip execution actions must use the browser-local Tier 1 trial identity.");
   }
 
   const nextState = applyTrialAction(session.trialState, action);
@@ -200,7 +200,7 @@ export function applyTier1RoundTripRecordAction(
   action: Tier1RoundTripRecordAction
 ): Tier1RoundTripSession {
   if (action.actorId !== TIER1_ROUNDTRIP_ACTOR_ID) {
-    throw new Error("Round-trip record actions must use the synthetic Tier 1 trial identity.");
+    throw new Error("Round-trip record actions must use the browser-local Tier 1 trial identity.");
   }
   const record = action.type === "resolve-problem"
     ? session.trialState.problems.find((problem) => problem.id === action.problemId)
@@ -428,8 +428,8 @@ export function chooseTier1RoundTripInitialClock(preview: ProjectXmlPreview): {
     return { minute: Math.min(...plannedStarts), source: "Earliest task planned start" };
   }
   return {
-    minute: parseProjectIsoMinute(SYNTHETIC_ROUNDTRIP_INITIAL_TIME, "Synthetic fallback"),
-    source: "Synthetic fallback"
+    minute: parseProjectIsoMinute(ROUNDTRIP_FALLBACK_INITIAL_TIME, "Fixed fallback"),
+    source: "Fixed fallback"
   };
 }
 
@@ -531,7 +531,7 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
     initialTimeSource: clock.source,
     sourceTasks,
     state: {
-      scenarioVersion: TIER1_ROUNDTRIP_SCENARIO_VERSION,
+      modelVersion: TIER1_ROUNDTRIP_MODEL_VERSION,
       now: clock.minute,
       nextSequence: 1,
       project: {
@@ -541,26 +541,16 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
         site: "Browser-local Project source",
         timezone: "Project-local time; timezone not inferred",
         operationalDayStartMinute: modulo(clock.minute, 1440),
-        shiftBoundaryMinutes: [],
         importedSnapshot: `Temporary browser source: ${fileName.trim()}`
       },
       users: [{ id: TIER1_ROUNDTRIP_ACTOR_ID, name: "Tier 1 round-trip reviewer", tier: "Tier 1" }],
       tasks,
-      trackingAssignments: [],
-      fieldAssignments: [],
       executionEvents: [],
       pauseIntervals: [],
       progressObservations: [],
       problems: [],
       actions: [],
-      criticalTemplates: [],
-      criticalItems: [],
-      criticalPolicies: [],
-      criticalObligations: [],
-      criticalReports: [],
-      shiftProgressNeeds: [],
-      history: importedHistory,
-      processedClockEvents: []
+      history: importedHistory
     }
   };
 }
