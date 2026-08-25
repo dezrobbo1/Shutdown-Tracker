@@ -110,7 +110,7 @@ export async function generateProjectXmlCandidate(
       const valueRange = simpleElementValueRange(field, sourceXml);
       const escapedValue = escapeProjectXmlText(mapping.proposedValue);
       const replacement = field.selfClosing
-        ? `<${field.qualifiedName}>${escapedValue}</${field.qualifiedName}>`
+        ? `${sourceXml.slice(field.openStart, field.openEnd).replace(/\s*\/\s*>$/u, ">")}${escapedValue}</${field.qualifiedName}>`
         : escapedValue;
       edits.push({
         start: valueRange.start,
@@ -140,9 +140,10 @@ export async function generateProjectXmlCandidate(
   };
 }
 
-export async function sha256Hex(value: string): Promise<string> {
+export async function sha256Hex(value: string | Uint8Array): Promise<string> {
   if (!globalThis.crypto?.subtle) throw new Error("Browser SHA-256 is unavailable in this environment.");
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : Uint8Array.from(value);
+  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
@@ -196,11 +197,12 @@ type TextEdit = {
 };
 
 // Direct Task children in the order documented by the Microsoft Project MSPDI
-// Task schema. Manual and Active are later-version tail fields emitted by the
-// repository's synthetic MSPDI fixture. Missing fields are inserted only at a
-// boundary with immediately adjacent, recognised Task-order neighbours.
+// Task schema, with the early GUID/Active/Manual fields emitted by current
+// Microsoft Project XML exports. Missing fields are inserted only at a boundary
+// with immediately adjacent, recognised Task-order neighbours. Unknown fields
+// remain hard boundaries rather than being guessed across.
 const MSPDI_TASK_ELEMENT_ORDER = [
-  "UID", "ID", "Name", "Type", "IsNull", "CreateDate", "Contact", "WBS", "WBSLevel",
+  "UID", "GUID", "ID", "Name", "Active", "Manual", "Type", "IsNull", "CreateDate", "Contact", "WBS", "WBSLevel",
   "OutlineNumber", "OutlineLevel", "Priority", "Start", "Finish", "Duration", "DurationFormat",
   "Work", "Stop", "Resume", "ResumeValid", "EffortDriven", "Recurring", "OverAllocated", "Estimated",
   "Milestone", "Summary", "Critical", "IsSubproject", "IsSubprojectReadOnly", "SubprojectName",
@@ -215,7 +217,7 @@ const MSPDI_TASK_ELEMENT_ORDER = [
   "HyperlinkSubAddress", "IgnoreResourceCalendar", "Notes", "HideBar", "Rollup", "BCWS", "BCWP",
   "PhysicalPercentComplete", "EarnedValueMethod", "PredecessorLink", "ActualWorkProtected",
   "ActualOvertimeWorkProtected", "ExtendedAttribute", "Baseline", "IsPublished", "StatusManager",
-  "CommitmentStart", "CommitmentFinish", "CommitmentType", "OutlineCode", "TimephasedData", "Manual", "Active"
+  "CommitmentStart", "CommitmentFinish", "CommitmentType", "OutlineCode", "TimephasedData"
 ] as const;
 
 const TASK_ELEMENT_ORDER = new Map<string, number>(

@@ -28,7 +28,7 @@ function stateTone(state: OperationalTask["state"]): StatusTone {
   return "info";
 }
 
-export function LoginView({ onContinue, trialMode = false }: { onContinue: () => void; trialMode?: boolean }) {
+export function LoginView({ onContinue, trialMode = false, roundTripMode = false }: { onContinue: () => void; trialMode?: boolean; roundTripMode?: boolean }) {
   return (
     <main className="entry-screen">
       <section className="entry-panel" aria-labelledby="login-title">
@@ -37,8 +37,8 @@ export function LoginView({ onContinue, trialMode = false }: { onContinue: () =>
         <h1 id="login-title">Shutdown Tracker</h1>
         <p className="entry-lead">Whole-project operational control, schedule-source review, and shutdown oversight.</p>
         <div className="implementation-note">
-          <strong>{trialMode ? "Synthetic operational trial" : "Static visual only"}</strong>
-          <span>{trialMode ? "Deterministic local state. No production persistence or backend execution API is used." : "OIDC and production session handling are not yet implemented. This transition exists only for visual review."}</span>
+          <strong>{roundTripMode ? "Tier 1 Project round-trip trial" : trialMode ? "Synthetic operational trial" : "Static visual only"}</strong>
+          <span>{roundTripMode ? "Browser-local experimental workflow. No production persistence or approved export contract." : trialMode ? "Deterministic local state. No production persistence or backend execution API is used." : "OIDC and production session handling are not yet implemented. This transition exists only for visual review."}</span>
         </div>
         <button className="button-primary" type="button" onClick={onContinue}>Continue to Projects Home</button>
         <p className="entry-footnote">No credentials are collected or stored by this review shell.</p>
@@ -47,12 +47,16 @@ export function LoginView({ onContinue, trialMode = false }: { onContinue: () =>
   );
 }
 
-export function ProjectsHome({ onOpenProject, trialProject }: { onOpenProject: (projectId: string) => void; trialProject?: { id: string; name: string; code: string; site: string } }) {
+export function ProjectsHome({ onOpenProject, trialProject, roundTripMode = false }: { onOpenProject: (projectId: string) => void; trialProject?: { id: string; name: string; code: string; site: string }; roundTripMode?: boolean }) {
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<ProjectStatus | "All">("All");
-  const availableProjects = trialProject ? [{ ...trialProject, status: "Active" as const, period: "24–25 August 2026 · deterministic clock", updated: "Resettable synthetic scenario" }] : projects;
+  const availableProjects = trialProject
+    ? [{ ...trialProject, status: (roundTripMode ? "Draft" : "Active") as ProjectStatus, statusLabel: roundTripMode ? "Temporary trial" : "Active", period: roundTripMode ? "Imported source · controlled trial clock" : "24–25 August 2026 · deterministic clock", updated: roundTripMode ? "Temporary browser-memory project" : "Resettable synthetic scenario" }]
+    : roundTripMode
+      ? [{ id: "roundtrip-empty", name: "No source selected", code: "LOCAL-XML-TRIAL", site: "Browser-local", status: "Draft" as ProjectStatus, statusLabel: "Temporary trial", period: "Choose a disposable Microsoft Project XML/MSPDI source", updated: "Nothing imported or persisted" }]
+      : projects.map((project) => ({ ...project, statusLabel: project.status }));
   const visibleProjects = availableProjects.filter((project) => {
-    const matchesStatus = status === "All" || project.status === status;
+    const matchesStatus = roundTripMode || status === "All" || project.status === status;
     const searchText = `${project.name} ${project.code} ${project.site}`.toLowerCase();
     return matchesStatus && searchText.includes(query.trim().toLowerCase());
   });
@@ -63,10 +67,10 @@ export function ProjectsHome({ onOpenProject, trialProject }: { onOpenProject: (
         <div>
           <p className="eyebrow">Master Console · Tier 1</p>
           <h1>Projects Home</h1>
-          <p>Open or switch a project before entering its Console.</p>
+          <p>{roundTripMode ? "Open the local XML trial entry point; the imported source will become the temporary project." : "Open or switch a project before entering its Console."}</p>
         </div>
         <div className="header-control-group">
-          <StatusLabel tone="warning">{trialProject ? "Synthetic operational trial" : "Static visual only"}</StatusLabel>
+          <StatusLabel tone="warning">{roundTripMode ? "Tier 1 Project round-trip trial" : trialProject ? "Synthetic operational trial" : "Static visual only"}</StatusLabel>
           <button type="button" disabled title="Project creation API is not implemented">Create Project</button>
         </div>
       </header>
@@ -77,13 +81,13 @@ export function ProjectsHome({ onOpenProject, trialProject }: { onOpenProject: (
           <span className="sr-only">Search projects</span>
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search name, code, or site" />
         </label>
-        <div className="segmented-control">
+        {roundTripMode ? <span>One temporary browser-memory trial entry point</span> : <div className="segmented-control">
           {(["All", "Active", "Draft", "Closed", "Archived"] as const).map((value) => (
             <button key={value} type="button" className={status === value ? "selected" : ""} onClick={() => setStatus(value)}>
               {value} {value === "All" ? availableProjects.length : availableProjects.filter((project) => project.status === value).length}
             </button>
           ))}
-        </div>
+        </div>}
       </section>
 
       <section className="table-panel" aria-label="Projects">
@@ -94,16 +98,16 @@ export function ProjectsHome({ onOpenProject, trialProject }: { onOpenProject: (
               {visibleProjects.map((project) => (
                 <tr key={project.id}>
                   <td><strong>{project.name}</strong><span>{project.code}</span></td>
-                  <td><StatusLabel tone={project.status === "Active" ? "success" : project.status === "Draft" ? "warning" : "neutral"}>{project.status}</StatusLabel></td>
+                  <td><StatusLabel tone={project.status === "Active" ? "success" : project.status === "Draft" ? "warning" : "neutral"}>{project.statusLabel}</StatusLabel></td>
                   <td>{project.site}</td><td>{project.period}</td><td>{project.updated}</td>
-                  <td><button className="button-link" type="button" onClick={() => onOpenProject(project.id)}>Open project</button></td>
+                  <td><button className="button-link" type="button" onClick={() => onOpenProject(project.id)}>{roundTripMode && !trialProject ? "Choose XML source" : "Open project"}</button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       </section>
-      <p className="surface-caption">Project creation, lifecycle actions, archive, restore, and production switching remain not yet implemented.</p>
+      <p className="surface-caption">{roundTripMode ? "Browser-local experimental workflow · No production persistence · No approved export contract." : "Project creation, lifecycle actions, archive, restore, and production switching remain not yet implemented."}</p>
     </main>
   );
 }

@@ -71,6 +71,8 @@ export type ClassifiedStructuralDifference = StructuralDifference & {
 export type ProjectIdentityComparison = {
   status: "matched" | "not-comparable";
   projectUid: string | null;
+  matchedBy: "project-uid" | "project-name" | null;
+  value: string | null;
 };
 
 export type ProjectRoundTripComparison = {
@@ -327,15 +329,32 @@ function compareProjectIdentity(
   candidate: ProjectXmlPreview | undefined,
   projectResult: ProjectXmlPreview
 ): ProjectIdentityComparison {
-  const supplied = [source.projectUid, candidate?.projectUid ?? null, projectResult.projectUid]
-    .filter((value): value is string => value !== null);
-  if (new Set(supplied.map(normalizeProjectUid)).size > 1) {
-    throw new Error("Project-result identity does not match the imported source project identity.");
+  if (source.projectUid !== null) {
+    const expected = normalizeProjectUid(source.projectUid);
+    const supplied = [candidate?.projectUid, projectResult.projectUid];
+    if (supplied.some((value) => value === null)
+      || supplied.filter((value): value is string => value !== undefined && value !== null)
+        .some((value) => normalizeProjectUid(value) !== expected)) {
+      throw new Error("Project-result identity does not match the imported source project identity.");
+    }
+    return {
+      status: "matched",
+      projectUid: source.projectUid,
+      matchedBy: "project-uid",
+      value: source.projectUid
+    };
   }
-  const comparable = source.projectUid !== null && projectResult.projectUid !== null;
+
+  const names = [source.projectName, ...(candidate ? [candidate.projectName] : []), projectResult.projectName];
+  if (new Set(names).size > 1) {
+    throw new Error("Project-result name does not match the imported source project identity.");
+  }
+  const comparable = source.projectName !== "Unnamed Project schedule";
   return {
     status: comparable ? "matched" : "not-comparable",
-    projectUid: comparable ? source.projectUid : null
+    projectUid: null,
+    matchedBy: comparable ? "project-name" : null,
+    value: comparable ? source.projectName : null
   };
 }
 

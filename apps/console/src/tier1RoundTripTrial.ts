@@ -32,8 +32,8 @@ export type RoundTripSourceTaskIdentity = {
   summary: boolean;
   critical: boolean;
   sourceValues: {
-    start: string;
-    finish: string;
+    start: string | null;
+    finish: string | null;
     actualStart: string | null;
     actualFinish: string | null;
     percentComplete: number | null;
@@ -76,7 +76,7 @@ export type RoundTripDisposition =
 export type Tier1RoundTripSessionHistoryEvent = {
   id: string;
   at: number;
-  type: "source-loaded" | "clock-advanced" | "execution" | "progress-observation";
+  type: "source-loaded" | "clock-advanced" | "execution" | "progress-observation" | "record-management";
   summary: string;
   taskId?: string;
 };
@@ -85,6 +85,7 @@ export type Tier1RoundTripSession = {
   source: {
     fileName: string;
     xml: string;
+    bytes: Uint8Array;
     hash: string | null;
     preview: ProjectXmlPreview;
   };
@@ -102,6 +103,7 @@ export type Tier1RoundTripSession = {
 export type CreateTier1RoundTripSessionInput = {
   fileName: string;
   sourceXml: string;
+  sourceBytes?: Uint8Array;
   preview: ProjectXmlPreview;
   sourceHash?: string | null;
 };
@@ -109,6 +111,11 @@ export type CreateTier1RoundTripSessionInput = {
 export type Tier1RoundTripExecutionAction = Extract<
   TrialAction,
   { type: "cant-start" | "start" | "pause" | "resume" | "finish" }
+>;
+
+export type Tier1RoundTripRecordAction = Extract<
+  TrialAction,
+  { type: "resolve-problem" | "complete-action" }
 >;
 
 export type Tier1ProgressObservationInput = {
@@ -124,6 +131,18 @@ type PreviewTaskWithCritical = ProjectXmlTaskPreview & { critical?: boolean };
 export function createTier1RoundTripSession(input: CreateTier1RoundTripSessionInput): Tier1RoundTripSession {
   if (!input.fileName.trim()) throw new Error("The source filename is required.");
   if (!input.sourceXml) throw new Error("The exact source XML is required.");
+  const sourceBytes = input.sourceBytes
+    ? Uint8Array.from(input.sourceBytes)
+    : new TextEncoder().encode(input.sourceXml);
+  let decodedSource: string;
+  try {
+    decodedSource = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(sourceBytes);
+  } catch {
+    throw new Error("The retained Project source bytes are not valid UTF-8.");
+  }
+  if (decodedSource !== input.sourceXml) {
+    throw new Error("The retained Project source bytes do not match the inspected XML text.");
+  }
 
   const adapted = adaptImportedProjectToTrialState(input.fileName, input.preview);
   const sourcePreview = structuredClone(input.preview);
@@ -138,6 +157,7 @@ export function createTier1RoundTripSession(input: CreateTier1RoundTripSessionIn
     source: {
       fileName: input.fileName.trim(),
       xml: input.sourceXml,
+      bytes: sourceBytes,
       hash: input.sourceHash ?? null,
       preview: sourcePreview
     },
@@ -175,6 +195,30 @@ export function applyTier1RoundTripExecutionAction(
   });
 }
 
+export function applyTier1RoundTripRecordAction(
+  session: Tier1RoundTripSession,
+  action: Tier1RoundTripRecordAction
+): Tier1RoundTripSession {
+  if (action.actorId !== TIER1_ROUNDTRIP_ACTOR_ID) {
+    throw new Error("Round-trip record actions must use the synthetic Tier 1 trial identity.");
+  }
+  const record = action.type === "resolve-problem"
+    ? session.trialState.problems.find((problem) => problem.id === action.problemId)
+    : session.trialState.actions.find((item) => item.id === action.actionId);
+  const nextState = applyTrialAction(session.trialState, action);
+  const task = record ? requiredTask(nextState, record.taskId) : null;
+  return invalidateDerivedExportState({
+    ...session,
+    trialState: nextState,
+    history: appendSessionHistory(session, {
+      at: nextState.now,
+      type: "record-management",
+      summary: `${action.type === "resolve-problem" ? "Problem resolved" : "Action completed"}${task ? ` for ${task.name}` : ""}.`,
+      ...(task ? { taskId: task.id } : {})
+    })
+  });
+}
+
 export function recordTier1RoundTripProgress(
   session: Tier1RoundTripSession,
   input: Tier1ProgressObservationInput
@@ -191,6 +235,7 @@ export function recordTier1RoundTripProgress(
     throw new Error("Completion must be between 0 and 100.");
   }
   if (!input.remainingWork.trim()) throw new Error("What remains is required.");
+  if (!input.nextIssue?.trim()) throw new Error("Next issue is required; enter None if there is no next issue.");
 
   const observationId = nextStateId(nextState, "progress");
   nextState.progressObservations.push({
@@ -200,7 +245,7 @@ export function recordTier1RoundTripProgress(
     at: nextState.now,
     completionPercent: input.completionPercent,
     remainingWork: input.remainingWork.trim(),
-    nextShiftIssue: input.nextIssue?.trim() || "None reported",
+    nextShiftIssue: input.nextIssue.trim(),
     noteEvidence: input.note?.trim() || undefined
   });
 
@@ -228,6 +273,7 @@ export function jumpTier1RoundTripClockToTaskStart(
   taskId: string
 ): Tier1RoundTripSession {
   const task = requiredTask(session.trialState, taskId);
+  if (task.plannedStart === null) throw new Error(`${task.name} has no imported planned Start to jump to.`);
   return setRoundTripClock(session, task.plannedStart, `Jumped trial time to the planned start for ${task.name}.`, task.id);
 }
 
@@ -236,6 +282,7 @@ export function resetTier1RoundTripSession(session: Tier1RoundTripSession): Tier
     ...session,
     source: {
       ...session.source,
+      bytes: Uint8Array.from(session.source.bytes),
       preview: structuredClone(session.source.preview)
     },
     initialTrialState: structuredClone(session.initialTrialState),
@@ -407,9 +454,11 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
 
     const outlineLevel = requiredOutlineLevel(task);
     const trialTaskId = taskIdForProjectUid(uid);
-    const plannedStart = requiredTaskDate(task.start, `Task UID ${uid} planned Start`);
-    const plannedFinish = requiredTaskDate(task.finish, `Task UID ${uid} planned Finish`);
-    if (plannedFinish < plannedStart) throw new Error(`Task UID ${uid} planned Finish precedes planned Start.`);
+    const plannedStart = nullableTaskDate(task.start, `Task UID ${uid} planned Start`);
+    const plannedFinish = nullableTaskDate(task.finish, `Task UID ${uid} planned Finish`);
+    if (plannedStart !== null && plannedFinish !== null && plannedFinish < plannedStart) {
+      throw new Error(`Task UID ${uid} planned Finish precedes planned Start.`);
+    }
     const importedProgress = task.percentComplete ?? 0;
     requirePercentage(importedProgress, `Task UID ${uid} imported PercentComplete`);
     if (task.physicalPercentComplete !== null) {
@@ -458,8 +507,8 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
       summary: task.summary,
       critical,
       sourceValues: {
-        start: task.start!,
-        finish: task.finish!,
+        start: task.start,
+        finish: task.finish,
         actualStart: task.actualStart,
         actualFinish: task.actualFinish,
         percentComplete: task.percentComplete,
@@ -569,9 +618,8 @@ function requiredOutlineLevel(task: ProjectXmlTaskPreview) {
   return task.outlineLevel;
 }
 
-function requiredTaskDate(value: string | null, field: string) {
-  if (!value) throw new Error(`${field} is required for the temporary trial schedule.`);
-  return parseProjectIsoMinute(value, field);
+function nullableTaskDate(value: string | null, field: string) {
+  return value ? parseProjectIsoMinute(value, field) : null;
 }
 
 function optionalTaskDate(value: string | null, field: string) {

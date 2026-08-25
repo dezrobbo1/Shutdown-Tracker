@@ -28,7 +28,9 @@ describe("Tier 1 Project round-trip comparison", () => {
 
     expect(comparison.projectIdentity).toEqual({
       status: "matched",
-      projectUid: "project-guid-1"
+      projectUid: "project-guid-1",
+      matchedBy: "project-uid",
+      value: "project-guid-1"
     });
     expect(comparison.selectedInputs).toMatchObject([{
       classification: "Tracker-selected input",
@@ -71,6 +73,12 @@ describe("Tier 1 Project round-trip comparison", () => {
       projectResult: preview([task()], "another-project-guid"),
       selectedChanges: [percentChange()]
     })).toThrow(/identity does not match/i);
+
+    expect(() => compareProjectRoundTrip({
+      source: preview([task()]),
+      projectResult: preview([task()], null),
+      selectedChanges: [percentChange()]
+    })).toThrow(/identity does not match/i);
   });
 
   it("treats conventional Project GUID casing and braces as the same identity", () => {
@@ -82,8 +90,29 @@ describe("Tier 1 Project round-trip comparison", () => {
 
     expect(comparison.projectIdentity).toEqual({
       status: "matched",
-      projectUid: "{ABCDEF00-1111-2222-3333-444444444444}"
+      projectUid: "{ABCDEF00-1111-2222-3333-444444444444}",
+      matchedBy: "project-uid",
+      value: "{ABCDEF00-1111-2222-3333-444444444444}"
     });
+  });
+
+  it("uses the exact project name when the source does not supply a Project UID", () => {
+    const source = preview([task()], null);
+    const matched = compareProjectRoundTrip({
+      source,
+      projectResult: preview([task()], null),
+      selectedChanges: []
+    });
+    expect(matched.projectIdentity).toEqual({
+      status: "matched",
+      projectUid: null,
+      matchedBy: "project-name",
+      value: "Synthetic Project round-trip"
+    });
+
+    const renamed = { ...preview([task()], null), projectName: "Another project" };
+    expect(() => compareProjectRoundTrip({ source, projectResult: renamed, selectedChanges: [] }))
+      .toThrow(/name does not match/i);
   });
 
   it("fails safely when task UID is missing, duplicated, or paired with another ID", () => {

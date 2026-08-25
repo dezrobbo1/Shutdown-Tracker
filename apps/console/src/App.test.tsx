@@ -293,6 +293,29 @@ describe("Tier 1 Project round-trip trial boundary", () => {
     expect(ordinaryExport).toContain("Export unavailable");
     expect(ordinaryExport).not.toContain("Generate experimental candidate");
   });
+
+  it("never falls through to the fixed fictional project before a local source starts", () => {
+    const login = renderToString(<App initialView="login" roundTripTrialMode />);
+    const projects = renderToString(<App initialView="projects" roundTripTrialMode />);
+    const entry = renderToString(<App initialView="console" roundTripTrialMode />);
+    const tasks = renderToString(<App initialView="console" initialSection="Tasks" roundTripTrialMode />);
+    const critical = renderToString(<App initialView="console" initialSection="Critical" roundTripTrialMode />);
+    const settings = renderToString(<App initialView="console" initialSection="Project Settings" roundTripTrialMode />);
+
+    expect(login).toContain("Tier 1 Project round-trip trial");
+    expect(login).not.toContain("Synthetic operational trial");
+    expect(projects).toContain("No source selected");
+    expect(projects).toContain("Choose XML source");
+    expect(entry).toContain("Choose Project XML/MSPDI in Import");
+    for (const html of [projects, entry, tasks, critical, settings]) {
+      expect(html).not.toContain("Calciner 2026 Shutdown");
+      expect(html).not.toContain("D2 Stack");
+      expect(html).not.toContain("Tier 2 reporting owner");
+    }
+    for (const html of [tasks, critical, settings]) {
+      expect(html).toContain("No fixed fictional task list is active in round-trip mode");
+    }
+  });
 });
 
 describe("ordinary Console review data fetching", () => {

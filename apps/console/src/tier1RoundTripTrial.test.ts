@@ -6,6 +6,7 @@ import {
   TIER1_ROUNDTRIP_ACTOR_ID,
   advanceTier1RoundTripClock,
   applyTier1RoundTripExecutionAction,
+  applyTier1RoundTripRecordAction,
   chooseTier1RoundTripInitialClock,
   createTier1RoundTripSession,
   deriveTier1RoundTripMappingProposals,
@@ -64,6 +65,26 @@ describe("Tier 1 imported Project round-trip session", () => {
     });
   });
 
+  it("retains losslessly decoded source bytes, including a UTF-8 BOM", () => {
+    const xml = `\uFEFF${SOURCE_XML}`;
+    const bytes = new TextEncoder().encode(xml);
+    const session = createTier1RoundTripSession({
+      fileName: "bom-source.xml",
+      sourceXml: xml,
+      sourceBytes: bytes,
+      preview: preview()
+    });
+    expect(session.source.xml).toBe(xml);
+    expect([...session.source.bytes]).toEqual([...bytes]);
+    expect([...resetTier1RoundTripSession(session).source.bytes]).toEqual([...bytes]);
+    expect(() => createTier1RoundTripSession({
+      fileName: "mismatch.xml",
+      sourceXml: SOURCE_XML,
+      sourceBytes: new TextEncoder().encode(`${SOURCE_XML} `),
+      preview: preview()
+    })).toThrow("do not match the inspected XML text");
+  });
+
   it("uses StatusDate, then earliest planned start, then the explicit synthetic fallback", () => {
     expect(createSession().initialTimeSource).toBe("Project StatusDate");
 
@@ -83,6 +104,16 @@ describe("Tier 1 imported Project round-trip session", () => {
     }));
     expect(fallback.source).toBe("Synthetic fallback");
     expect(formatRoundTripMinute(fallback.minute)).toBe("2026-01-01T06:00:00");
+
+    const fallbackSession = createTier1RoundTripSession({
+      fileName: "unscheduled.xml",
+      sourceXml: SOURCE_XML,
+      preview: preview({ statusDate: null, tasks: [task({ start: null, finish: null })] })
+    });
+    expect(fallbackSession.initialTimeSource).toBe("Synthetic fallback");
+    expect(fallbackSession.trialState.tasks[0]).toMatchObject({ plannedStart: null, plannedFinish: null });
+    expect(() => jumpTier1RoundTripClockToTaskStart(fallbackSession, "project-task-uid:1"))
+      .toThrow("has no imported planned Start");
   });
 
   it("keeps imported Actual Start, Actual Finish, and PercentComplete as execution evidence", () => {
@@ -200,6 +231,38 @@ describe("Tier 1 imported Project round-trip session", () => {
     expect(session.trialState.problems.find((problem) => problem.id === problemId)?.status).toBe("open");
   });
 
+  it("lets Tier 1 resolve linked problems and complete linked actions locally", () => {
+    const taskId = "project-task-uid:11";
+    let session = applyTier1RoundTripExecutionAction(createSession(), {
+      type: "cant-start",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+      reason: "Access unavailable",
+      whatIsNeeded: "Release access",
+      createProblem: true,
+      createAction: true
+    });
+    const problemId = session.trialState.problems[0].id;
+    const actionId = session.trialState.actions[0].id;
+    session = applyTier1RoundTripRecordAction(session, {
+      type: "resolve-problem",
+      problemId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID
+    });
+    session = applyTier1RoundTripRecordAction(session, {
+      type: "complete-action",
+      actionId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID
+    });
+    expect(session.trialState.problems[0].status).toBe("resolved");
+    expect(session.trialState.actions[0].status).toBe("completed");
+    expect(() => applyTier1RoundTripRecordAction(session, {
+      type: "complete-action",
+      actionId,
+      actorId: "tier2-not-allowed"
+    })).toThrow("synthetic Tier 1 trial identity");
+  });
+
   it("rejects summary execution and any non-Tier-1 trial actor", () => {
     const session = createSession();
     expect(() => applyTier1RoundTripExecutionAction(session, {
@@ -246,6 +309,12 @@ describe("Tier 1 imported Project round-trip session", () => {
       remainingWork: " ",
       nextIssue: "None"
     })).toThrow("What remains is required");
+    expect(() => recordTier1RoundTripProgress(session, {
+      taskId,
+      completionPercent: 50,
+      remainingWork: "Continue",
+      nextIssue: " "
+    })).toThrow("Next issue is required");
   });
 
   it("rejects contradictory unfinished-progress observations after completion", () => {
@@ -411,10 +480,10 @@ describe("Tier 1 imported Project round-trip session", () => {
       preview: preview({ tasks: [task({ uid: "1" }), task({ uid: "1", id: "2" })] })
     })).toThrow("occurs more than once");
     expect(() => createTier1RoundTripSession({
-      fileName: "missing-date.xml",
+      fileName: "contradictory-dates.xml",
       sourceXml: SOURCE_XML,
-      preview: preview({ tasks: [task({ start: null })] })
-    })).toThrow("planned Start is required");
+      preview: preview({ tasks: [task({ start: "2026-01-05T12:00:00", finish: "2026-01-05T06:00:00" })] })
+    })).toThrow("planned Finish precedes planned Start");
     expect(() => parseProjectIsoMinute("2026-02-30T06:00:00", "Invalid date"))
       .toThrow("not a valid Microsoft Project date-time");
     expect(() => parseProjectIsoMinute("2026-01-01T06:00:01", "Seconds"))

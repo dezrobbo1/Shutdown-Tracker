@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseProjectXmlPreview } from "./projectXmlPreview";
+import { parseProjectXmlPreview, readUtf8ProjectXml } from "./projectXmlPreview";
 
 const PROJECT_NAMESPACE = "http://schemas.microsoft.com/project";
 
@@ -50,6 +50,38 @@ describe("browser MSPDI inspection", () => {
     expect(() => parseProjectXmlPreview(
       `<?xml version="1.0" encoding="UTF-16"?><Project xmlns="${PROJECT_NAMESPACE}" />`
     )).toThrow("Only UTF-8 Microsoft Project XML");
+  });
+
+  it("retains a UTF-8 BOM and rejects lossy invalid UTF-8 decoding", async () => {
+    const xml = `\uFEFF<?xml version="1.0" encoding="UTF-8"?><Project xmlns="${PROJECT_NAMESPACE}" />`;
+    const originalBytes = new TextEncoder().encode(xml);
+    const retained = await readUtf8ProjectXml(new Blob([originalBytes]));
+    expect(retained.xml).toBe(xml);
+    expect([...retained.bytes]).toEqual([...originalBytes]);
+
+    await expect(readUtf8ProjectXml(new Blob([new Uint8Array([0xc3, 0x28])])))
+      .rejects.toThrow("valid UTF-8 Microsoft Project XML");
+  });
+
+  it("rejects duplicate and invalid comparison-critical Task fields", () => {
+    const duplicateContainers = element("Project", null, [
+      element("Tasks", null, [task([["UID", "1"], ["ID", "1"]])], PROJECT_NAMESPACE),
+      element("Tasks", null, [task([["UID", "2"], ["ID", "2"]])], PROJECT_NAMESPACE)
+    ], PROJECT_NAMESPACE);
+    installDomParser(documentResult(duplicateContainers));
+    expect(() => parseProjectXmlPreview("<Project />")).toThrow("more than one direct Tasks");
+
+    const duplicateUid = element("Project", null, [
+      element("Tasks", null, [task([["UID", "1"], ["UID", "2"], ["ID", "1"]])], PROJECT_NAMESPACE)
+    ], PROJECT_NAMESPACE);
+    installDomParser(documentResult(duplicateUid));
+    expect(() => parseProjectXmlPreview("<Project />")).toThrow("more than one direct UID");
+
+    const invalidProgress = element("Project", null, [
+      element("Tasks", null, [task([["UID", "1"], ["ID", "1"], ["PercentComplete", "not-a-number"]])], PROJECT_NAMESPACE)
+    ], PROJECT_NAMESPACE);
+    installDomParser(documentResult(invalidProgress));
+    expect(() => parseProjectXmlPreview("<Project />")).toThrow("PercentComplete must be numeric");
   });
 
   it("ignores direct children that rebind away from the Project namespace", () => {

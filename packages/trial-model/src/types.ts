@@ -42,8 +42,8 @@ export type TrialTask = {
   workPackage: string;
   summary: boolean;
   depth: number;
-  plannedStart: number;
-  plannedFinish: number;
+  plannedStart: number | null;
+  plannedFinish: number | null;
   importedActualStart?: number;
   importedActualFinish?: number;
   importedProgress: number;

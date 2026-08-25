@@ -82,22 +82,32 @@ export function ImportExportView({
       {active === "Current Schedule" && (
         <section className="schedule-grid">
           <article className="detail-panel">
-            <PanelHeading title="Current Schedule" detail="Configured import snapshot or static product-trial context." />
+            <PanelHeading title="Current Schedule" detail={roundTripTrialMode ? "Temporary browser-memory source context." : "Configured import snapshot or static product-trial context."} />
             <dl className="detail-list">
               <div><dt>Mode</dt><dd>{ordinaryMode}</dd></div>
-              <div><dt>Static shell project</dt><dd>{shellProjectLabel}</dd></div>
-              <div><dt>Configured import project</dt><dd>{reviewData?.projectId ?? "No backend project configured"}</dd></div>
-              <div><dt>Snapshots returned</dt><dd>{reviewData?.snapshots.length ?? 0}</dd></div>
-              <div><dt>Selected snapshot</dt><dd>{roundTripState ? `Temporary source · ${roundTripState.session.source.fileName}` : selectedSnapshot ? `v${selectedSnapshot.snapshotVersion} · ${selectedSnapshot.status}` : "No imported snapshot selected"}</dd></div>
+              {roundTripTrialMode ? <>
+                <div><dt>Temporary project</dt><dd>{roundTripState?.session.source.preview.projectName ?? "No source selected"}</dd></div>
+                <div><dt>Source</dt><dd>{roundTripState?.session.source.fileName ?? "Choose Project XML/MSPDI in Import"}</dd></div>
+                <div><dt>Project UID</dt><dd>{roundTripState?.session.source.preview.projectUid ?? "Not supplied"}</dd></div>
+                <div><dt>Source-file SHA-256</dt><dd>{roundTripState?.session.source.hash ? <code>{roundTripState.session.source.hash}</code> : "Unavailable until a source is selected"}</dd></div>
+                <div><dt>Persistence</dt><dd>Browser memory only</dd></div>
+              </> : <>
+                <div><dt>Static shell project</dt><dd>{shellProjectLabel}</dd></div>
+                <div><dt>Configured import project</dt><dd>{reviewData?.projectId ?? "No backend project configured"}</dd></div>
+                <div><dt>Snapshots returned</dt><dd>{reviewData?.snapshots.length ?? 0}</dd></div>
+                <div><dt>Selected snapshot</dt><dd>{selectedSnapshot ? `v${selectedSnapshot.snapshotVersion} · ${selectedSnapshot.status}` : "No imported snapshot selected"}</dd></div>
+              </>}
               <div><dt>Read state</dt><dd>{loadState.message}</dd></div>
             </dl>
-            <button
-              type="button"
-              onClick={onRefresh}
-              disabled={!liveEnabled || loadState.status === "loading"}
-            >
-              <RefreshCw size={16} aria-hidden="true" /> Refresh imported schedule
-            </button>
+            {roundTripTrialMode
+              ? <p className="surface-caption">Choose or replace the local XML source from Import. Nothing is refreshed from a backend.</p>
+              : <button
+                  type="button"
+                  onClick={onRefresh}
+                  disabled={!liveEnabled || loadState.status === "loading"}
+                >
+                  <RefreshCw size={16} aria-hidden="true" /> Refresh imported schedule
+                </button>}
           </article>
           <article className="detail-panel">
             <PanelHeading title="Trial boundary" detail="Schedule-source context supports operational trial review." />

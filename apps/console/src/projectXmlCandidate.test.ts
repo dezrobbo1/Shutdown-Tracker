@@ -100,6 +100,25 @@ describe("complete-source browser Project XML candidate", () => {
     ]);
   });
 
+  it("uses the current Project GUID, Active, Manual ordering without inserting execution fields near Name", async () => {
+    const source = projectSource()
+      .replace("      <ActualStart>2026-08-24T07:00:00</ActualStart>\n", "")
+      .replace("      <UID>2</UID>\n", "      <UID>2</UID>\n      <GUID>22222222-2222-2222-2222-222222222222</GUID>\n")
+      .replace("      <Name>Inspect synthetic equipment</Name>\n", "      <Name>Inspect synthetic equipment</Name>\n      <Active>1</Active>\n      <Manual>0</Manual>\n      <Type>0</Type>\n")
+      .replaceAll("      <Manual>0</Manual>\n      <Active>1</Active>\n", "");
+
+    const result = await generateProjectXmlCandidate(source, [
+      mapping({ field: "ActualStart", expectedSourceValue: null, proposedValue: "2026-08-24T07:15:00" })
+    ]);
+
+    expect(result.candidateXml).toContain([
+      "<OvertimeWork>PT0H0M0S</OvertimeWork>",
+      "      <ActualStart>2026-08-24T07:15:00</ActualStart>",
+      "      <ActualFinish>2026-08-24T08:00:00</ActualFinish>"
+    ].join("\n      ").replaceAll("\n            ", "\n      "));
+    expect(result.candidateXml.indexOf("<ActualStart>")).toBeGreaterThan(result.candidateXml.indexOf("<OvertimeWork>"));
+  });
+
   it("replaces a self-closing supported field without altering its surrounding Task content", async () => {
     const source = projectSource().replace(
       "<PercentComplete>25</PercentComplete>",
@@ -113,11 +132,26 @@ describe("complete-source browser Project XML candidate", () => {
       "<PercentComplete />",
       "<PercentComplete>35</PercentComplete>"
     ));
+
+    const attributed = projectSource().replace(
+      "<PercentComplete>25</PercentComplete>",
+      '<PercentComplete data-origin="retained" />'
+    );
+    const attributedResult = await generateProjectXmlCandidate(attributed, [
+      mapping({ field: "PercentComplete", expectedSourceValue: null, proposedValue: "35" })
+    ]);
+    expect(attributedResult.candidateXml).toBe(attributed.replace(
+      '<PercentComplete data-origin="retained" />',
+      '<PercentComplete data-origin="retained">35</PercentComplete>'
+    ));
   });
 
   it("escapes XML text and calculates browser SHA-256 deterministically", async () => {
     expect(escapeProjectXmlText(`&<>"'`)).toBe("&amp;&lt;&gt;&quot;&apos;");
     await expect(sha256Hex("abc")).resolves.toBe(
+      "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+    await expect(sha256Hex(new TextEncoder().encode("abc"))).resolves.toBe(
       "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
   });

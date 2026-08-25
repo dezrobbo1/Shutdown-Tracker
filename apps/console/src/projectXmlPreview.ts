@@ -28,6 +28,19 @@ export type ProjectXmlPreview = {
 
 const PROJECT_NAMESPACE = "http://schemas.microsoft.com/project";
 
+export async function readUtf8ProjectXml(blob: Pick<Blob, "arrayBuffer">): Promise<{
+  bytes: Uint8Array;
+  xml: string;
+}> {
+  const bytes = new Uint8Array(await blob.arrayBuffer());
+  try {
+    const xml = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes);
+    return { bytes: Uint8Array.from(bytes), xml };
+  } catch {
+    throw new Error("Only valid UTF-8 Microsoft Project XML is supported in this browser trial.");
+  }
+}
+
 export function parseProjectXmlPreview(xml: string): ProjectXmlPreview {
   if (!xml.trim()) {
     throw new Error("The selected XML file is empty.");
@@ -76,26 +89,30 @@ export function parseProjectXmlPreview(xml: string): ProjectXmlPreview {
 
 function parseTask(task: Element): ProjectXmlTaskPreview {
   return {
-    uid: childText(task, "UID"),
-    id: childText(task, "ID"),
+    uid: integerText(childText(task, "UID"), "Task UID"),
+    id: integerText(childText(task, "ID"), "Task ID"),
     name: childText(task, "Name") ?? "Unnamed task",
     wbs: childText(task, "WBS"),
     outlineNumber: childText(task, "OutlineNumber"),
-    outlineLevel: numberValue(childText(task, "OutlineLevel")),
-    summary: booleanValue(childText(task, "Summary")),
+    outlineLevel: numberValue(childText(task, "OutlineLevel"), "Task OutlineLevel"),
+    summary: booleanValue(childText(task, "Summary"), "Task Summary"),
     start: childText(task, "Start"),
     finish: childText(task, "Finish"),
     duration: childText(task, "Duration"),
     actualStart: childText(task, "ActualStart"),
     actualFinish: childText(task, "ActualFinish"),
-    percentComplete: numberValue(childText(task, "PercentComplete")),
-    physicalPercentComplete: numberValue(childText(task, "PhysicalPercentComplete")),
-    critical: optionalBooleanValue(childText(task, "Critical"))
+    percentComplete: numberValue(childText(task, "PercentComplete"), "Task PercentComplete"),
+    physicalPercentComplete: numberValue(childText(task, "PhysicalPercentComplete"), "Task PhysicalPercentComplete"),
+    critical: optionalBooleanValue(childText(task, "Critical"), "Task Critical")
   };
 }
 
 function directChild(parent: Element, localName: string) {
-  return directChildren(parent, localName)[0] ?? null;
+  const matches = directChildren(parent, localName);
+  if (matches.length > 1) {
+    throw new Error(`${parent.localName} contains more than one direct ${localName} element.`);
+  }
+  return matches[0] ?? null;
 }
 
 function directChildren(parent: Element, localName: string) {
@@ -109,20 +126,34 @@ function directChildren(parent: Element, localName: string) {
 }
 
 function childText(parent: Element, localName: string) {
-  const value = directChild(parent, localName)?.textContent?.trim();
+  const matches = directChildren(parent, localName);
+  if (matches.length > 1) {
+    throw new Error(`${parent.localName} contains more than one direct ${localName} element.`);
+  }
+  const value = matches[0]?.textContent?.trim();
   return value ? value : null;
 }
 
-function numberValue(value: string | null) {
-  if (value === null || value === "") return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+function integerText(value: string | null, field: string) {
+  if (value === null) return null;
+  if (!/^-?\d+$/u.test(value)) throw new Error(`${field} must be an integer in Microsoft Project XML.`);
+  return value;
 }
 
-function booleanValue(value: string | null) {
+function numberValue(value: string | null, field: string) {
+  if (value === null || value === "") return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) throw new Error(`${field} must be numeric in Microsoft Project XML.`);
+  return parsed;
+}
+
+function booleanValue(value: string | null, field: string) {
+  if (value !== null && !/^(?:0|1|true|false)$/iu.test(value)) {
+    throw new Error(`${field} must be 0, 1, true, or false in Microsoft Project XML.`);
+  }
   return value === "1" || value?.toLowerCase() === "true";
 }
 
-function optionalBooleanValue(value: string | null) {
-  return value === null ? null : booleanValue(value);
+function optionalBooleanValue(value: string | null, field: string) {
+  return value === null ? null : booleanValue(value, field);
 }
