@@ -238,10 +238,14 @@ describe("deterministic Console operational trial", () => {
       onBack={() => undefined}
       onAction={() => undefined}
       initialSection="Execution"
-    />);
+    />).replaceAll("<!-- -->", "").replaceAll("&#x27;", "'");
 
     expect(state.executionEvents.at(-2)?.at).toBe(state.executionEvents.at(-1)?.at);
-    expect(html.indexOf("· Start")).toBeLessThan(html.indexOf("· Can&#x27;t Start"));
+    const startIndex = html.indexOf("· Start");
+    const cantStartIndex = html.indexOf("· Can't Start");
+    expect(startIndex).toBeGreaterThanOrEqual(0);
+    expect(cantStartIndex).toBeGreaterThanOrEqual(0);
+    expect(startIndex).toBeLessThan(cantStartIndex);
   });
 
   it("renders configurable, controlled, versioned Critical policy trial controls", () => {
