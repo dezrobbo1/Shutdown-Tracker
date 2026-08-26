@@ -8,7 +8,7 @@ The Master Console and Mobile App are separate React clients. Their approved pro
 
 The Console can read configured import snapshot list/detail data through `apps/console/src/apiReviewClient.ts`. `apps/console/src/projectXmlPreview.ts` also provides standalone local browser inspection of valid Microsoft Project MSPDI/XML. Neither capability authenticates a user, activates a project, changes a snapshot, or updates a Microsoft Project file.
 
-The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, Project-open verification controls, or mandatory Microsoft Project acceptance gate. The explicitly flagged Tier 1 evidence trial has an independent source-preserving browser patcher and optional manual Project review; it has no approval lifecycle and does not make that workflow product authority. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until evidence supports a separate product decision.
+The active frontend contains no PR #48 RoundTripWorkspace and has no dependency on its candidate approval, sealed preview, Project-open verification controls, or mandatory Microsoft Project acceptance gate. The explicitly activated Tier 1 evidence trial has an independent source-preserving browser patcher and optional manual Project review; it has no approval lifecycle and does not make that workflow product authority. Main's older export-preview and minimal-writer code remains experimental backend compatibility only. The final export/round-trip workflow is intentionally deferred until evidence supports a separate product decision.
 
 Neither the default visual shells nor the imported Tier 1 round-trip trial implement:
 
@@ -110,8 +110,8 @@ There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / 
 | Mobile Assigned Tasks empty frame | Static visual only | The approved Assigned Tasks frame is present and shows an honest zero-task state. No persona, assignment, task, execution, reporting, or sync data is fabricated. |
 | Mobile Task Detail | Designed, not built | Task Detail is not rendered. Production identity, assignment, task, execution, reporting, Mobile API, and offline queue paths do not exist. |
 | Import snapshot list/detail | Read-only API-wired | GET-only ordinary Console wiring when an API project is explicitly configured. |
-| Local MSPDI/XML inspection | Verified in repository | Browser-only XML namespace/content inspection; no `.mpp`, persistence, or activation. |
-| Tier 1 Project round-trip trial | Verified in repository | Explicit flag only; temporary imported XML schedule, unrestricted browser-local Tier 1 leaf execution, reviewed optional mappings, separate source-preserving candidate, manual Project step, local result comparison, and reset/discard. Browser-memory evidence only; no approved contract or backend workflow. |
+| Local MSPDI/XML inspection | Verified in repository | Browser-only lossless XML namespace/content inspection with local SHA-256. A valid inspected source may be explicitly promoted into the temporary round-trip trial; there is no `.mpp`, production persistence, upload, or production activation. |
+| Tier 1 Project round-trip trial | Verified in repository | Explicit Start from ordinary Import, with the environment flag retained as a direct-entry shortcut; temporary imported XML schedule, unrestricted browser-local Tier 1 leaf execution, reviewed optional mappings, separate source-preserving candidate, manual Project step, local result comparison, and reset/discard. Browser-memory evidence only; no approved contract or backend workflow. |
 | Export | Designed, not built | Direction is deliberately not finalised; experimental main compatibility code is not presented as product authority. |
 
 ## Execution visual rules
@@ -236,4 +236,4 @@ Revise a visual PR if it:
 - uses colour as the only state signal;
 - infers authority from category, discipline, contractor, work group, area, WBS, Resource `Group`, saved view, or Critical membership.
 
-The explicitly flagged Tier 1 Project round-trip evidence trial is the current bounded interactive product-validation surface. Its human review results may inform a later product slice but do not approve one. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.
+The explicitly activated Tier 1 Project round-trip evidence trial is the current bounded interactive product-validation surface. Its human review results may inform a later product slice but do not approve one. Production task-execution backend work, durable persistence, authentication, offline sync, and final Project export design each require separate reviewed decisions and implementation PRs.

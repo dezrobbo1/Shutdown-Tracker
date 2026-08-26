@@ -6,6 +6,10 @@ import { buildConsoleReviewConfig, loadConsoleReviewData } from "./apiReviewClie
 import { consoleNavItems } from "./consoleData";
 import { ImportExportView } from "./ImportExportView";
 import { buildTier1RoundTripConfig } from "./roundTripTrialMode";
+import {
+  activateTier1RoundTripSource,
+  type Tier1RoundTripWorkspaceState
+} from "./Tier1RoundTripTrialViews";
 
 describe("approved Master Console information architecture", () => {
   it("starts with a clearly non-production Login view and no preloaded project", () => {
@@ -58,13 +62,17 @@ describe("approved Master Console information architecture", () => {
     const exportView = renderToString(<ImportExportView reviewData={null} loadState={{ status: "unconfigured", message: "No project configured." }} onRefresh={() => undefined} initialSection="Export" />);
 
     for (const section of ["Current Schedule", "Import", "Export", "History"]) expect(shell).toContain(section);
-    expect(shell).toContain("Browser Project XML inspection");
+    expect(shell).toContain("Choose a disposable Project XML source");
     expect(shell).toContain("No active project");
-    expect(shell).toContain("final export and round-trip contract is intentionally deferred");
+    expect(shell).toContain("final export contract remains deferred");
     expect(importView).toContain('type="file"');
-    expect(importView).toContain("the selected file stays in this browser and is not uploaded");
+    expect(importView).toContain("The complete original text stays in browser memory and is never uploaded or overwritten");
+    expect(importView).toContain("Start round-trip trial");
+    expect(importView).toMatch(/<button[^>]*disabled=""[^>]*>Start round-trip trial<\/button>/u);
+    expect(importView).toContain("Explicit browser-local trial only");
+    expect(importView).not.toContain("Round-trip trial time");
     expect(importView).toContain("Persist imported schedule");
-    expect(importView).toContain("Activate trial schedule");
+    expect(importView).not.toContain("Activate trial schedule");
     expect(exportView).toContain("Export design not finalised");
     expect(exportView).toContain("Earlier candidate and approval experiments remain technical research");
     expect(exportView).toContain("Export unavailable");
@@ -95,11 +103,53 @@ describe("approved Master Console information architecture", () => {
 });
 
 describe("Tier 1 Project round-trip trial boundary", () => {
-  it("enables only from the explicit round-trip flag and ignores the removed trial flag", () => {
+  it("allows direct entry only from the explicit round-trip flag and ignores the removed trial flag", () => {
     expect(buildTier1RoundTripConfig({ VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL: "true" }).enabled).toBe(true);
     expect(buildTier1RoundTripConfig({ VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL: " true " }).enabled).toBe(false);
     expect(buildTier1RoundTripConfig({ VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL: "false" }).enabled).toBe(false);
     expect(buildTier1RoundTripConfig({ VITE_SHUTDOWN_TRACKER_TRIAL_MODE: "true" }).enabled).toBe(false);
+  });
+
+  it("uses an explicitly started browser-memory workspace even when the build flag is off", () => {
+    const workspace = importedRoundTripWorkspace();
+    const html = renderToString(
+      <App
+        initialView="console"
+        initialSection="Tasks"
+        initialRoundTripState={workspace}
+        roundTripTrialMode={false}
+      />
+    );
+
+    expect(html).toContain("Imported fixture schedule");
+    expect(html).toContain("Imported fixture leaf");
+    expect(html).toContain("Browser-local experimental trial");
+    expect(html).toContain("Tier 1 may execute");
+    expect(html).not.toContain("No active project");
+  });
+
+  it("promotes the exact inspected source and signals navigation only through explicit Start", () => {
+    const draft = importedSourceDraft();
+    let changed: Tier1RoundTripWorkspaceState | null = null;
+    let started = 0;
+
+    const workspace = activateTier1RoundTripSource(
+      draft,
+      (next) => {
+        if (typeof next === "function") throw new Error("Activation must publish a complete workspace.");
+        changed = next;
+      },
+      () => { started += 1; }
+    );
+
+    expect(changed).toBe(workspace);
+    expect(started).toBe(1);
+    expect(workspace.session.source.fileName).toBe(draft.fileName);
+    expect(workspace.session.source.xml).toBe(draft.xml);
+    expect([...workspace.session.source.bytes]).toEqual([...draft.bytes]);
+    expect(workspace.session.source.hash).toBe(draft.sha256);
+    expect(workspace.session.source.preview).toEqual(draft.preview);
+    expect(workspace.session.trialState.tasks[0]?.name).toBe("Imported fixture leaf");
   });
 
   it("is explicit, browser-local, and keeps ordinary Export deferred", () => {
@@ -188,6 +238,46 @@ const taskRow = {
   summary: false, parentExternalUid: null, parentImportedTaskId: null, plannedStart: null, plannedFinish: null, actualStart: null,
   actualFinish: null, percentComplete: 0, physicalPercentComplete: null, notes: null
 };
+
+function importedRoundTripWorkspace() {
+  return activateTier1RoundTripSource(importedSourceDraft(), () => undefined, () => undefined);
+}
+
+function importedSourceDraft() {
+  const sourceXml = '<?xml version="1.0" encoding="UTF-8"?><Project xmlns="http://schemas.microsoft.com/project"><Name>Imported fixture schedule</Name></Project>';
+  return {
+    fileName: "imported-fixture.xml",
+    xml: sourceXml,
+    bytes: new TextEncoder().encode(sourceXml),
+    sha256: "fixture-source-hash",
+    preview: {
+      projectName: "Imported fixture schedule",
+      projectUid: "11111111-1111-1111-1111-111111111111",
+      statusDate: "2026-08-24T06:00:00",
+      taskCount: 1,
+      summaryTaskCount: 0,
+      leafTaskCount: 1,
+      tasks: [{
+        uid: "1",
+        id: "1",
+        name: "Imported fixture leaf",
+        wbs: "1",
+        outlineNumber: "1",
+        outlineLevel: 1,
+        summary: false,
+        start: "2026-08-24T07:00:00",
+        finish: "2026-08-24T08:00:00",
+        duration: "PT1H0M0S",
+        actualStart: null,
+        actualFinish: null,
+        percentComplete: 0,
+        physicalPercentComplete: null,
+        critical: false
+      }]
+    }
+  };
+}
+
 function jsonResponse(body: unknown) {
   return new Response(JSON.stringify(body), { status: 200, headers: { "Content-Type": "application/json" } });
 }

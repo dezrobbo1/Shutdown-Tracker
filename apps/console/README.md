@@ -16,23 +16,32 @@ Project Console
   Project Settings
 ```
 
-Outside the explicitly flagged Tier 1 Project round-trip trial, the Console starts without an active project. Projects Home provides an honest empty state and directs the reviewer to Import / Export. Today, Tasks, Critical, and Project Settings remain visible as the approved information architecture but show no project records until a real project path exists. No fictional projects, tasks, people, Critical records, activity, or settings are preloaded. OIDC, production project APIs, lifecycle persistence, task execution, assignment, Critical, mapping, and operational-record writes are not implemented.
+Without an active Tier 1 Project round-trip session, the Console starts without an active project. Projects Home provides an honest empty state and directs the reviewer to Import / Export. Today, Tasks, Critical, and Project Settings remain visible as the approved information architecture but show no project records until a reviewer explicitly starts a browser-local session from an inspected XML source. No fictional projects, tasks, people, Critical records, activity, or settings are preloaded. OIDC, production project APIs, lifecycle persistence, task execution, assignment, Critical, mapping, and operational-record writes are not implemented.
 
 Problems, Discussion, Actions, Evidence, and History belong to the relevant Task Dashboard rather than project-level navigation.
 
 ## Tier 1 Project round-trip trial
 
-Enable the browser-local evidence trial with:
+The ordinary Import page provides the primary activation path:
+
+1. choose a Microsoft Project XML/MSPDI source;
+2. wait for local inspection and SHA-256 hashing to complete;
+3. review the imported identity and task rows; and
+4. select `Start round-trip trial`.
+
+Selection alone never activates a project. Explicit Start promotes the exact retained bytes/text into a temporary browser-memory session and opens the imported Tasks hierarchy.
+
+The environment flag remains available as a direct-entry shortcut:
 
 ```text
 VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
 ```
 
-Import / Export can then retain the original UTF-8 bytes and losslessly decoded text of a Microsoft Project XML/MSPDI source in memory, adapt its hierarchy into a temporary Tier 1 schedule, capture local Can't Start / Start / Pause / Resume / Finish and progress facts, and offer reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. Invalid or non-UTF-8 input fails closed, and no mapping is included by default.
+The shared Import path retains the original UTF-8 bytes and losslessly decoded text of a Microsoft Project XML/MSPDI source in memory, adapts its hierarchy into a temporary Tier 1 schedule after explicit Start, captures local Can't Start / Start / Pause / Resume / Finish and progress facts, and offers reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. Invalid or non-UTF-8 input fails closed, and no mapping is included by default.
 
 The source-preserving browser patcher creates a separate complete-source candidate from only the selected fields, with identity/source-value checks and source/candidate hashes. The reviewer downloads it, opens/recalculates it manually in Microsoft Project, exports a new result XML, and re-imports that result for conservative local comparison and an in-memory disposition. Reset retains the immutable source and removes generated session state; discard or reload disposes of the complete browser-memory trial.
 
-This is an experimental product trial, not PR #48's approval workflow or a final export contract. It has no backend/API persistence, approval lifecycle, native `.mpp`, automatic Project operation, CPM, or Mobile redesign. Ordinary Export remains not finalised outside this flag. See [Tier 1 Project Round-Trip Trial](../../docs/product/tier1-project-roundtrip-trial.md).
+This is an experimental product trial, not PR #48's approval workflow or a final export contract. It has no backend/API persistence, approval lifecycle, native `.mpp`, automatic Project operation, CPM, or Mobile redesign. Ordinary Export remains not finalised until an explicit browser-memory round-trip session is active. See [Tier 1 Project Round-Trip Trial](../../docs/product/tier1-project-roundtrip-trial.md).
 
 ## Task execution and Critical reporting
 
@@ -50,7 +59,8 @@ Import / Export includes a functional browser-only Project XML/MSPDI inspector. 
 - reads project identity and status date where supplied;
 - counts summary and leaf tasks;
 - presents searchable task, WBS, UID/ID, planned date, and imported progress context;
-- keeps the selected source in the browser and does not upload or mutate it.
+- keeps the selected source in the browser and does not upload or mutate it; and
+- enables explicit creation of a temporary round-trip session from that exact retained source.
 
 This is lightweight technical inspection, not complete semantic validation or production import acceptance. Native `.mpp` cannot be inspected in the browser.
 
@@ -62,7 +72,7 @@ VITE_SHUTDOWN_TRACKER_PROJECT_ID=<review-project-id>
 VITE_SHUTDOWN_TRACKER_IMPORT_SNAPSHOT_ID=<optional-snapshot-id>
 ```
 
-Without `VITE_SHUTDOWN_TRACKER_PROJECT_ID`, the read-only review state is shown as unconfigured and no backend request is made. Persistence, Operational Mapping validation, comparison/reconciliation, activation, and production project switching remain disabled or unimplemented.
+Without `VITE_SHUTDOWN_TRACKER_PROJECT_ID`, the read-only review state is shown as unconfigured and no backend request is made. Persistence, Operational Mapping validation, comparison/reconciliation, production activation, and production project switching remain disabled or unimplemented. The separate Start action creates only the disposable local trial described above.
 
 ## Export boundary
 
@@ -91,7 +101,7 @@ npm test
 npm run build
 ```
 
-From the repository root, the Tier 1 Project round-trip trial can be started with:
+From the repository root, direct-entry trial mode can be enabled with:
 
 ```text
 VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true npm run dev --workspace @shutdown-tracker/console
