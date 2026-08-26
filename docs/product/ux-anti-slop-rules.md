@@ -176,35 +176,19 @@ Avoid:
 
 ## Visual review shell copy
 
-Use one global label for current prototype screens:
+Use this boundary for an unconnected frontend shell:
 
 ```text
-Visual review shell. Static/synthetic data. No production write workflow.
+No connected project or assignment data. No production write workflow.
 ```
 
 Avoid repeating `Review mode`, `Review scaffold`, and `Visual state only` in many locations. Repetition makes the UI feel generated and distracts from workflow review.
 
-## Synthetic data rules
+## Runtime and fixture data rules
 
-Visible sample data should be sanitized but realistic.
+Ordinary frontend shells must not be pre-populated with fictional projects, tasks, people, events, reports, history, or sync outcomes. Show an explicit empty or unconfigured state until a connected source exists.
 
-Avoid visible labels like:
-
-- `Synthetic Task A1`;
-- `Synthetic Summary Mobile`;
-- `Tier 3 user A`;
-- `Demo record`.
-
-Prefer:
-
-- `C2 Cyclone — remove access cover`;
-- `D2 Stack — scaffold inspection`;
-- `HV inlet — vacuum clean-out`;
-- `Furnace bottom — install blanking plate`;
-- `Permit isolation — await operations release`;
-- `Crane lift — wait for lift plan sign-off`;
-- `Tier 2 user A`;
-- `Tier 3 user B`.
+Automated tests must continue to use synthetic fixtures instead of real customer/site data. Keep fixture identifiers test-only and do not surface them as current operational state.
 
 ## Chip and card rules
 
@@ -273,8 +257,8 @@ Every future Codex UI prompt should include:
 - do not introduce generic chat;
 - do not imply Microsoft Project write-back;
 - keep write controls disabled unless APIs exist;
-- label static/synthetic surfaces clearly;
-- use sanitized realistic examples, not `Synthetic Task A1` labels;
+- label static/empty surfaces clearly;
+- show explicit empty/unconfigured runtime states instead of populated fictional examples;
 - keep mobile cards minimal;
 - use tables/lists for Tier 1 import/source comparison;
 - include acceptance criteria for IA, sync honesty, and Project boundary.

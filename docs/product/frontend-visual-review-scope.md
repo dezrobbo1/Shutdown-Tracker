@@ -4,7 +4,7 @@ This document defines how frontend visual-review work and the imported [Tier 1 P
 
 ## Current implementation boundary
 
-The Master Console and Mobile App are separate React clients. Their approved product shells remain static by default. The fixed fictional Console/Mobile operational trial, shared scenario, guided workflow, and linked-window bridge are not current capabilities.
+The Master Console and Mobile App are separate React clients. Their approved product shells are empty by default: no fictional projects, tasks, people, execution records, Critical reports, lifecycle history, personas, or sync states are loaded. The fixed fictional Console/Mobile operational trial, its static review datasets, shared scenario, guided workflow, and linked-window bridge are not current capabilities.
 
 The Console can read configured import snapshot list/detail data through `apps/console/src/apiReviewClient.ts`. `apps/console/src/projectXmlPreview.ts` also provides standalone local browser inspection of valid Microsoft Project MSPDI/XML. Neither capability authenticates a user, activates a project, changes a snapshot, or updates a Microsoft Project file.
 
@@ -37,7 +37,7 @@ Every visual brief and surface must use one of these labels:
 | --- | --- |
 | Verified in repository | Bounded runtime or independently useful technical capability is present |
 | Read-only API-wired | Surface reads backend data but does not provide production writes |
-| Static visual only | Synthetic or hard-coded UI for product review |
+| Static visual only | Frontend structure or empty-state UI exists without a connected production workflow |
 | Designed, not built | Approved product behaviour without end-to-end runtime implementation |
 | Explicitly excluded | Outside the active product boundary |
 
@@ -103,15 +103,16 @@ There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / 
 
 | Frontend area | Current label | Limit |
 | --- | --- | --- |
-| Login and Projects Home | Static visual only | Review-only transitions with synthetic projects; no identity or project API. |
-| Today, Tasks, Task Dashboard | Verified in repository | The Tier 1 round-trip trial derives these views from an imported XML schedule and browser-memory execution state. Ordinary views remain static; there is no production query or write API. |
-| Critical | Static visual only | Selected items/work packs, ownership, policies, reports, and history are review examples with disabled writes. Imported Project Critical may appear as read-only round-trip context; there is no production Critical API or persistence. |
-| Project Settings | Static visual only | General, Users, Operational Mapping, Project History, and Lifecycle are review shells with disabled writes. |
-| Mobile Assigned Tasks and Task Detail | Static visual only | Persona selection and list/detail navigation use local static data; execution, progress, delegation, reporting, and sync controls do not write. There is no Mobile API or offline queue. |
+| Login and Projects Home | Static visual only | Review-only transition and an honest no-project state; no identity, fabricated project portfolio, or project API. |
+| Today, Tasks, Task Dashboard | Verified in repository | The Tier 1 round-trip trial derives these views from an imported XML schedule and browser-memory execution state. Ordinary mode shows no active-project state; there is no production query or write API. |
+| Critical | Designed, not built | Ordinary mode shows no active-project state. Imported Project Critical may appear as read-only round-trip context; there is no fabricated reporting dataset, production Critical API, or persistence. |
+| Project Settings | Designed, not built | Ordinary mode shows no active-project state. Production General, Users, Operational Mapping, Project History, and Lifecycle data paths are not implemented. |
+| Mobile Assigned Tasks empty frame | Static visual only | The approved Assigned Tasks frame is present and shows an honest zero-task state. No persona, assignment, task, execution, reporting, or sync data is fabricated. |
+| Mobile Task Detail | Designed, not built | Task Detail is not rendered. Production identity, assignment, task, execution, reporting, Mobile API, and offline queue paths do not exist. |
 | Import snapshot list/detail | Read-only API-wired | GET-only ordinary Console wiring when an API project is explicitly configured. |
 | Local MSPDI/XML inspection | Verified in repository | Browser-only XML namespace/content inspection; no `.mpp`, persistence, or activation. |
 | Tier 1 Project round-trip trial | Verified in repository | Explicit flag only; temporary imported XML schedule, unrestricted browser-local Tier 1 leaf execution, reviewed optional mappings, separate source-preserving candidate, manual Project step, local result comparison, and reset/discard. Browser-memory evidence only; no approved contract or backend workflow. |
-| Export | Static visual only | Direction is deliberately not finalised; experimental main compatibility code is not presented as product authority. |
+| Export | Designed, not built | Direction is deliberately not finalised; experimental main compatibility code is not presented as product authority. |
 
 ## Execution visual rules
 
@@ -160,10 +161,10 @@ Export design is not finalised. Existing compatibility code is experimental and 
 
 ## General visual-review copy
 
-Use one global visual-shell statement:
+Use this boundary on empty frontend shells:
 
 ```text
-Visual review shell. Static/synthetic data. No production write workflow.
+No connected project or assignment data. No production write workflow.
 ```
 
 Use all four statements in the Tier 1 Project round-trip trial:
@@ -185,27 +186,11 @@ Server received.
 Last synced at [time].
 ```
 
-## Synthetic data rules
+## Runtime and fixture data rules
 
-Synthetic data should be clearly non-operational to developers but realistic enough for visual review.
+Do not populate ordinary frontend runtime shells with fictional projects, tasks, people, events, reports, history, or transport states. Use explicit zero-data and unconfigured states until a real connected or reviewer-selected source exists.
 
-Avoid:
-
-- `Synthetic Task A1`;
-- `Synthetic Summary B`;
-- `Sample Row 1`;
-- `Demo User A`.
-
-Prefer sanitized examples:
-
-- `C2 Cyclone — remove access cover`;
-- `D2 Stack — scaffold inspection`;
-- `HV inlet — vacuum clean-out`;
-- `Furnace bottom — install blanking plate`;
-- `Permit isolation — await operations release`;
-- `Crane lift — wait for lift plan sign-off`.
-
-Synthetic metadata may keep fixture IDs internally.
+Synthetic XML and text fixtures remain required for automated tests so real customer/site schedules do not enter the repository. Test-only fixture names and metadata must not be presented as active application data.
 
 ## Console visual rules
 
