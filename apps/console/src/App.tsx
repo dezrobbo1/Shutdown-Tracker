@@ -8,15 +8,11 @@ import {
   type ConsoleReviewData,
   type ConsoleReviewLoadState
 } from "./apiReviewClient";
-import { consoleNavItems, projects, type ConsoleSection } from "./consoleData";
+import { consoleNavItems, type ConsoleSection } from "./consoleData";
 import {
-  CriticalView,
   LoginView,
-  ProjectSettingsView,
-  ProjectsHome,
-  TaskDashboard,
-  TasksView,
-  TodayView
+  NoActiveProjectView,
+  ProjectsHome
 } from "./ConsoleViews";
 import { ImportExportView } from "./ImportExportView";
 import {
@@ -40,7 +36,7 @@ export type AppProps = {
 
 export function App({
   initialView = "login",
-  initialSection = "Today",
+  initialSection = "Import / Export",
   initialTaskId = null,
   roundTripTrialMode
 }: AppProps) {
@@ -51,8 +47,6 @@ export function App({
     roundTripEnabled && initialSection === "Today" ? "Import / Export" : initialSection
   );
   const [taskId, setTaskId] = useState<string | null>(initialTaskId);
-  const [taskOrigin, setTaskOrigin] = useState<"Today" | "Tasks">(initialSection === "Today" ? "Today" : "Tasks");
-  const [projectId, setProjectId] = useState(roundTripEnabled ? "roundtrip-empty" : "calciner-2026");
   const [reviewData, setReviewData] = useState<ConsoleReviewData | null>(null);
   const [loadState, setLoadState] = useState<ConsoleReviewLoadState>(() => roundTripEnabled
     ? roundTripReviewLoadState()
@@ -72,7 +66,7 @@ export function App({
     try {
       const next = await loadConsoleReviewData();
       setReviewData(next);
-      setLoadState({ status: next.mode === "live" ? "loaded" : "synthetic", message: next.message });
+      setLoadState({ status: next.mode === "live" ? "loaded" : "unconfigured", message: next.message });
     } catch (error) {
       setLoadState({ status: "error", message: formatConsoleReviewError(error) });
     }
@@ -98,9 +92,7 @@ export function App({
     if (roundTripState && nextProjectId !== roundTripState.session.trialState.project.id) {
       setRoundTripState(null);
     }
-    setProjectId(nextProjectId);
-    setActiveSection(roundTripEnabled && !roundTripState ? "Import / Export" : "Today");
-    setTaskOrigin("Today");
+    setActiveSection(roundTripEnabled && roundTripState ? "Today" : "Import / Export");
     setView("console");
   }
 
@@ -139,7 +131,12 @@ export function App({
           site: "Browser-local",
           status: "Temporary trial" as const
         }
-    : projects.find((project) => project.id === projectId) ?? projects[0];
+    : {
+        name: "No active project",
+        code: "NOT CONFIGURED",
+        site: "No project source",
+        status: "Unconfigured" as const
+      };
 
   function navigate(section: ConsoleSection) {
     setTaskId(null);
@@ -147,7 +144,6 @@ export function App({
   }
 
   function openTask(nextTaskId: string) {
-    setTaskOrigin(activeSection === "Today" ? "Today" : "Tasks");
     setTaskId(nextTaskId);
   }
 
@@ -156,7 +152,7 @@ export function App({
       <aside className="sidebar" aria-label="Master Console navigation">
         <div className="brand"><span className="brand-mark">ST</span><div><strong>Shutdown Tracker</strong><span>Master Console · Tier 1</span></div></div>
         <button className="project-switcher" type="button" onClick={() => leaveProject("projects")}>
-          <span><small>Current project</small><strong>{selectedProject.name}</strong><em>{selectedProject.code} · {selectedProject.status}</em></span><ChevronDown size={17} aria-hidden="true" />
+          <span><small>Project context</small><strong>{selectedProject.name}</strong><em>{selectedProject.code} · {selectedProject.status}</em></span><ChevronDown size={17} aria-hidden="true" />
         </button>
         <nav className="nav-list">
           {consoleNavItems.map((item) => {
@@ -165,7 +161,7 @@ export function App({
           })}
         </nav>
         <div className="sidebar-footer">
-          <span>{roundTripEnabled ? "Tier 1 Project round-trip trial" : "Static product shell"}</span>
+          <span>{roundTripEnabled ? "Tier 1 Project round-trip trial" : "No active project"}</span>
           {roundTripEnabled ? <small>Browser-local experimental workflow<br />No production persistence</small> : null}
           <button type="button" onClick={() => leaveProject("login")}><LogOut size={15} aria-hidden="true" /> Exit review</button>
         </div>
@@ -179,8 +175,8 @@ export function App({
               ? `Trial time · ${formatRoundTripMinute(roundTripState.session.trialState.now).replace("T", " ")}`
               : roundTripEnabled
                 ? "Choose a disposable XML source"
-                : "Operational day · 06:00"}</span>
-            <button type="button" disabled aria-label="Refresh project data"><RefreshCw size={16} aria-hidden="true" /> {roundTripEnabled ? "No backend connection" : "Live refresh not implemented"}</button>
+                : "No schedule loaded"}</span>
+            <button type="button" disabled aria-label="Refresh project data"><RefreshCw size={16} aria-hidden="true" /> {roundTripEnabled ? "No backend connection" : "Refresh unavailable"}</button>
           </div>
         </header>
 
@@ -193,32 +189,31 @@ export function App({
               ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
               : roundTripState
                 ? <Tier1RoundTripTaskDashboard state={roundTripState} taskId={taskId} onBack={() => setTaskId(null)} onChange={setRoundTripState} />
-                : <TaskDashboard taskId={taskId} backLabel={taskOrigin} onBack={() => setTaskId(null)} />
+                : <NoActiveProjectView section="Tasks" onOpenImport={() => navigate("Import / Export")} />
           ) : (
             <>
               {activeSection === "Today" && (roundTripState
                 ? <Tier1RoundTripTodayView state={roundTripState} onOpenTask={openTask} />
                 : roundTripEnabled
                   ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
-                  : <TodayView onOpenTask={openTask} />)}
+                  : <NoActiveProjectView section="Today" onOpenImport={() => navigate("Import / Export")} />)}
               {activeSection === "Tasks" && (roundTripState
                 ? <Tier1RoundTripTasksView state={roundTripState} onOpenTask={openTask} />
                 : roundTripEnabled
                   ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
-                  : <TasksView onOpenTask={openTask} />)}
+                  : <NoActiveProjectView section="Tasks" onOpenImport={() => navigate("Import / Export")} />)}
               {activeSection === "Critical" && (roundTripEnabled
                 ? <RoundTripCriticalBoundary state={roundTripState} onOpenImport={() => navigate("Import / Export")} />
-                : <CriticalView />)}
+                : <NoActiveProjectView section="Critical" onOpenImport={() => navigate("Import / Export")} />)}
               {activeSection === "Import / Export" && (
                 <ImportExportView
-                  initialSection={roundTripEnabled && !roundTripState ? "Import" : "Current Schedule"}
+                  initialSection={roundTripState ? "Current Schedule" : "Import"}
                   roundTripTrialMode={roundTripEnabled}
                   roundTripState={roundTripState}
                   onRoundTripChange={(next) => {
                     setRoundTripState(next);
                     setTaskId(null);
                   }}
-                  shellProjectLabel={`${selectedProject.name} (${selectedProject.code})`}
                   reviewData={reviewData}
                   loadState={loadState}
                   onRefresh={() => void refreshReviewData()}
@@ -226,7 +221,7 @@ export function App({
               )}
               {activeSection === "Project Settings" && (roundTripEnabled
                 ? <RoundTripSettingsBoundary state={roundTripState} onOpenImport={() => navigate("Import / Export")} />
-                : <ProjectSettingsView />)}
+                : <NoActiveProjectView section="Project Settings" onOpenImport={() => navigate("Import / Export")} />)}
             </>
           )}
         </div>
@@ -236,7 +231,7 @@ export function App({
 }
 
 function roundTripReviewLoadState(): ConsoleReviewLoadState {
-  return { status: "synthetic", message: "Tier 1 round-trip trial keeps source and result XML in browser memory only." };
+  return { status: "unconfigured", message: "Tier 1 round-trip trial keeps source and result XML in browser memory only." };
 }
 
 export function RoundTripNoScheduleView({ onOpenImport }: { onOpenImport: () => void }) {

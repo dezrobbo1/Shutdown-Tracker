@@ -3,28 +3,29 @@ import { renderToString } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
 import { buildConsoleReviewConfig, loadConsoleReviewData } from "./apiReviewClient";
-import { consoleNavItems, taskDashboardSections } from "./consoleData";
-import { ProjectSettingsView } from "./ConsoleViews";
+import { consoleNavItems } from "./consoleData";
 import { ImportExportView } from "./ImportExportView";
 import { buildTier1RoundTripConfig } from "./roundTripTrialMode";
 
 describe("approved Master Console information architecture", () => {
-  it("starts with a clearly non-production Login view", () => {
+  it("starts with a clearly non-production Login view and no preloaded project", () => {
     const html = renderToString(<App />);
     expect(html).toContain("Shutdown Tracker");
     expect(html).toContain("Continue to Projects Home");
     expect(html).toContain("OIDC and production session handling are not yet implemented");
-    expect(html).not.toContain("type=\"password\"");
+    expect(html).toContain("No project data is preloaded");
+    expect(html).not.toContain('type="password"');
   });
 
-  it("represents Projects Home, creation, switching, search, and all lifecycle groups", () => {
+  it("renders an honest empty Projects Home with an import-first action", () => {
     const html = renderToString(<App initialView="projects" />);
     expect(html).toContain("Projects Home");
+    expect(html).toContain("No projects available");
+    expect(html).toContain("No active project");
+    expect(html).toContain("Open Import / Export");
+    expect(html).toContain("does not create, activate, or persist a Tracker project");
     expect(html).toContain("Create Project");
-    expect(html).toContain("Search name, code, or site");
-    for (const status of ["Active", "Draft", "Closed", "Archived"]) expect(html).toContain(status);
-    expect(html).toContain("Open project");
-    expect(html).toContain("Static visual only");
+    expect(html).not.toContain("Open project");
   });
 
   it("uses exactly the five approved project-level destinations", () => {
@@ -35,92 +36,31 @@ describe("approved Master Console information architecture", () => {
     for (const removed of ["Problems", "Evidence", "Exports", "Handover", "Discussion", "Review", "Reports"]) expect(nav).not.toContain(`>${removed}<`);
   });
 
-  it("renders Today as a 24-hour project projection with separate state and attention", () => {
-    const html = renderToString(<App initialView="console" initialSection="Today" />);
-    expect(html).toContain("24 August 2026 · 06:00 to 25 August 2026 · 06:00");
-    for (const state of ["Not Started", "In Progress", "Paused", "Completed"]) expect(html).toContain(state);
-    expect(html).toContain("Blocked / delayed");
-    expect(html).toContain("Late to Start");
-    expect(html).toContain("No Tracker start; imported progress 0%");
-    expect(html).toContain("A passed planned start never creates In Progress");
-    expect(html).toContain("Critical reports due / overdue");
-    expect(html).toContain("Active delays / problems");
-    const statusStrip = html.match(/<section class="status-strip"[\s\S]*?<\/section>/)?.[0] ?? "";
-    expect(statusStrip).not.toContain("status-label");
-    expect(html).toContain('status-label status-neutral">Not Started');
+  it("keeps ordinary operational destinations empty until a real project path exists", () => {
+    const views = [
+      renderToString(<App initialView="console" initialSection="Today" />),
+      renderToString(<App initialView="console" initialSection="Tasks" />),
+      renderToString(<App initialView="console" initialSection="Tasks" initialTaskId="not-a-real-task" />),
+      renderToString(<App initialView="console" initialSection="Critical" />),
+      renderToString(<App initialView="console" initialSection="Project Settings" />)
+    ];
+    for (const html of views) {
+      expect(html).toContain("No active project");
+      expect(html).toContain("Select a source before project data can be shown");
+      expect(html).toContain("Open Import / Export");
+      expect(html).toContain("Local XML inspection is read-only");
+    }
   });
 
-  it("renders the Project-like Tasks explorer without schedule editing", () => {
-    const html = renderToString(<App initialView="console" initialSection="Tasks" />);
-    for (const tool of ["Filter", "Group", "Columns", "Saved views"]) expect(html).toContain(tool);
-    expect(html).toContain("WBS / task");
-    expect(html).toContain('aria-expanded="true"');
-    expect(html).toContain("Tier 2 tracking owner");
-    expect(html).toContain("Schedule editing and date recalculation are not available");
-    expect(html).not.toMatch(/\bGantt\b|\bCPM\b|critical path calculation/i);
-  });
-
-  it("keeps all operational records inside the Task Dashboard", () => {
-    const html = renderToString(<App initialView="console" initialSection="Tasks" initialTaskId="1.1.2" />);
-    const todayHtml = renderToString(<App initialView="console" initialSection="Today" initialTaskId="1.1.2" />);
-    expect(html).toContain("Inspect refractory lining");
-    expect(html).toMatch(/Back to.*Tasks/);
-    expect(todayHtml).toMatch(/Back to.*Today/);
-    for (const section of taskDashboardSections) expect(html).toContain(section);
-    expect(html).toContain("One operational record for this task");
-    const normalizedHtml = html.replaceAll("&#x27;", "'");
-    for (const action of ["Can't Start", "Start", "Pause", "Resume", "Finish"]) expect(normalizedHtml).toContain(`>${action}<`);
-    expect(html).toContain("action times recorded automatically");
-    expect(html).toContain("Not yet implemented");
-    expect(html).toContain('aria-current="page"');
-  });
-
-  it("renders configurable versioned Critical policy without calculation or form-building claims", () => {
-    const html = renderToString(<App initialView="console" initialSection="Critical" />);
-    expect(html).toContain("Project-critical leaf");
-    expect(html).toContain("Critical Work Pack");
-    expect(html).toContain("Summary task 1.1 plus all descendants");
-    expect(html).toContain("Tier 2 reporting owner");
-    expect(html).toContain("Critical Reporting Policy");
-    expect(html).toContain("Policy v3");
-    expect(html).toContain("Two-hour critical-task reporting");
-    expect(html).toContain("Fixed interval");
-    expect(html).toContain("Fixed times");
-    expect(html).toContain("Shift-based");
-    expect(html).toContain("Ad hoc / requested");
-    expect(html).toContain("Event / exception triggered");
-    for (const field of ["Completion / progress", "Operational condition", "Current position / focus", "Main delay / constraint", "Action / recovery", "Next target", "Forecast completion", "Resources / labour where configured", "Evidence / photo requirement", "Comment / update text"]) expect(html).toContain(field);
-    expect(html).toContain("Create new policy version");
-    expect(html).toContain("Save item override");
-    expect(html).toContain("Policy changes create a new effective version");
-    expect(html).toContain("Critical reporting is not mandatory for every task");
-    expect(html).toContain("Overdue");
-    expect(html).toContain("does not calculate critical path");
-    expect(html).not.toMatch(/add custom field|build report form|form builder/i);
-  });
-
-  it("renders the complete static Project Settings shell and lifecycle boundary", () => {
-    const html = renderToString(<App initialView="console" initialSection="Project Settings" />);
-    const users = renderToString(<ProjectSettingsView initialSection="Users" />);
-    const mapping = renderToString(<ProjectSettingsView initialSection="Operational Mapping" />);
-    const lifecycle = renderToString(<ProjectSettingsView initialSection="Lifecycle" />);
-    for (const section of ["General", "Users", "Operational Mapping", "Project History", "Lifecycle"]) expect(html).toContain(section);
-    expect(html).toContain("Australia/Perth");
-    expect(users).toContain("Exactly three application tiers");
-    expect(mapping).toContain("never an authorization scope");
-    expect(lifecycle).toContain("Draft");
-    expect(lifecycle).toContain("Archived");
-    expect(lifecycle).not.toContain(">Clear Project</button>");
-  });
-
-  it("keeps Import review useful while leaving Export explicitly unfinalised", () => {
-    const shell = renderToString(<App initialView="console" initialSection="Import / Export" />);
-    const importView = renderToString(<ImportExportView shellProjectLabel="Static review" reviewData={null} loadState={{ status: "synthetic", message: "Static import review." }} onRefresh={() => undefined} initialSection="Import" />);
-    const exportView = renderToString(<ImportExportView shellProjectLabel="Static review" reviewData={null} loadState={{ status: "synthetic", message: "Static import review." }} onRefresh={() => undefined} initialSection="Export" />);
+  it("opens the ordinary Console at Import and keeps Export explicitly unfinalised", () => {
+    const shell = renderToString(<App initialView="console" />);
+    const importView = renderToString(<ImportExportView reviewData={null} loadState={{ status: "unconfigured", message: "No project configured." }} onRefresh={() => undefined} initialSection="Import" />);
+    const exportView = renderToString(<ImportExportView reviewData={null} loadState={{ status: "unconfigured", message: "No project configured." }} onRefresh={() => undefined} initialSection="Export" />);
 
     for (const section of ["Current Schedule", "Import", "Export", "History"]) expect(shell).toContain(section);
+    expect(shell).toContain("Browser Project XML inspection");
+    expect(shell).toContain("No active project");
     expect(shell).toContain("final export and round-trip contract is intentionally deferred");
-    expect(importView).toContain("Browser Project XML inspection");
     expect(importView).toContain('type="file"');
     expect(importView).toContain("the selected file stays in this browser and is not uploaded");
     expect(importView).toContain("Persist imported schedule");
@@ -131,6 +71,26 @@ describe("approved Master Console information architecture", () => {
     for (const removedControl of ["Approve exact inputs", "Generate candidate", "Open round-trip review workspace", "Record verification"]) {
       expect(`${shell}\n${importView}\n${exportView}`).not.toContain(`>${removedControl}<`);
     }
+  });
+
+  it("does not render the removed fictional Console records in any ordinary destination", () => {
+    const html = [
+      renderToString(<App initialView="projects" />),
+      ...consoleNavItems.map((item) => renderToString(<App initialView="console" initialSection={item.label} />))
+    ].join("\n");
+    for (const removed of [
+      "Calciner major shutdown",
+      "Kiln maintenance outage",
+      "Boiler annual shutdown",
+      "Morgan Lee",
+      "Avery Singh",
+      "Jordan Kim",
+      "Taylor Chen",
+      "Inspect refractory lining",
+      "Accepted snapshot v4",
+      "Mapped leaf tasks",
+      "Active Critical items"
+    ]) expect(html).not.toContain(removed);
   });
 });
 
@@ -144,8 +104,8 @@ describe("Tier 1 Project round-trip trial boundary", () => {
 
   it("is explicit, browser-local, and keeps ordinary Export deferred", () => {
     const trial = renderToString(<App initialView="console" initialSection="Import / Export" roundTripTrialMode />);
-    const trialExport = renderToString(<ImportExportView shellProjectLabel="Temporary review" reviewData={null} loadState={{ status: "synthetic", message: "Browser memory only." }} onRefresh={() => undefined} initialSection="Export" roundTripTrialMode />);
-    const ordinaryExport = renderToString(<ImportExportView shellProjectLabel="Ordinary shell" reviewData={null} loadState={{ status: "synthetic", message: "Static." }} onRefresh={() => undefined} initialSection="Export" />);
+    const trialExport = renderToString(<ImportExportView reviewData={null} loadState={{ status: "unconfigured", message: "Browser memory only." }} onRefresh={() => undefined} initialSection="Export" roundTripTrialMode />);
+    const ordinaryExport = renderToString(<ImportExportView reviewData={null} loadState={{ status: "unconfigured", message: "Not configured." }} onRefresh={() => undefined} initialSection="Export" />);
 
     expect(trial).toContain("Tier 1 Project round-trip trial");
     expect(trial).toContain("Browser-local experimental workflow");
@@ -174,8 +134,8 @@ describe("Tier 1 Project round-trip trial boundary", () => {
     expect(entry).toContain("Choose a disposable Project XML source");
     expect(entry).toContain("Choose Project XML/MSPDI");
     for (const html of [projects, entry, tasks, critical, settings]) {
-      expect(html).not.toContain("Calciner 2026 Shutdown");
-      expect(html).not.toContain("D2 Stack");
+      expect(html).not.toContain("Calciner major shutdown");
+      expect(html).not.toContain("Morgan Lee");
       expect(html).not.toContain("Tier 2 reporting owner");
     }
     for (const html of [tasks, critical, settings]) {
@@ -186,12 +146,13 @@ describe("Tier 1 Project round-trip trial boundary", () => {
 });
 
 describe("ordinary Console review data fetching", () => {
-  it("stays synthetic until a project ID is configured", async () => {
+  it("stays unconfigured until a project ID is supplied", async () => {
     const config = buildConsoleReviewConfig({ VITE_SHUTDOWN_TRACKER_API_BASE_URL: " http://localhost:8080 ", VITE_SHUTDOWN_TRACKER_PROJECT_ID: " " });
     const data = await loadConsoleReviewData(config);
     expect(config.liveEnabled).toBe(false);
-    expect(data.mode).toBe("synthetic");
+    expect(data.mode).toBe("unconfigured");
     expect(data.snapshots).toEqual([]);
+    expect(data.message).toContain("No project is configured");
   });
 
   it("uses GET only for configured import snapshot reads", async () => {

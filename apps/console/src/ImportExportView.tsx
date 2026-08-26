@@ -21,16 +21,14 @@ import {
 type ImportExportSection = (typeof importExportSections)[number];
 
 export function ImportExportView({
-  shellProjectLabel,
   reviewData,
   loadState,
   onRefresh,
-  initialSection = "Current Schedule",
+  initialSection = "Import",
   roundTripTrialMode = false,
   roundTripState = null,
   onRoundTripChange = () => undefined
 }: {
-  shellProjectLabel: string;
   reviewData: ConsoleReviewData | null;
   loadState: ConsoleReviewLoadState;
   onRefresh: () => void;
@@ -42,7 +40,7 @@ export function ImportExportView({
   const [active, setActive] = useState<ImportExportSection>(initialSection);
   const reviewRows = useMemo(() => buildReviewRows(reviewData), [reviewData]);
   const liveEnabled = !roundTripTrialMode && reviewApiRuntimeConfig.liveEnabled;
-  const ordinaryMode = roundTripTrialMode ? "Browser-local experimental trial" : liveEnabled ? "Read-only API-wired" : "Static visual only";
+  const ordinaryMode = roundTripTrialMode ? "Browser-local experimental trial" : liveEnabled ? "Read-only API-wired" : "Not configured";
   const selectedSnapshot = reviewData?.snapshotDetail?.snapshot ?? null;
 
   return (
@@ -61,7 +59,7 @@ export function ImportExportView({
       {liveEnabled && (
         <div className="review-context-warning" role="note">
           <strong>Configured read-only source</strong>
-          <span>The static shell project is {shellProjectLabel}. Snapshot reads use configured project <code>{reviewApiRuntimeConfig.projectId}</code>; switching the visual shell does not retarget that environment value.</span>
+          <span>Snapshot reads use configured project <code>{reviewApiRuntimeConfig.projectId}</code>. This read-only configuration does not activate a Tracker project.</span>
         </div>
       )}
       <nav className="section-tabs" aria-label="Import and Export sections">
@@ -80,7 +78,7 @@ export function ImportExportView({
       {active === "Current Schedule" && (
         <section className="schedule-grid">
           <article className="detail-panel">
-            <PanelHeading title="Current Schedule" detail={roundTripTrialMode ? "Temporary browser-memory source context." : "Configured import snapshot or static product-trial context."} />
+            <PanelHeading title="Current Schedule" detail={roundTripTrialMode ? "Temporary browser-memory source context." : "Configured read-only import context; no active Tracker project."} />
             <dl className="detail-list">
               <div><dt>Mode</dt><dd>{ordinaryMode}</dd></div>
               {roundTripTrialMode ? <>
@@ -90,7 +88,7 @@ export function ImportExportView({
                 <div><dt>Source-file SHA-256</dt><dd>{roundTripState?.session.source.hash ? <code>{roundTripState.session.source.hash}</code> : "Unavailable until a source is selected"}</dd></div>
                 <div><dt>Persistence</dt><dd>Browser memory only</dd></div>
               </> : <>
-                <div><dt>Static shell project</dt><dd>{shellProjectLabel}</dd></div>
+                <div><dt>Active Tracker project</dt><dd>None</dd></div>
                 <div><dt>Configured import project</dt><dd>{reviewData?.projectId ?? "No backend project configured"}</dd></div>
                 <div><dt>Snapshots returned</dt><dd>{reviewData?.snapshots.length ?? 0}</dd></div>
                 <div><dt>Selected snapshot</dt><dd>{selectedSnapshot ? `v${selectedSnapshot.snapshotVersion} · ${selectedSnapshot.status}` : "No imported snapshot selected"}</dd></div>
@@ -259,7 +257,7 @@ function ImportReview({
       <section className="table-panel">
         <div className="panel-heading import-review-heading">
           <div><h2>Persisted import review</h2><p>Configured snapshot list/detail reads only.</p></div>
-          <StatusLabel tone={liveEnabled ? "info" : "warning"}>{liveEnabled ? "Read-only API-wired" : "Static visual only"}</StatusLabel>
+          <StatusLabel tone={liveEnabled ? "info" : "warning"}>{liveEnabled ? "Read-only API-wired" : "Not configured"}</StatusLabel>
         </div>
         <ReviewRows rows={reviewRows} />
         <div className="disabled-action-row">

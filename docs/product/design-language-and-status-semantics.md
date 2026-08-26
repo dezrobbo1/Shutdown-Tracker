@@ -41,7 +41,7 @@ Examples:
 | --- | --- |
 | Execution review console | Execution review |
 | Mobile shell | Assigned tasks |
-| Visual state only | Visual review shell. Static/synthetic data. No production write workflow. |
+| Visual state only | No connected project or assignment data. No production write workflow. |
 | Thread may be out of date | Last synced at [time] for task/progress surfaces |
 | Real-time collaboration | Needs response / assigned action / blocker owner |
 
@@ -266,5 +266,5 @@ Before accepting a frontend visual PR, confirm:
 - Critical configuration uses the supported catalogue rather than a generic form builder;
 - no screen implies hidden `.mpp` update;
 - no screen introduces scheduler visuals or chat;
-- synthetic labels are sanitized and realistic;
+- ordinary runtime shells do not contain fabricated operational records;
 - controls that are not wired are disabled or explicitly visual-only.
