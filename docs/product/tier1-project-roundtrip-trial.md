@@ -35,13 +35,21 @@ The inspector extracts the bounded source facts it can support safely, including
 
 This first adapter requires every imported task row used by the temporary hierarchy to have one unique UID and a valid, continuous Outline Level. Planned Start and Finish remain nullable imported facts; the adapter does not invent them. Contradictory supplied dates, unsupported values, duplicate identity, or discontinuous hierarchy stop the trial with an explicit error rather than being inferred. That bounded admission rule is not a claim of complete MSPDI semantic support.
 
-The controllable clock starts from Project Status Date where present, otherwise the earliest supported planned start, otherwise a labelled synthetic fallback. All generated Tracker events use that trial time.
+## Current location time
+
+The Console uses the browser/device's current instant in the IANA time zone detected when the trial starts. The displayed clock and `Today`/attention projections refresh from that source, and each Can't Start, Start, Pause, Resume, Finish, progress, problem-resolution, or action-completion submission reads the clock again before recording the event. Timestamps use whole-minute precision because that is the current trial model and candidate policy.
+
+The trial does not use Project `StatusDate`, the earliest planned Start, or a fixed fallback as execution time. Those values remain immutable imported schedule facts. Manual time advance and planned-start jump controls are not provided.
+
+In this browser-only boundary, “location” means the device-configured IANA time zone at session activation. The zone is fixed for that temporary session so its evidence basis cannot change silently; discard and restart after changing device location/time zone. It is not inferred from Project XML, GPS, or IP address and is not verified by a server. Production project/site time-zone and operational-day configuration remain unbuilt; the current `Today` view therefore uses local calendar midnight.
+
+Because the trial records timezone-neutral local wall-clock values, a daylight-saving fall-back can repeat an earlier minute. New updates fail closed while current local time is earlier than existing evidence; the Console preserves prior projections and instructs the reviewer to wait through the repeated interval or reset/discard the temporary session. A future production clock model must preserve an absolute instant separately from the reviewed Project-local field value.
 
 ## Tier 1 execution evidence
 
 From an imported leaf Task Dashboard, Tier 1 may exercise Can't Start, Start, Pause, Resume, Finish, and a plain-language field-progress observation. The approved semantics remain unchanged: planned dates alone do not establish In Progress, Can't Start remains Not Started, Pause need not be an adverse delay, Resume does not silently close a linked problem, and progress alone does not silently create Start.
 
-These events are temporary Tracker evidence. They do not update the imported source or establish production execution persistence.
+These events are temporary Tracker evidence. They do not update the imported source or establish production execution persistence. If the device clock changes so a new timestamp would precede existing local evidence, the trial fails closed and asks the reviewer to correct the device setting.
 
 ## Experimental mapping review
 
@@ -78,7 +86,7 @@ The reviewer may record an in-memory disposition: Works as expected, Mapping nee
 
 ## Reset and disposal
 
-Reset returns the temporary session to its imported-source baseline and removes generated execution facts, mappings, candidates, comparisons, annotations, and dispositions without changing the retained source text. Discard or reload removes the browser-memory project entirely. No trial history is written to a backend, database, `localStorage`, or master Project file.
+Reset returns the temporary session to its imported-source baseline at the then-current device time and removes generated execution facts, mappings, candidates, comparisons, annotations, and dispositions without changing the retained source text. Discard or reload removes the browser-memory project entirely. No trial history is written to a backend, database, `localStorage`, or master Project file.
 
 ## Questions this trial can inform
 
