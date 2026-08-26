@@ -324,6 +324,24 @@ describe("Tier 1 Project round-trip comparison", () => {
     }).differences[0].classification).toBe("Unclassified difference — manual review required");
   });
 
+  it("surfaces Project duration-format changes for manual review", () => {
+    const candidate = preview([task({ durationFormat: 5 })]);
+    const projectResult = preview([task({ durationFormat: 6 })]);
+    const differences = buildConservativeProjectDifferences({
+      candidateXml: "<candidate />",
+      resultXml: "<result />",
+      selectedChanges: [],
+      candidate,
+      projectResult
+    });
+
+    expect(differences).toContainEqual(expect.objectContaining({
+      path: "Task UID task-uid-2 / DurationFormat",
+      candidateValue: 5,
+      resultValue: 6
+    }));
+  });
+
   it("surfaces equal-length uninterpreted XML changes without creating an equal-value difference", () => {
     const samePreview = preview([task()]);
     const differences = buildConservativeProjectDifferences({
@@ -384,6 +402,10 @@ describe("Tier 1 Project round-trip comparison", () => {
       .not.toThrow();
     expect(() => assertCandidatePreviewPreserved(source, preview([task({ wbs: "9.9" })])))
       .toThrow(/schedule context.*wbs/i);
+    expect(() => assertCandidatePreviewPreserved(source, preview([task({ durationFormat: 8 })])))
+      .toThrow(/schedule context.*durationFormat/i);
+    expect(() => assertCandidatePreviewPreserved(source, { ...preview([task()]), minutesPerDay: 600 }))
+      .toThrow(/duration-display context/i);
     expect(() => assertCandidatePreviewPreserved(source, preview([])))
       .toThrow(/task structure/i);
   });
@@ -395,6 +417,10 @@ function preview(tasks: ProjectXmlTaskPreview[], projectUid: string | null = "pr
     projectName: "Synthetic Project round-trip",
     projectUid,
     statusDate: "2026-08-24T06:00:00",
+    defaultDurationFormat: 5,
+    minutesPerDay: 480,
+    minutesPerWeek: 2400,
+    daysPerMonth: 20,
     taskCount: tasks.length,
     summaryTaskCount,
     leafTaskCount: tasks.length - summaryTaskCount,
@@ -414,6 +440,7 @@ function task(overrides: Partial<ProjectXmlTaskPreview> = {}): ProjectXmlTaskPre
     start: "2026-08-24T06:00:00",
     finish: "2026-08-24T10:00:00",
     duration: "PT4H0M0S",
+    durationFormat: 5,
     actualStart: null,
     actualFinish: null,
     percentComplete: 0,

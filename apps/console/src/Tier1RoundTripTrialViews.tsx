@@ -24,7 +24,12 @@ import {
   type ProjectXmlCandidateResult,
   type ProjectXmlMappingField
 } from "./projectXmlCandidate";
-import { parseProjectXmlPreview, readUtf8ProjectXml, type ProjectXmlPreview } from "./projectXmlPreview";
+import {
+  formatImportedProjectDuration,
+  parseProjectXmlPreview,
+  readUtf8ProjectXml,
+  type ProjectXmlPreview
+} from "./projectXmlPreview";
 import {
   applyTier1RoundTripRecordAction,
   applyTier1RoundTripExecutionAction,
@@ -36,6 +41,7 @@ import {
   readTier1RoundTripLocationClock,
   recordTier1RoundTripProgress,
   resetTier1RoundTripSession,
+  selectTier1RoundTripTaskRows,
   tier1RoundTripLocalDayWindow,
   TIER1_ROUNDTRIP_ACTOR_ID,
   updateTier1RoundTripMappingSelection,
@@ -241,16 +247,17 @@ export function Tier1RoundTripImportPanel({
               <div><dt>Project</dt><dd>{source.preview.projectName}</dd></div>
               <div><dt>Project UID</dt><dd>{source.preview.projectUid ?? "Not supplied"}</dd></div>
               <div><dt>Status date</dt><dd>{source.preview.statusDate ?? "Not supplied"}</dd></div>
-              <div><dt>Tasks</dt><dd>{source.preview.taskCount}</dd></div>
-              <div><dt>Leaf tasks</dt><dd>{source.preview.leafTaskCount}</dd></div>
+              <div><dt>Source task rows</dt><dd>{source.preview.taskCount}</dd></div>
+              <div><dt>Tracked leaf tasks</dt><dd>{source.preview.leafTaskCount}</dd></div>
+              <div><dt>Summary hierarchy rows</dt><dd>{source.preview.summaryTaskCount}</dd></div>
               <div><dt>Original source-file SHA-256</dt><dd><code>{source.sha256}</code></dd></div>
             </dl>
             <div className="import-task-tools">
-              <label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported tasks</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search task, WBS, UID, or ID" /></label>
-              <span>{visibleTasks.length} task rows</span>
+              <label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported source rows</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search task, WBS, UID, or ID" /></label>
+              <span>{visibleTasks.filter((task) => !task.summary).length} tracked leaf tasks · {visibleTasks.filter((task) => task.summary).length} hierarchy rows</span>
             </div>
-            <RoundTripSourceTaskTable tasks={visibleTasks.slice(0, rowLimit)} />
-            {visibleTasks.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, visibleTasks.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {visibleTasks.length} matching rows.</span></div> : null}
+            <RoundTripSourceTaskTable tasks={visibleTasks.slice(0, rowLimit)} settings={source.preview} />
+            {visibleTasks.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, visibleTasks.length - rowLimit)} more rows</button><span>Showing {rowLimit} of {visibleTasks.length} matching rows.</span></div> : null}
           </>
         ) : null}
         <div className="disabled-action-row">
@@ -313,11 +320,12 @@ export function Tier1RoundTripTasksView({
 }) {
   const [query, setQuery] = useState("");
   const [rowLimit, setRowLimit] = useState(TASK_TABLE_PAGE_SIZE);
-  const normalized = query.trim().toLowerCase();
   const rows = useMemo(
-    () => state.session.trialState.tasks.filter((task) => !normalized || `${task.wbs} ${task.name}`.toLowerCase().includes(normalized)),
-    [normalized, state.session.trialState.tasks]
+    () => selectTier1RoundTripTaskRows(state.session.trialState.tasks, query),
+    [query, state.session.trialState.tasks]
   );
+  const trackedLeafCount = rows.filter((task) => !task.summary).length;
+  const hierarchyRowCount = rows.length - trackedLeafCount;
   const identityByTaskId = useMemo(
     () => new Map(state.session.sourceTasks.map((task) => [task.trialTaskId, task])),
     [state.session.sourceTasks]
@@ -328,13 +336,44 @@ export function Tier1RoundTripTasksView({
   );
   return (
     <>
-      <PageHeading eyebrow="Tasks · imported round-trip schedule" title={state.session.trialState.project.name} description="Temporary hierarchy and execution truth derived from the selected Project XML source." status="Browser-local experimental trial" />
-      <section className="explorer-tools"><label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported trial tasks</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search WBS or task" /></label><span>Showing {Math.min(rowLimit, rows.length)} of {rows.length} matching rows</span></section>
-      <section className="table-panel"><div className="table-scroll"><table className="data-table task-table"><thead><tr><th>WBS / task</th><th>Project UID / ID</th><th>Execution state</th><th>Planned window</th><th>Imported / Tracker progress</th><th>Authority</th></tr></thead><tbody>{rows.slice(0, rowLimit).map((task) => {
-        const projection = selectTaskProjection(currentTrialState, task.id);
-        const identity = identityByTaskId.get(task.id);
-        return <tr key={task.id} className={task.summary ? "summary-row" : ""}><td><div className="task-name-cell" style={{ paddingInlineStart: `${task.depth * 20}px` }}><span className="wbs">{task.wbs}</span><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.name}</button></div></td><td>UID {identity?.projectTaskUid ?? "—"}<small>ID {identity?.projectTaskId ?? "—"}</small></td><td><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{projection.attention.join(" · ") || "No attention"}</small></td><td>{formatImportedTrialMinute(task.plannedStart)}<small>to {formatImportedTrialMinute(task.plannedFinish)}</small></td><td><strong>{projection.progressPercent}%</strong><small>{projection.progressBasis}</small></td><td>{task.summary ? "Read-only summary" : "Tier 1 may execute"}</td></tr>;
-      })}</tbody></table></div>{rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more tasks</button><span>Large imported schedules stay responsive by rendering rows progressively.</span></div> : null}</section>
+      <PageHeading eyebrow="Tasks · imported round-trip schedule" title={state.session.trialState.project.name} description="Only imported leaf tasks are tracked. Summary rows remain non-operational Project hierarchy context." status="Browser-local experimental trial" />
+      <section className="explorer-tools"><label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported trial tasks</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search WBS or task" /></label><span>{trackedLeafCount} matching tracked leaf tasks · {hierarchyRowCount} hierarchy rows</span></section>
+      <section className="table-panel">
+        <div className="table-scroll">
+          <table className="data-table task-table">
+            <thead><tr><th>WBS / task</th><th>Project UID / ID</th><th>Tracking state</th><th>Planned window</th><th>Duration</th><th>Imported / Tracker progress</th><th>Authority</th></tr></thead>
+            <tbody>{rows.slice(0, rowLimit).map((task) => {
+              const identity = identityByTaskId.get(task.id);
+              if (task.summary) {
+                return (
+                  <tr key={task.id} className="summary-row">
+                    <td><div className="task-name-cell" style={{ paddingInlineStart: `${task.depth * 20}px` }}><span className="wbs">{task.wbs}</span><strong>{task.name}</strong></div></td>
+                    <td>UID {identity?.projectTaskUid ?? "—"}<small>ID {identity?.projectTaskId ?? "—"}</small></td>
+                    <td><strong>Hierarchy only</strong><small>Not a tracked task</small></td>
+                    <td>{formatImportedTrialMinute(task.plannedStart)}<small>to {formatImportedTrialMinute(task.plannedFinish)}</small></td>
+                    <td>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</td>
+                    <td>Not tracked</td>
+                    <td>No execution record</td>
+                  </tr>
+                );
+              }
+              const projection = selectTaskProjection(currentTrialState, task.id);
+              return (
+                <tr key={task.id}>
+                  <td><div className="task-name-cell" style={{ paddingInlineStart: `${task.depth * 20}px` }}><span className="wbs">{task.wbs}</span><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.name}</button></div></td>
+                  <td>UID {identity?.projectTaskUid ?? "—"}<small>ID {identity?.projectTaskId ?? "—"}</small></td>
+                  <td><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{projection.attention.join(" · ") || "No attention"}</small></td>
+                  <td>{formatImportedTrialMinute(task.plannedStart)}<small>to {formatImportedTrialMinute(task.plannedFinish)}</small></td>
+                  <td>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</td>
+                  <td><strong>{projection.progressPercent}%</strong><small>{projection.progressBasis}</small></td>
+                  <td>Tier 1 may execute</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+        {rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more rows</button><span>Large imported schedules stay responsive by rendering source rows progressively.</span></div> : null}
+      </section>
     </>
   );
 }
@@ -379,6 +418,10 @@ export function Tier1RoundTripTodayView({
         : [];
     });
   }, [currentTrialState, windowEnd, windowStart]);
+  const identityByTaskId = useMemo(
+    () => new Map(state.session.sourceTasks.map((task) => [task.trialTaskId, task])),
+    [state.session.sourceTasks]
+  );
   const counts = new Map<ExecutionState, number>([["Not Started", 0], ["In Progress", 0], ["Paused", 0], ["Completed", 0]]);
   for (const { executionState } of rows) {
     const value = executionState;
@@ -388,7 +431,7 @@ export function Tier1RoundTripTodayView({
     <>
       <PageHeading eyebrow="Today · imported round-trip schedule" title="Local calendar-day projection" description={`${formatRoundTripMinute(windowStart).replace("T", " ")} to ${formatRoundTripMinute(windowEnd).replace("T", " ")} · ${state.session.locationTimeZone}`} status="Browser-local experimental trial" />
       <section className="status-strip roundtrip-status-strip">{["Not Started", "In Progress", "Paused", "Completed"].map((label) => <div key={label}><span>{label}</span><strong>{counts.get(label as ExecutionState) ?? 0}</strong></div>)}</section>
-      <section className="table-panel"><PanelHeading title="Imported work in period" detail="Planned passage creates attention only; it never creates In Progress." /><div className="table-scroll"><table className="data-table"><thead><tr><th>Task</th><th>State</th><th>Attention</th></tr></thead><tbody>{rows.slice(0, rowLimit).map(({ task, executionState }) => { const projection = selectTaskProjection(currentTrialState, task.id); return <tr key={task.id}><td><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.wbs} · {task.name}</button></td><td>{executionState}</td><td>{projection.attention.join(" · ") || "None"}</td></tr>; })}</tbody></table></div>{rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {rows.length} tasks in this trial day.</span></div> : null}</section>
+      <section className="table-panel"><PanelHeading title="Tracked leaf work in period" detail="Summary hierarchy rows are excluded. Planned passage creates attention only; it never creates In Progress." /><div className="table-scroll"><table className="data-table"><thead><tr><th>Task</th><th>Duration</th><th>State</th><th>Attention</th></tr></thead><tbody>{rows.slice(0, rowLimit).map(({ task, executionState }) => { const projection = selectTaskProjection(currentTrialState, task.id); const identity = identityByTaskId.get(task.id); return <tr key={task.id}><td><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.wbs} · {task.name}</button></td><td>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</td><td>{executionState}</td><td>{projection.attention.join(" · ") || "None"}</td></tr>; })}</tbody></table></div>{rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {rows.length} tracked leaf tasks in this trial day.</span></div> : null}</section>
     </>
   );
 }
@@ -410,15 +453,28 @@ export function Tier1RoundTripTaskDashboard({
     () => projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute),
     [currentMinute, state.session.trialState]
   );
-  const projection = selectTaskProjection(currentTrialState, taskId);
+  const task = currentTrialState.tasks.find((item) => item.id === taskId);
   const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId);
   const [active, setActive] = useState("Overview");
   const tabs = ["Overview", "Execution", "People", "Discussion", "Delays / Problems", "Actions", "Evidence", "History", "Project context"];
+  if (!task || task.summary) {
+    return (
+      <>
+        <button className="back-link" type="button" onClick={onBack}>← Back to Tasks</button>
+        <section className="detail-panel roundtrip-empty-project">
+          <h1>{task?.name ?? "Task unavailable"}</h1>
+          <p>{task ? "This imported summary row is Project hierarchy context only. It has no tracked-task dashboard or execution record." : "The requested imported leaf task is unavailable in this temporary session."}</p>
+          <button className="button-primary" type="button" onClick={onBack}>Return to tracked leaf tasks</button>
+        </section>
+      </>
+    );
+  }
+  const projection = selectTaskProjection(currentTrialState, taskId);
   return (
     <>
       <button className="back-link" type="button" onClick={onBack}>← Back to Tasks</button>
-      <PageHeading eyebrow={`${projection.task.wbs} · Project UID ${identity?.projectTaskUid ?? "—"}`} title={projection.task.name} description={projection.task.summary ? "Imported summary task · not executable" : "Executable leaf · Tier 1 has unrestricted project authority"} status="Browser-local experimental trial" />
-      <section className="task-state-header"><div><span>Execution state</span><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{roundTripExecutionBasis(state, taskId)}</small></div><div><span>Schedule attention</span><strong>{projection.attention.join(" · ") || "None"}</strong><small>Attention remains separate from execution.</small></div><div><span>Tier 1 authority</span><strong>{projection.task.summary ? "Summary read-only" : "May execute this task"}</strong><small>No assignment/category restriction.</small></div></section>
+      <PageHeading eyebrow={`${projection.task.wbs} · Project UID ${identity?.projectTaskUid ?? "—"}`} title={projection.task.name} description="Tracked executable leaf · Tier 1 has unrestricted project authority" status="Browser-local experimental trial" />
+      <section className="task-state-header"><div><span>Execution state</span><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{roundTripExecutionBasis(state, taskId)}</small></div><div><span>Schedule attention</span><strong>{projection.attention.join(" · ") || "None"}</strong><small>Attention remains separate from execution.</small></div><div><span>Tier 1 authority</span><strong>May execute this task</strong><small>No assignment/category restriction.</small></div></section>
       <nav className="section-tabs roundtrip-dashboard-tabs" aria-label="Imported Task Dashboard sections">{tabs.map((tab) => <button type="button" className={active === tab ? "selected" : ""} aria-current={active === tab ? "page" : undefined} onClick={() => setActive(tab)} key={tab}>{tab}</button>)}</nav>
       <section className="detail-panel trial-dashboard-panel">
         {active === "Overview" ? <RoundTripOverview state={state} currentMinute={currentMinute} taskId={taskId} /> : null}
@@ -687,7 +743,11 @@ function Tier1ExecutionPanel({
   );
 }
 
-function RoundTripOverview({ state, currentMinute, taskId }: { state: Tier1RoundTripWorkspaceState; currentMinute: number; taskId: string }) { const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId); return <><PanelHeading title="Overview" detail="Imported Project facts and local Tracker truth." /><dl className="detail-list"><div><dt>Execution</dt><dd>{projection.executionState}</dd></div><div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div><div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div><div><dt>Active problems</dt><dd>{projection.activeProblems.length}</dd></div></dl></>; }
+function RoundTripOverview({ state, currentMinute, taskId }: { state: Tier1RoundTripWorkspaceState; currentMinute: number; taskId: string }) {
+  const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId);
+  const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId);
+  return <><PanelHeading title="Overview" detail="Imported Project facts and local Tracker truth." /><dl className="detail-list"><div><dt>Execution</dt><dd>{projection.executionState}</dd></div><div><dt>Imported duration</dt><dd>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</dd></div><div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div><div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div><div><dt>Active problems</dt><dd>{projection.activeProblems.length}</dd></div></dl></>;
+}
 function RoundTripPeople({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const task = state.session.trialState.tasks.find((item) => item.id === taskId); return <><PanelHeading title="People" detail="Authority is explicit and browser-local for this Tier 1-only trial." /><dl className="detail-list"><div><dt>Current operator</dt><dd>Tier 1 round-trip reviewer</dd></div><div><dt>Task authority</dt><dd>{task?.summary ? "Summary inspection only" : "May execute and update this leaf"}</dd></div><div><dt>Derived assignments</dt><dd>None — Project resource data never creates application authority</dd></div></dl></>; }
 function RoundTripProblems({ state, currentMinute, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; currentMinute: number; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
   const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId);
@@ -701,9 +761,9 @@ function RoundTripActions({ state, currentMinute, taskId, onChange }: { state: T
 }
 function RoundTripPlaceholder({ title, detail }: { title: string; detail: string }) { return <><PanelHeading title={title} detail="Browser-local experimental trial" /><p className="trial-placeholder">{detail}</p></>; }
 function RoundTripTaskHistory({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const progressEvents = state.session.history.filter((item) => item.taskId === taskId && item.type === "progress-observation"); const events = [...state.session.trialState.history.filter((item) => item.taskId === taskId), ...progressEvents].sort((a, b) => b.at - a.at); return <><PanelHeading title="History" detail="Imported activation and local execution/progress events." /><ol className="activity-list trial-history-list">{events.map((event) => <li key={event.id}><strong>{formatRoundTripMinute(event.at).replace("T", " ")}</strong><span>{event.summary}</span></li>)}</ol></>; }
-function RoundTripProjectContext({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId); return <><PanelHeading title="Project context" detail="Immutable imported identity and source values." /><dl className="detail-list"><div><dt>Project task UID / ID</dt><dd>{identity?.projectTaskUid} / {identity?.projectTaskId ?? "—"}</dd></div><div><dt>WBS</dt><dd>{identity?.wbs ?? "—"}</dd></div><div><dt>Imported Actual Start</dt><dd>{identity?.sourceValues.actualStart ?? "Absent"}</dd></div><div><dt>Imported Actual Finish</dt><dd>{identity?.sourceValues.actualFinish ?? "Absent"}</dd></div><div><dt>Imported % Complete</dt><dd>{identity?.sourceValues.percentComplete ?? "Absent"}</dd></div></dl></>; }
+function RoundTripProjectContext({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId); return <><PanelHeading title="Project context" detail="Immutable imported identity and source values." /><dl className="detail-list"><div><dt>Project task UID / ID</dt><dd>{identity?.projectTaskUid} / {identity?.projectTaskId ?? "—"}</dd></div><div><dt>WBS</dt><dd>{identity?.wbs ?? "—"}</dd></div><div><dt>Imported Start</dt><dd>{identity?.sourceValues.start ?? "Absent"}</dd></div><div><dt>Imported Finish</dt><dd>{identity?.sourceValues.finish ?? "Absent"}</dd></div><div><dt>Imported Duration</dt><dd>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</dd></div><div><dt>Imported Actual Start</dt><dd>{identity?.sourceValues.actualStart ?? "Absent"}</dd></div><div><dt>Imported Actual Finish</dt><dd>{identity?.sourceValues.actualFinish ?? "Absent"}</dd></div><div><dt>Imported % Complete</dt><dd>{identity?.sourceValues.percentComplete ?? "Absent"}</dd></div></dl></>; }
 function TemporaryProjectSummary({ state }: { state: Tier1RoundTripWorkspaceState }) { return <section className="detail-panel"><PanelHeading title="Temporary round-trip trial active" detail="Imported source is the current browser-memory schedule context." /><dl className="detail-list"><div><dt>Source</dt><dd>{state.session.source.fileName}</dd></div><div><dt>Project</dt><dd>{state.session.trialState.project.name}</dd></div><div><dt>Time source</dt><dd>{state.session.initialTimeSource} · {state.session.locationTimeZone}</dd></div><div><dt>Persistence</dt><dd>None</dd></div></dl></section>; }
-function RoundTripSourceTaskTable({ tasks }: { tasks: ProjectXmlPreview["tasks"] }) { return <div className="table-scroll"><table className="data-table import-task-table"><thead><tr><th>WBS / task</th><th>UID</th><th>ID</th><th>Type</th><th>Start</th><th>Finish</th><th>Imported progress</th></tr></thead><tbody>{tasks.map((task, index) => <tr key={`${task.uid ?? "no-uid"}:${task.id ?? "no-id"}:${index}`} className={task.summary ? "summary-row" : ""}><td>{task.wbs ?? task.outlineNumber ?? "—"} · {task.name}</td><td>{task.uid ?? "—"}</td><td>{task.id ?? "—"}</td><td>{task.summary ? "Summary" : "Leaf"}</td><td>{task.start ?? "—"}</td><td>{task.finish ?? "—"}</td><td>{task.percentComplete === null ? "—" : `${task.percentComplete}%`}</td></tr>)}</tbody></table></div>; }
+function RoundTripSourceTaskTable({ tasks, settings }: { tasks: ProjectXmlPreview["tasks"]; settings: ProjectXmlPreview }) { return <div className="table-scroll"><table className="data-table import-task-table"><thead><tr><th>WBS / task</th><th>UID</th><th>ID</th><th>Type</th><th>Start</th><th>Finish</th><th>Duration</th><th>Imported progress</th></tr></thead><tbody>{tasks.map((task, index) => <tr key={`${task.uid ?? "no-uid"}:${task.id ?? "no-id"}:${index}`} className={task.summary ? "summary-row" : ""}><td>{task.wbs ?? task.outlineNumber ?? "—"} · {task.name}</td><td>{task.uid ?? "—"}</td><td>{task.id ?? "—"}</td><td>{task.summary ? "Hierarchy summary" : "Tracked leaf"}</td><td>{task.start ?? "—"}</td><td>{task.finish ?? "—"}</td><td>{formatImportedProjectDuration(task.duration, task.durationFormat, settings)}</td><td>{task.percentComplete === null ? "—" : `${task.percentComplete}%`}</td></tr>)}</tbody></table></div>; }
 
 function stringifySourceValue(value: string | number | null) { return value === null ? null : String(value); }
 function normalizeComparableValue(field: ProjectXmlMappingField, value: string | number | null) { if (value === null) return null; return field === "PercentComplete" || field === "PhysicalPercentComplete" ? Number(value) : String(value); }

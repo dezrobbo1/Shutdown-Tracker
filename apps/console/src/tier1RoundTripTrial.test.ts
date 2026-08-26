@@ -14,6 +14,7 @@ import {
   readTier1RoundTripLocationClock,
   recordTier1RoundTripProgress,
   resetTier1RoundTripSession,
+  selectTier1RoundTripTaskRows,
   tier1RoundTripLocalDayWindow,
   updateTier1RoundTripMappingSelection,
   type Tier1RoundTripSession
@@ -58,10 +59,22 @@ describe("Tier 1 imported Project round-trip session", () => {
       sourceValues: {
         start: "2026-01-05T07:00:00",
         finish: "2026-01-05T12:00:00",
+        duration: "PT6H0M0S",
+        durationFormat: 5,
         percentComplete: 0,
         physicalPercentComplete: 15
       }
     });
+  });
+
+  it("keeps summary ancestry as hierarchy context when task search matches a leaf or work pack", () => {
+    const tasks = createSession().trialState.tasks;
+
+    expect(selectTier1RoundTripTaskRows(tasks, "Executable leaf").map((task) => task.name))
+      .toEqual(["Summary", "Executable leaf"]);
+    expect(selectTier1RoundTripTaskRows(tasks, "Summary").map((task) => task.name))
+      .toEqual(["Summary", "Executable leaf"]);
+    expect(selectTier1RoundTripTaskRows(tasks, "not present")).toEqual([]);
   });
 
   it("retains losslessly decoded source bytes, including a UTF-8 BOM", () => {
@@ -578,6 +591,31 @@ describe("Tier 1 imported Project round-trip session", () => {
       .toThrow("Unknown experimental mapping");
   });
 
+  it("never proposes or accepts an experimental mapping for a summary hierarchy row", () => {
+    const session = createSession();
+    const malformed = structuredClone(session);
+    malformed.trialState.executionEvents.push({
+      id: "malformed-summary-start",
+      taskId: "project-task-uid:10",
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+      type: "start",
+      at: TEST_START
+    });
+    expect(deriveTier1RoundTripMappingProposals(malformed)).toEqual([]);
+
+    expect(() => updateTier1RoundTripMappingSelection(session, [{
+      id: "summary-mapping",
+      trackerFactId: "malformed-summary-start",
+      trialTaskId: "project-task-uid:10",
+      projectTaskUid: "10",
+      trackerFact: "start",
+      projectField: "ActualStart",
+      sourceValue: null,
+      proposedValue: "2026-01-05T06:00:00",
+      included: false
+    }], "summary-mapping", { included: true })).toThrow("only to tracked leaf tasks");
+  });
+
   it("resets repeatably without changing the imported source", () => {
     const taskId = "project-task-uid:11";
     let session = createSession();
@@ -719,6 +757,10 @@ function preview(overrides: Partial<ProjectXmlPreview> = {}): ProjectXmlPreview 
     projectName: "Test imported schedule",
     projectUid: "11111111-1111-1111-1111-111111111111",
     statusDate: "2026-01-05T06:00:00",
+    defaultDurationFormat: 5,
+    minutesPerDay: 480,
+    minutesPerWeek: 2400,
+    daysPerMonth: 20,
     taskCount: 2,
     summaryTaskCount: 1,
     leafTaskCount: 1,
@@ -742,6 +784,7 @@ function task(overrides: Partial<ProjectXmlTaskPreview & { critical: boolean }> 
     start: "2026-01-05T06:00:00",
     finish: "2026-01-05T12:00:00",
     duration: "PT6H0M0S",
+    durationFormat: 5,
     actualStart: null,
     actualFinish: null,
     percentComplete: 0,

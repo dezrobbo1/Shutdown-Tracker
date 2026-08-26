@@ -38,6 +38,8 @@ export type RoundTripSourceTaskIdentity = {
   sourceValues: {
     start: string | null;
     finish: string | null;
+    duration: string | null;
+    durationFormat: number | null;
     actualStart: string | null;
     actualFinish: string | null;
     percentComplete: number | null;
@@ -131,6 +133,42 @@ export type Tier1ProgressObservationInput = {
   nextIssue?: string;
   note?: string;
 };
+
+export function selectTier1RoundTripTaskRows(tasks: readonly TrialTask[], query: string): TrialTask[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [...tasks];
+
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const childrenByParentId = new Map<string, TrialTask[]>();
+  for (const task of tasks) {
+    if (task.parentId === null) continue;
+    const children = childrenByParentId.get(task.parentId) ?? [];
+    children.push(task);
+    childrenByParentId.set(task.parentId, children);
+  }
+
+  const included = new Set<string>();
+  for (const task of tasks) {
+    if (!`${task.wbs} ${task.name}`.toLowerCase().includes(normalized)) continue;
+    included.add(task.id);
+
+    let parentId = task.parentId;
+    while (parentId !== null && !included.has(parentId)) {
+      included.add(parentId);
+      parentId = taskById.get(parentId)?.parentId ?? null;
+    }
+
+    if (!task.summary) continue;
+    const pending = [...(childrenByParentId.get(task.id) ?? [])];
+    for (let index = 0; index < pending.length; index += 1) {
+      const descendant = pending[index];
+      if (included.has(descendant.id)) continue;
+      included.add(descendant.id);
+      pending.push(...(childrenByParentId.get(descendant.id) ?? []));
+    }
+  }
+  return tasks.filter((task) => included.has(task.id));
+}
 
 type PreviewTaskWithCritical = ProjectXmlTaskPreview & { critical?: boolean };
 
@@ -315,7 +353,7 @@ export function deriveTier1RoundTripMappingProposals(
   for (const event of session.trialState.executionEvents) {
     if (event.type !== "start" && event.type !== "finish") continue;
     const identity = session.sourceTasks.find((task) => task.trialTaskId === event.taskId);
-    if (!identity) continue;
+    if (!identity || identity.summary) continue;
     proposals.push({
       id: `mapping-${event.id}`,
       trackerFactId: event.id,
@@ -330,7 +368,7 @@ export function deriveTier1RoundTripMappingProposals(
   }
   for (const observation of session.trialState.progressObservations) {
     const identity = session.sourceTasks.find((task) => task.trialTaskId === observation.taskId);
-    if (!identity) continue;
+    if (!identity || identity.summary) continue;
     proposals.push({
       id: `mapping-${observation.id}`,
       trackerFactId: observation.id,
@@ -367,6 +405,7 @@ export function updateTier1RoundTripMappingSelection(
     const next = { ...mapping, ...patch };
     const identity = session.sourceTasks.find((task) => task.trialTaskId === mapping.trialTaskId);
     if (!identity) throw new Error(`Unknown imported trial task ${mapping.trialTaskId}.`);
+    if (identity.summary) throw new Error("Experimental execution/progress mappings apply only to tracked leaf tasks.");
     if (Object.hasOwn(patch, "projectField")) {
       next.included = false;
       if (next.projectField === "PercentComplete") next.sourceValue = identity.sourceValues.percentComplete;
@@ -553,6 +592,8 @@ function adaptImportedProjectToTrialState(
       sourceValues: {
         start: task.start,
         finish: task.finish,
+        duration: task.duration,
+        durationFormat: task.durationFormat,
         actualStart: task.actualStart,
         actualFinish: task.actualFinish,
         percentComplete: task.percentComplete,
@@ -700,8 +741,4 @@ function executionActionLabel(type: Tier1RoundTripExecutionAction["type"]) {
     finish: "Finish"
   };
   return labels[type];
-}
-
-export function roundTripTaskExecutionState(session: Tier1RoundTripSession, taskId: string) {
-  return selectExecutionState(session.trialState, taskId);
 }

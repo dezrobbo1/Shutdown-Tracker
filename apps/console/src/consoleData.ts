@@ -28,13 +28,13 @@ export function buildReviewRows(reviewData: ConsoleReviewData | null): ReviewRow
   const snapshots = reviewData.snapshots.map((snapshot) => ({
     item: snapshot.externalProjectName ?? `Snapshot ${snapshot.snapshotVersion}`,
     source: `Snapshot v${snapshot.snapshotVersion}`,
-    state: `${snapshot.status} · ${snapshot.taskCount} tasks`,
+    state: `${snapshot.status} · ${snapshot.leafTaskCount} leaf tasks · ${snapshot.summaryTaskCount} summary rows`,
     context: `Batch ${shortId(snapshot.importBatchId)}`
   }));
   const tasks = reviewData.snapshotDetail?.tasks.slice(0, 3).map((task) => ({
     item: task.name ?? task.externalId ?? "Unnamed imported task",
-    source: task.summary ? "Summary task" : "Leaf task",
-    state: "Imported task context",
+    source: task.summary ? "Summary hierarchy row" : "Leaf task",
+    state: task.summary ? "Imported hierarchy context" : "Imported leaf context",
     context: task.outlineNumber ?? task.wbs ?? "Imported task"
   })) ?? [];
   return [...snapshots, ...tasks];

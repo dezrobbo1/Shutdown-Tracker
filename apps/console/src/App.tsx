@@ -152,6 +152,8 @@ export function App({
   }
 
   function openTask(nextTaskId: string) {
+    const importedTask = roundTripState?.session.trialState.tasks.find((task) => task.id === nextTaskId);
+    if (roundTripState && (!importedTask || importedTask.summary)) return;
     setTaskId(nextTaskId);
   }
 
@@ -259,11 +261,11 @@ export function RoundTripNoScheduleView({ onOpenImport }: { onOpenImport: () => 
 
 export function RoundTripCriticalBoundary({ state, onOpenImport }: { state: Tier1RoundTripWorkspaceState | null; onOpenImport: () => void }) {
   if (!state) return <RoundTripNoScheduleView onOpenImport={onOpenImport} />;
-  const flagged = state.session.sourceTasks.filter((task) => task.critical).length;
+  const flagged = state.session.sourceTasks.filter((task) => task.critical && !task.summary).length;
   return (
     <section className="detail-panel roundtrip-context-boundary">
       <h1>Critical · imported Project context</h1>
-      <p>{flagged} imported task{flagged === 1 ? " is" : "s are"} marked Critical in the selected source. This schedule fact never limits Tier 1 authority or creates Critical ownership.</p>
+      <p>{flagged} imported leaf task{flagged === 1 ? " is" : "s are"} marked Critical in the selected source. Critical summary rows remain hierarchy context only. This schedule fact never limits Tier 1 authority or creates Critical ownership.</p>
       <dl className="detail-list">
         <div><dt>Tier 1 authority</dt><dd>Every executable leaf, regardless of Critical membership</dd></div>
         <div><dt>Trial configuration</dt><dd>No Critical reporting policy is invented from Project data</dd></div>
