@@ -15,6 +15,8 @@ The primary source types are:
 1. **Selected Project-critical leaf task** — a Tier 1-selected imported executable leaf task, using Project-critical context as selection information rather than automatic membership.
 2. **Critical Work Pack** — one Tier 1-selected imported summary task plus all descendants.
 
+Selecting a summary as the structural source of a Critical Work Pack does not turn that summary into a tracked execution task. Execution and field-progress truth remain on executable descendant leaves; the work-pack view aggregates or reports over that context.
+
 The first approved product UX exposes one summary task plus descendants for a Critical Work Pack. The existing V006 data foundation can represent multiple summary sources and must remain compatible, but multi-summary grouping is deferred and is not exposed in the first approved UX unless separately approved.
 
 Arbitrary leaf-task grouping is not part of the first approved UX.

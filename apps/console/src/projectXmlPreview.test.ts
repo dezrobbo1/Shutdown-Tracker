@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { parseProjectXmlPreview, readUtf8ProjectXml } from "./projectXmlPreview";
+import {
+  formatImportedProjectDuration,
+  parseProjectXmlPreview,
+  readUtf8ProjectXml
+} from "./projectXmlPreview";
 
 const PROJECT_NAMESPACE = "http://schemas.microsoft.com/project";
 
@@ -14,6 +18,12 @@ describe("browser MSPDI inspection", () => {
     expect(preview.projectName).toBe("Synthetic Trial Schedule");
     expect(preview.projectUid).toBe("11111111-1111-1111-1111-111111111111");
     expect(preview.statusDate).toBe("2026-08-24T06:00:00");
+    expect(preview).toMatchObject({
+      defaultDurationFormat: 5,
+      minutesPerDay: 480,
+      minutesPerWeek: 2400,
+      daysPerMonth: 20
+    });
     expect(preview.taskCount).toBe(2);
     expect(preview.summaryTaskCount).toBe(1);
     expect(preview.leafTaskCount).toBe(1);
@@ -23,12 +33,35 @@ describe("browser MSPDI inspection", () => {
       wbs: "1.1",
       outlineLevel: 2,
       summary: false,
+      duration: "PT1H30M0S",
+      durationFormat: 5,
       actualStart: "2026-08-24T07:15:00",
       actualFinish: null,
       percentComplete: 25,
       physicalPercentComplete: 20,
       critical: true
     });
+  });
+
+  it("renders imported durations using task units and the Project default without deriving from dates", () => {
+    const settings = { defaultDurationFormat: 5, minutesPerDay: 480, minutesPerWeek: 2400, daysPerMonth: 20 };
+
+    expect(formatImportedProjectDuration("PT1H30M0S", 5, settings)).toBe("1.5h");
+    expect(formatImportedProjectDuration("PT96H0M0S", 8, settings)).toBe("4ed");
+    expect(formatImportedProjectDuration("PT240H0M0S", 6, settings)).toBe("240eh");
+    expect(formatImportedProjectDuration("PT30M0S", 3, settings)).toBe("30m");
+    expect(formatImportedProjectDuration("PT30M0S", 4, settings)).toBe("30em");
+    expect(formatImportedProjectDuration("PT8H0M0S", 7, settings)).toBe("1d");
+    expect(formatImportedProjectDuration("PT40H0M0S", 9, settings)).toBe("1w");
+    expect(formatImportedProjectDuration("P7D", 10, settings)).toBe("1ew");
+    expect(formatImportedProjectDuration("PT160H0M0S", 11, settings)).toBe("1mo");
+    expect(formatImportedProjectDuration("P20D", 12, settings)).toBe("1emo");
+    expect(formatImportedProjectDuration("PT8H0M0S", 21, settings)).toBe("8h");
+    expect(formatImportedProjectDuration("PT8H0M0S", 37, settings)).toBe("8h?");
+    expect(formatImportedProjectDuration("PT8H0M0S", 53, settings)).toBe("8h?");
+    expect(formatImportedProjectDuration("PT8H0M0S", 999, settings)).toBe("PT8H0M0S");
+    expect(formatImportedProjectDuration("PT8H0M0S", 7, { ...settings, minutesPerDay: null })).toBe("PT8H0M0S");
+    expect(formatImportedProjectDuration(null, 5, settings)).toBe("Not supplied");
   });
 
   it("rejects malformed or non-MSPDI browser parse results", () => {
@@ -82,6 +115,12 @@ describe("browser MSPDI inspection", () => {
     ], PROJECT_NAMESPACE);
     installDomParser(documentResult(invalidProgress));
     expect(() => parseProjectXmlPreview("<Project />")).toThrow("PercentComplete must be numeric");
+
+    const invalidDurationFormat = element("Project", null, [
+      element("Tasks", null, [task([["UID", "1"], ["ID", "1"], ["DurationFormat", "5.5"]])], PROJECT_NAMESPACE)
+    ], PROJECT_NAMESPACE);
+    installDomParser(documentResult(invalidDurationFormat));
+    expect(() => parseProjectXmlPreview("<Project />")).toThrow("DurationFormat must be an integer");
   });
 
   it("ignores direct children that rebind away from the Project namespace", () => {
@@ -136,9 +175,13 @@ function projectDocument() {
     field("Name", "Synthetic Trial Schedule"),
     field("GUID", "11111111-1111-1111-1111-111111111111"),
     field("StatusDate", "2026-08-24T06:00:00"),
+    field("DurationFormat", "5"),
+    field("MinutesPerDay", "480"),
+    field("MinutesPerWeek", "2400"),
+    field("DaysPerMonth", "20"),
     element("Tasks", null, [
       task([["UID", "1"], ["ID", "1"], ["Name", "Summary work pack"], ["WBS", "1"], ["OutlineNumber", "1"], ["OutlineLevel", "1"], ["Summary", "1"]]),
-      task([["UID", "2"], ["ID", "2"], ["Name", "Inspect synthetic equipment"], ["WBS", "1.1"], ["OutlineNumber", "1.1"], ["OutlineLevel", "2"], ["Summary", "0"], ["Start", "2026-08-24T07:00:00"], ["Finish", "2026-08-24T08:00:00"], ["ActualStart", "2026-08-24T07:15:00"], ["PercentComplete", "25"], ["PhysicalPercentComplete", "20"], ["Critical", "1"]])
+      task([["UID", "2"], ["ID", "2"], ["Name", "Inspect synthetic equipment"], ["WBS", "1.1"], ["OutlineNumber", "1.1"], ["OutlineLevel", "2"], ["Summary", "0"], ["Start", "2026-08-24T07:00:00"], ["Finish", "2026-08-24T08:00:00"], ["Duration", "PT1H30M0S"], ["DurationFormat", "5"], ["ActualStart", "2026-08-24T07:15:00"], ["PercentComplete", "25"], ["PhysicalPercentComplete", "20"], ["Critical", "1"]])
     ], PROJECT_NAMESPACE)
   ], PROJECT_NAMESPACE);
   return documentResult(root);

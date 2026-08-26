@@ -104,7 +104,7 @@ There is no separate Mobile Today, Problems, Evidence, Sync, Critical, Import / 
 | Frontend area | Current label | Limit |
 | --- | --- | --- |
 | Login and Projects Home | Static visual only | Review-only transition and an honest no-project state; no identity, fabricated project portfolio, or project API. |
-| Today, Tasks, Task Dashboard | Verified in repository | The Tier 1 round-trip trial derives these views from an imported XML schedule and browser-memory execution state. Ordinary mode shows no active-project state; there is no production query or write API. |
+| Today, Tasks, Task Dashboard | Verified in repository | The Tier 1 round-trip trial derives leaf-only tracked views from an imported XML schedule and browser-memory execution state, shows imported leaf Duration, and retains summary rows as non-operational hierarchy context. Ordinary mode shows no active-project state; there is no production query or write API. |
 | Critical | Designed, not built | Ordinary mode shows no active-project state. Imported Project Critical may appear as read-only round-trip context; there is no fabricated reporting dataset, production Critical API, or persistence. |
 | Project Settings | Designed, not built | Ordinary mode shows no active-project state. Production General, Users, Operational Mapping, Project History, and Lifecycle data paths are not implemented. |
 | Mobile Assigned Tasks empty frame | Static visual only | The approved Assigned Tasks frame is present and shows an honest zero-task state. No persona, assignment, task, execution, reporting, or sync data is fabricated. |
@@ -196,7 +196,7 @@ Synthetic XML and text fixtures remain required for automated tests so real cust
 
 - One job per screen.
 - Today is a high-signal configurable 24-hour project view over task records.
-- Tasks provides hierarchy, browsing, filtering, grouping, columns, saved views, and Task Dashboard entry.
+- Tasks provides hierarchy, tracked-leaf browsing, filtering, grouping, columns, saved views, and tracked-leaf Task Dashboard entry. Summary rows may provide hierarchy/work-pack context but are not tracked execution tasks.
 - Critical is reporting configuration and oversight, not critical-path calculation.
 - Import / Export separates verified import-review capability from deferred export direction.
 - Project Settings contains General, Users, Operational Mapping, Project History, and Lifecycle.

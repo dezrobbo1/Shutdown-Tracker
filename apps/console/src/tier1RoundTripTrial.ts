@@ -13,7 +13,11 @@ import type {
 
 export const TIER1_ROUNDTRIP_ACTOR_ID = "tier1-roundtrip-operator";
 export const TIER1_ROUNDTRIP_MODEL_VERSION = "tier1-project-roundtrip-trial-v1";
-export const ROUNDTRIP_FALLBACK_INITIAL_TIME = "2026-01-01T06:00:00";
+
+export type Tier1RoundTripLocationClock = {
+  minute: number;
+  timeZone: string;
+};
 
 export type ExperimentalProjectField =
   | "ActualStart"
@@ -34,6 +38,8 @@ export type RoundTripSourceTaskIdentity = {
   sourceValues: {
     start: string | null;
     finish: string | null;
+    duration: string | null;
+    durationFormat: number | null;
     actualStart: string | null;
     actualFinish: string | null;
     percentComplete: number | null;
@@ -76,7 +82,7 @@ export type RoundTripDisposition =
 export type Tier1RoundTripSessionHistoryEvent = {
   id: string;
   at: number;
-  type: "source-loaded" | "clock-advanced" | "execution" | "progress-observation" | "record-management";
+  type: "source-loaded" | "execution" | "progress-observation" | "record-management";
   summary: string;
   taskId?: string;
 };
@@ -89,7 +95,8 @@ export type Tier1RoundTripSession = {
     hash: string | null;
     preview: ProjectXmlPreview;
   };
-  initialTimeSource: "Project StatusDate" | "Earliest task planned start" | "Fixed fallback";
+  initialTimeSource: "Current device time";
+  locationTimeZone: string;
   initialTrialState: TrialState;
   trialState: TrialState;
   sourceTasks: RoundTripSourceTaskIdentity[];
@@ -106,6 +113,7 @@ export type CreateTier1RoundTripSessionInput = {
   sourceBytes?: Uint8Array;
   preview: ProjectXmlPreview;
   sourceHash?: string | null;
+  clock?: Tier1RoundTripLocationClock;
 };
 
 export type Tier1RoundTripExecutionAction = Extract<
@@ -126,6 +134,42 @@ export type Tier1ProgressObservationInput = {
   note?: string;
 };
 
+export function selectTier1RoundTripTaskRows(tasks: readonly TrialTask[], query: string): TrialTask[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [...tasks];
+
+  const taskById = new Map(tasks.map((task) => [task.id, task]));
+  const childrenByParentId = new Map<string, TrialTask[]>();
+  for (const task of tasks) {
+    if (task.parentId === null) continue;
+    const children = childrenByParentId.get(task.parentId) ?? [];
+    children.push(task);
+    childrenByParentId.set(task.parentId, children);
+  }
+
+  const included = new Set<string>();
+  for (const task of tasks) {
+    if (!`${task.wbs} ${task.name}`.toLowerCase().includes(normalized)) continue;
+    included.add(task.id);
+
+    let parentId = task.parentId;
+    while (parentId !== null && !included.has(parentId)) {
+      included.add(parentId);
+      parentId = taskById.get(parentId)?.parentId ?? null;
+    }
+
+    if (!task.summary) continue;
+    const pending = [...(childrenByParentId.get(task.id) ?? [])];
+    for (let index = 0; index < pending.length; index += 1) {
+      const descendant = pending[index];
+      if (included.has(descendant.id)) continue;
+      included.add(descendant.id);
+      pending.push(...(childrenByParentId.get(descendant.id) ?? []));
+    }
+  }
+  return tasks.filter((task) => included.has(task.id));
+}
+
 type PreviewTaskWithCritical = ProjectXmlTaskPreview & { critical?: boolean };
 
 export function createTier1RoundTripSession(input: CreateTier1RoundTripSessionInput): Tier1RoundTripSession {
@@ -144,7 +188,10 @@ export function createTier1RoundTripSession(input: CreateTier1RoundTripSessionIn
     throw new Error("The retained Project source bytes do not match the inspected XML text.");
   }
 
-  const adapted = adaptImportedProjectToTrialState(input.fileName, input.preview);
+  const suppliedClock = input.clock ?? readTier1RoundTripLocationClock();
+  assertRoundTripMinute(suppliedClock.minute, "Current location time");
+  const clock = { ...suppliedClock, timeZone: requireSupportedTimeZone(suppliedClock.timeZone) };
+  const adapted = adaptImportedProjectToTrialState(input.fileName, input.preview, clock);
   const sourcePreview = structuredClone(input.preview);
   const baselineHistory: Tier1RoundTripSessionHistoryEvent[] = [{
     id: "roundtrip-session-1",
@@ -162,6 +209,7 @@ export function createTier1RoundTripSession(input: CreateTier1RoundTripSessionIn
       preview: sourcePreview
     },
     initialTimeSource: adapted.initialTimeSource,
+    locationTimeZone: clock.timeZone,
     initialTrialState: structuredClone(adapted.state),
     trialState: structuredClone(adapted.state),
     sourceTasks: adapted.sourceTasks,
@@ -175,18 +223,20 @@ export function createTier1RoundTripSession(input: CreateTier1RoundTripSessionIn
 
 export function applyTier1RoundTripExecutionAction(
   session: Tier1RoundTripSession,
-  action: Tier1RoundTripExecutionAction
+  action: Tier1RoundTripExecutionAction,
+  at = readTier1RoundTripLocationClock(new Date(), session.locationTimeZone).minute
 ): Tier1RoundTripSession {
   if (action.actorId !== TIER1_ROUNDTRIP_ACTOR_ID) {
     throw new Error("Round-trip execution actions must use the browser-local Tier 1 trial identity.");
   }
 
-  const nextState = applyTrialAction(session.trialState, action);
+  const currentSession = setRoundTripEventTime(session, at);
+  const nextState = applyTrialAction(currentSession.trialState, action);
   const task = requiredTask(nextState, action.taskId);
   return invalidateDerivedExportState({
-    ...session,
+    ...currentSession,
     trialState: nextState,
-    history: appendSessionHistory(session, {
+    history: appendSessionHistory(currentSession, {
       at: nextState.now,
       type: "execution",
       summary: `${executionActionLabel(action.type)} recorded for ${task.name}.`,
@@ -197,20 +247,22 @@ export function applyTier1RoundTripExecutionAction(
 
 export function applyTier1RoundTripRecordAction(
   session: Tier1RoundTripSession,
-  action: Tier1RoundTripRecordAction
+  action: Tier1RoundTripRecordAction,
+  at = readTier1RoundTripLocationClock(new Date(), session.locationTimeZone).minute
 ): Tier1RoundTripSession {
   if (action.actorId !== TIER1_ROUNDTRIP_ACTOR_ID) {
     throw new Error("Round-trip record actions must use the browser-local Tier 1 trial identity.");
   }
+  const currentSession = setRoundTripEventTime(session, at);
   const record = action.type === "resolve-problem"
-    ? session.trialState.problems.find((problem) => problem.id === action.problemId)
-    : session.trialState.actions.find((item) => item.id === action.actionId);
-  const nextState = applyTrialAction(session.trialState, action);
+    ? currentSession.trialState.problems.find((problem) => problem.id === action.problemId)
+    : currentSession.trialState.actions.find((item) => item.id === action.actionId);
+  const nextState = applyTrialAction(currentSession.trialState, action);
   const task = record ? requiredTask(nextState, record.taskId) : null;
   return invalidateDerivedExportState({
-    ...session,
+    ...currentSession,
     trialState: nextState,
-    history: appendSessionHistory(session, {
+    history: appendSessionHistory(currentSession, {
       at: nextState.now,
       type: "record-management",
       summary: `${action.type === "resolve-problem" ? "Problem resolved" : "Action completed"}${task ? ` for ${task.name}` : ""}.`,
@@ -221,9 +273,11 @@ export function applyTier1RoundTripRecordAction(
 
 export function recordTier1RoundTripProgress(
   session: Tier1RoundTripSession,
-  input: Tier1ProgressObservationInput
+  input: Tier1ProgressObservationInput,
+  at = readTier1RoundTripLocationClock(new Date(), session.locationTimeZone).minute
 ): Tier1RoundTripSession {
-  const nextState = structuredClone(session.trialState);
+  const currentSession = setRoundTripEventTime(session, at);
+  const nextState = structuredClone(currentSession.trialState);
   const task = requiredTask(nextState, input.taskId);
   if (task.summary) throw new Error("Progress observations apply to executable leaf tasks.");
   if (selectExecutionState(nextState, task.id) === "Completed") {
@@ -250,9 +304,9 @@ export function recordTier1RoundTripProgress(
   });
 
   return invalidateDerivedExportState({
-    ...session,
+    ...currentSession,
     trialState: nextState,
-    history: appendSessionHistory(session, {
+    history: appendSessionHistory(currentSession, {
       at: nextState.now,
       type: "progress-observation",
       summary: `Tier 1 recorded ${input.completionPercent}% Tracker field progress for ${task.name}.`,
@@ -261,23 +315,14 @@ export function recordTier1RoundTripProgress(
   });
 }
 
-export function advanceTier1RoundTripClock(
+export function resetTier1RoundTripSession(
   session: Tier1RoundTripSession,
-  minutes: 15 | 60
+  at = readTier1RoundTripLocationClock(new Date(), session.locationTimeZone).minute
 ): Tier1RoundTripSession {
-  return setRoundTripClock(session, session.trialState.now + minutes, `Advanced trial time by ${minutes} minutes.`);
-}
-
-export function jumpTier1RoundTripClockToTaskStart(
-  session: Tier1RoundTripSession,
-  taskId: string
-): Tier1RoundTripSession {
-  const task = requiredTask(session.trialState, taskId);
-  if (task.plannedStart === null) throw new Error(`${task.name} has no imported planned Start to jump to.`);
-  return setRoundTripClock(session, task.plannedStart, `Jumped trial time to the planned start for ${task.name}.`, task.id);
-}
-
-export function resetTier1RoundTripSession(session: Tier1RoundTripSession): Tier1RoundTripSession {
+  assertRoundTripMinute(at, "Current location time");
+  const initialTrialState = structuredClone(session.initialTrialState);
+  initialTrialState.now = at;
+  initialTrialState.history = initialTrialState.history.map((event) => event.baseline ? { ...event, at } : event);
   return {
     ...session,
     source: {
@@ -285,8 +330,8 @@ export function resetTier1RoundTripSession(session: Tier1RoundTripSession): Tier
       bytes: Uint8Array.from(session.source.bytes),
       preview: structuredClone(session.source.preview)
     },
-    initialTrialState: structuredClone(session.initialTrialState),
-    trialState: structuredClone(session.initialTrialState),
+    initialTrialState: structuredClone(initialTrialState),
+    trialState: structuredClone(initialTrialState),
     sourceTasks: structuredClone(session.sourceTasks),
     mappings: [],
     candidate: null,
@@ -294,7 +339,7 @@ export function resetTier1RoundTripSession(session: Tier1RoundTripSession): Tier
     disposition: null,
     history: [{
       id: "roundtrip-session-1",
-      at: session.initialTrialState.now,
+      at,
       type: "source-loaded",
       summary: `Temporary browser-memory trial created from ${session.source.fileName}.`
     }]
@@ -308,7 +353,7 @@ export function deriveTier1RoundTripMappingProposals(
   for (const event of session.trialState.executionEvents) {
     if (event.type !== "start" && event.type !== "finish") continue;
     const identity = session.sourceTasks.find((task) => task.trialTaskId === event.taskId);
-    if (!identity) continue;
+    if (!identity || identity.summary) continue;
     proposals.push({
       id: `mapping-${event.id}`,
       trackerFactId: event.id,
@@ -323,7 +368,7 @@ export function deriveTier1RoundTripMappingProposals(
   }
   for (const observation of session.trialState.progressObservations) {
     const identity = session.sourceTasks.find((task) => task.trialTaskId === observation.taskId);
-    if (!identity) continue;
+    if (!identity || identity.summary) continue;
     proposals.push({
       id: `mapping-${observation.id}`,
       trackerFactId: observation.id,
@@ -360,6 +405,7 @@ export function updateTier1RoundTripMappingSelection(
     const next = { ...mapping, ...patch };
     const identity = session.sourceTasks.find((task) => task.trialTaskId === mapping.trialTaskId);
     if (!identity) throw new Error(`Unknown imported trial task ${mapping.trialTaskId}.`);
+    if (identity.summary) throw new Error("Experimental execution/progress mappings apply only to tracked leaf tasks.");
     if (Object.hasOwn(patch, "projectField")) {
       next.included = false;
       if (next.projectField === "PercentComplete") next.sourceValue = identity.sourceValues.percentComplete;
@@ -411,29 +457,66 @@ export function parseProjectIsoMinute(value: string, field: string): number {
   return milliseconds / 60_000;
 }
 
-export function chooseTier1RoundTripInitialClock(preview: ProjectXmlPreview): {
-  minute: number;
-  source: Tier1RoundTripSession["initialTimeSource"];
-} {
-  if (preview.statusDate) {
-    return {
-      minute: parseProjectIsoMinute(preview.statusDate, "Project StatusDate"),
-      source: "Project StatusDate"
-    };
+export function readTier1RoundTripLocationClock(
+  instant = new Date(),
+  timeZone = resolveBrowserTimeZone()
+): Tier1RoundTripLocationClock {
+  if (!Number.isFinite(instant.getTime())) throw new Error("The current device time is invalid.");
+  const supportedTimeZone = requireSupportedTimeZone(timeZone);
+  let parts: Intl.DateTimeFormatPart[];
+  try {
+    parts = new Intl.DateTimeFormat("en-CA-u-ca-iso8601-nu-latn", {
+      timeZone: supportedTimeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(instant);
+  } catch {
+    throw new Error(`The device timezone ${supportedTimeZone} could not be read.`);
   }
-  const plannedStarts = preview.tasks
-    .filter((task): task is ProjectXmlTaskPreview & { start: string } => task.start !== null)
-    .map((task) => parseProjectIsoMinute(task.start, `Task UID ${task.uid ?? "not supplied"} planned Start`));
-  if (plannedStarts.length > 0) {
-    return { minute: Math.min(...plannedStarts), source: "Earliest task planned start" };
-  }
-  return {
-    minute: parseProjectIsoMinute(ROUNDTRIP_FALLBACK_INITIAL_TIME, "Fixed fallback"),
-    source: "Fixed fallback"
+  const value = (type: "year" | "month" | "day" | "hour" | "minute") => {
+    const part = parts.find((candidate) => candidate.type === type)?.value;
+    if (!part) throw new Error(`The browser could not resolve the current ${type} for ${supportedTimeZone}.`);
+    return Number(part);
   };
+  const minute = Date.UTC(value("year"), value("month") - 1, value("day"), value("hour"), value("minute")) / 60_000;
+  assertRoundTripMinute(minute, "Current location time");
+  return { minute, timeZone: supportedTimeZone };
 }
 
-function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlPreview): {
+export function resolveBrowserTimeZone(): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone?.trim();
+  if (!timeZone) {
+    throw new Error("The browser did not report an IANA timezone. Set the device timezone before starting the trial.");
+  }
+  return requireSupportedTimeZone(timeZone);
+}
+
+export function projectTier1RoundTripStateAtMinute(state: TrialState, minute: number): TrialState {
+  assertRoundTripMinute(minute, "Current location time");
+  return state.now === minute ? state : { ...state, now: minute };
+}
+
+export function tier1RoundTripLocalDayWindow(currentMinute: number, operationalDayStartMinute = 0) {
+  assertRoundTripMinute(currentMinute, "Current location time");
+  if (!Number.isInteger(operationalDayStartMinute)
+    || operationalDayStartMinute < 0
+    || operationalDayStartMinute >= 1440) {
+    throw new Error("Operational day start must be a whole minute from 0 to 1439.");
+  }
+  const offset = ((currentMinute - operationalDayStartMinute) % 1440 + 1440) % 1440;
+  const start = currentMinute - offset;
+  return { start, end: start + 1440 };
+}
+
+function adaptImportedProjectToTrialState(
+  fileName: string,
+  preview: ProjectXmlPreview,
+  clock: Tier1RoundTripLocationClock
+): {
   state: TrialState;
   sourceTasks: RoundTripSourceTaskIdentity[];
   initialTimeSource: Tier1RoundTripSession["initialTimeSource"];
@@ -509,6 +592,8 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
       sourceValues: {
         start: task.start,
         finish: task.finish,
+        duration: task.duration,
+        durationFormat: task.durationFormat,
         actualStart: task.actualStart,
         actualFinish: task.actualFinish,
         percentComplete: task.percentComplete,
@@ -517,7 +602,6 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
     });
   }
 
-  const clock = chooseTier1RoundTripInitialClock(preview);
   const importedHistory: TrialHistoryEvent[] = [{
     id: "history-imported-roundtrip-source",
     type: "import-activated",
@@ -528,7 +612,7 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
   }];
 
   return {
-    initialTimeSource: clock.source,
+    initialTimeSource: "Current device time",
     sourceTasks,
     state: {
       modelVersion: TIER1_ROUNDTRIP_MODEL_VERSION,
@@ -539,8 +623,8 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
         name: preview.projectName,
         code: "TEMPORARY-ROUNDTRIP",
         site: "Browser-local Project source",
-        timezone: "Project-local time; timezone not inferred",
-        operationalDayStartMinute: modulo(clock.minute, 1440),
+        timezone: clock.timeZone,
+        operationalDayStartMinute: 0,
         importedSnapshot: `Temporary browser source: ${fileName.trim()}`
       },
       users: [{ id: TIER1_ROUNDTRIP_ACTOR_ID, name: "Tier 1 round-trip reviewer", tier: "Tier 1" }],
@@ -555,27 +639,43 @@ function adaptImportedProjectToTrialState(fileName: string, preview: ProjectXmlP
   };
 }
 
-function setRoundTripClock(
-  session: Tier1RoundTripSession,
-  targetMinute: number,
-  summary: string,
-  taskId?: string
-): Tier1RoundTripSession {
-  if (!Number.isInteger(targetMinute)) throw new Error("Trial time can move only in whole minutes.");
-  if (targetMinute < session.trialState.now) throw new Error("Trial time can move only forward. Reset to replay.");
-  if (targetMinute === session.trialState.now) return session;
+function setRoundTripEventTime(session: Tier1RoundTripSession, targetMinute: number): Tier1RoundTripSession {
+  assertRoundTripMinute(targetMinute, "Current location time");
+  if (targetMinute < latestTrackerFactMinute(session)) {
+    throw new Error("The current device time precedes an existing Tracker event. Check the device clock before continuing.");
+  }
   const nextState = structuredClone(session.trialState);
   nextState.now = targetMinute;
-  return {
-    ...session,
-    trialState: nextState,
-    history: appendSessionHistory(session, {
-      at: targetMinute,
-      type: "clock-advanced",
-      summary,
-      taskId
-    })
-  };
+  return { ...session, trialState: nextState };
+}
+
+function latestTrackerFactMinute(session: Tier1RoundTripSession) {
+  return Math.max(
+    ...session.history.map((event) => event.at),
+    ...session.trialState.executionEvents.map((event) => event.at),
+    ...session.trialState.progressObservations.map((event) => event.at),
+    ...session.trialState.problems.map((record) => record.resolvedAt ?? record.createdAt),
+    ...session.trialState.actions.map((record) => record.completedAt ?? record.createdAt),
+    Number.NEGATIVE_INFINITY
+  );
+}
+
+function assertRoundTripMinute(minute: number, field: string) {
+  if (!Number.isInteger(minute)) throw new Error(`${field} must resolve to a whole minute.`);
+  if (!Number.isFinite(new Date(minute * 60_000).getTime())) {
+    throw new Error(`${field} is outside the supported date range.`);
+  }
+}
+
+function requireSupportedTimeZone(timeZone: string) {
+  const value = timeZone.trim();
+  if (!value) throw new Error("The device timezone was not supplied or is not supported.");
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: value }).format(new Date(0));
+  } catch {
+    throw new Error(`The device timezone ${value} is not supported.`);
+  }
+  return value;
 }
 
 function appendSessionHistory(
@@ -641,12 +741,4 @@ function executionActionLabel(type: Tier1RoundTripExecutionAction["type"]) {
     finish: "Finish"
   };
   return labels[type];
-}
-
-function modulo(value: number, divisor: number) {
-  return ((value % divisor) + divisor) % divisor;
-}
-
-export function roundTripTaskExecutionState(session: Tier1RoundTripSession, taskId: string) {
-  return selectExecutionState(session.trialState, taskId);
 }

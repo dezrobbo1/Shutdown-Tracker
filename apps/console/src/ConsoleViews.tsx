@@ -70,7 +70,7 @@ export function ProjectsHome({
   }
 
   const availableProjects = temporaryProject
-    ? [{ ...temporaryProject, statusLabel: "Temporary trial", period: "Imported source · controlled trial clock", updated: "Temporary browser-memory project" }]
+    ? [{ ...temporaryProject, statusLabel: "Temporary trial", period: "Imported source · current device clock", updated: "Temporary browser-memory project" }]
     : [{ id: "roundtrip-empty", name: "No source selected", code: "LOCAL-XML-TRIAL", site: "Browser-local", statusLabel: "Temporary trial", period: "Choose a disposable Microsoft Project XML/MSPDI source", updated: "Nothing imported or persisted" }];
   const visibleProjects = availableProjects.filter((project) => {
     const searchText = `${project.name} ${project.code} ${project.site}`.toLowerCase();

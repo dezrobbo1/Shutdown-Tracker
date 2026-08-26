@@ -4,7 +4,7 @@ import {
   type ExecutionState
 } from "@shutdown-tracker/trial-model";
 import { Download, RotateCcw, Search } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type FormEvent, type SetStateAction } from "react";
 import { PageHeading, PanelHeading, StatusLabel } from "./ConsoleViews";
 import {
   assertCandidatePreviewPreserved,
@@ -24,20 +24,28 @@ import {
   type ProjectXmlCandidateResult,
   type ProjectXmlMappingField
 } from "./projectXmlCandidate";
-import { parseProjectXmlPreview, readUtf8ProjectXml, type ProjectXmlPreview } from "./projectXmlPreview";
 import {
-  advanceTier1RoundTripClock,
+  formatImportedProjectDuration,
+  parseProjectXmlPreview,
+  readUtf8ProjectXml,
+  type ProjectXmlPreview
+} from "./projectXmlPreview";
+import {
   applyTier1RoundTripRecordAction,
   applyTier1RoundTripExecutionAction,
   createTier1RoundTripSession,
   deriveTier1RoundTripMappingProposals,
   formatRoundTripMinute,
-  jumpTier1RoundTripClockToTaskStart,
   mergeTier1RoundTripMappingSelections,
+  projectTier1RoundTripStateAtMinute,
+  readTier1RoundTripLocationClock,
   recordTier1RoundTripProgress,
   resetTier1RoundTripSession,
+  selectTier1RoundTripTaskRows,
+  tier1RoundTripLocalDayWindow,
   TIER1_ROUNDTRIP_ACTOR_ID,
   updateTier1RoundTripMappingSelection,
+  type Tier1RoundTripLocationClock,
   type RoundTripMappingSelection,
   type Tier1RoundTripSession
 } from "./tier1RoundTripTrial";
@@ -93,6 +101,45 @@ export function activateTier1RoundTripSource(
 }
 
 const TASK_TABLE_PAGE_SIZE = 250;
+
+export function useTier1RoundTripLiveClock(timeZone: string | null): Tier1RoundTripLocationClock | null {
+  const readClock = useCallback(
+    () => timeZone ? readTier1RoundTripLocationClock(new Date(), timeZone) : null,
+    [timeZone]
+  );
+  const [clock, setClock] = useState<Tier1RoundTripLocationClock | null>(() => readClock());
+
+  useEffect(() => {
+    if (!timeZone) {
+      setClock(null);
+      return;
+    }
+    const refresh = () => {
+      const next = readClock();
+      setClock((current) => current?.minute === next?.minute && current?.timeZone === next?.timeZone
+        ? current
+        : next);
+    };
+    let timeout: ReturnType<typeof globalThis.setTimeout> | undefined;
+    const scheduleNextMinute = () => {
+      refresh();
+      timeout = globalThis.setTimeout(scheduleNextMinute, 60_000 - (Date.now() % 60_000) + 25);
+    };
+    scheduleNextMinute();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      if (timeout !== undefined) globalThis.clearTimeout(timeout);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [readClock, timeZone]);
+
+  return clock?.timeZone === timeZone ? clock : null;
+}
 
 export function Tier1RoundTripBoundary() {
   return (
@@ -200,16 +247,17 @@ export function Tier1RoundTripImportPanel({
               <div><dt>Project</dt><dd>{source.preview.projectName}</dd></div>
               <div><dt>Project UID</dt><dd>{source.preview.projectUid ?? "Not supplied"}</dd></div>
               <div><dt>Status date</dt><dd>{source.preview.statusDate ?? "Not supplied"}</dd></div>
-              <div><dt>Tasks</dt><dd>{source.preview.taskCount}</dd></div>
-              <div><dt>Leaf tasks</dt><dd>{source.preview.leafTaskCount}</dd></div>
+              <div><dt>Source task rows</dt><dd>{source.preview.taskCount}</dd></div>
+              <div><dt>Tracked leaf tasks</dt><dd>{source.preview.leafTaskCount}</dd></div>
+              <div><dt>Summary hierarchy rows</dt><dd>{source.preview.summaryTaskCount}</dd></div>
               <div><dt>Original source-file SHA-256</dt><dd><code>{source.sha256}</code></dd></div>
             </dl>
             <div className="import-task-tools">
-              <label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported tasks</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search task, WBS, UID, or ID" /></label>
-              <span>{visibleTasks.length} task rows</span>
+              <label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported source rows</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search task, WBS, UID, or ID" /></label>
+              <span>{visibleTasks.filter((task) => !task.summary).length} tracked leaf tasks · {visibleTasks.filter((task) => task.summary).length} hierarchy rows</span>
             </div>
-            <RoundTripSourceTaskTable tasks={visibleTasks.slice(0, rowLimit)} />
-            {visibleTasks.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, visibleTasks.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {visibleTasks.length} matching rows.</span></div> : null}
+            <RoundTripSourceTaskTable tasks={visibleTasks.slice(0, rowLimit)} settings={source.preview} />
+            {visibleTasks.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, visibleTasks.length - rowLimit)} more rows</button><span>Showing {rowLimit} of {visibleTasks.length} matching rows.</span></div> : null}
           </>
         ) : null}
         <div className="disabled-action-row">
@@ -223,82 +271,157 @@ export function Tier1RoundTripImportPanel({
   );
 }
 
-export function Tier1RoundTripClock({ state, onChange }: { state: Tier1RoundTripWorkspaceState; onChange: Tier1RoundTripChangeHandler }) {
+export function Tier1RoundTripCurrentTime({
+  state,
+  clock,
+  onChange
+}: {
+  state: Tier1RoundTripWorkspaceState;
+  clock: Tier1RoundTripLocationClock;
+  onChange: Tier1RoundTripChangeHandler;
+}) {
   const [error, setError] = useState("");
-  function apply(change: () => Tier1RoundTripSession) {
+  const clockBehindEvidence = clock.minute < state.session.trialState.now;
+  function reset() {
     try {
-      onChange({ session: change(), candidate: null, projectResult: null, disposition: null });
+      const current = readTier1RoundTripLocationClock(new Date(), state.session.locationTimeZone);
+      onChange({
+        session: resetTier1RoundTripSession(state.session, current.minute),
+        candidate: null,
+        projectResult: null,
+        disposition: null
+      });
       setError("");
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The trial clock could not be changed.");
+      setError(caught instanceof Error ? caught.message : "The current location time could not be read.");
     }
   }
   return (
-    <section className="roundtrip-clock" aria-label="Tier 1 round-trip trial clock">
-      <div className="roundtrip-clock-readout"><span>Round-trip trial time</span><strong>{formatRoundTripMinute(state.session.trialState.now).replace("T", " ")}</strong><small>{state.session.initialTimeSource}</small></div>
+    <section className="roundtrip-clock" aria-label="Tier 1 current location time">
+      <div className="roundtrip-clock-readout"><span>Current location time</span><strong>{formatRoundTripMinute(clock.minute).replace("T", " ")}</strong><small>Device clock · {clock.timeZone}</small></div>
       <div className="roundtrip-clock-actions">
-        <button type="button" onClick={() => apply(() => advanceTier1RoundTripClock(state.session, 15))}>+15 minutes</button>
-        <button type="button" onClick={() => apply(() => advanceTier1RoundTripClock(state.session, 60))}>+1 hour</button>
-        <button type="button" onClick={() => apply(() => resetTier1RoundTripSession(state.session))}><RotateCcw size={15} aria-hidden="true" /> Reset trial</button>
+        <button type="button" onClick={reset}><RotateCcw size={15} aria-hidden="true" /> Reset trial</button>
       </div>
-      <p>Controllable Project-local trial time · no wall-clock ticking · reset preserves the immutable source and removes generated facts/artifacts.</p>
+      <p>Live device time in the IANA timezone captured when this trial started · not inferred from Project XML or verified by a server · reset preserves the immutable source and removes generated facts/artifacts.</p>
+      {clockBehindEvidence ? <p className="trial-form-error" role="alert">Current local wall time is earlier than existing trial evidence. New updates are blocked until the clock catches up; during a daylight-saving rollback, wait through the repeated interval or reset/discard the temporary trial.</p> : null}
       {error ? <p className="trial-form-error" role="alert">{error}</p> : null}
     </section>
   );
 }
 
-export function Tier1RoundTripTasksView({ state, onOpenTask }: { state: Tier1RoundTripWorkspaceState; onOpenTask: (taskId: string) => void }) {
+export function Tier1RoundTripTasksView({
+  state,
+  currentMinute,
+  onOpenTask
+}: {
+  state: Tier1RoundTripWorkspaceState;
+  currentMinute: number;
+  onOpenTask: (taskId: string) => void;
+}) {
   const [query, setQuery] = useState("");
   const [rowLimit, setRowLimit] = useState(TASK_TABLE_PAGE_SIZE);
-  const normalized = query.trim().toLowerCase();
   const rows = useMemo(
-    () => state.session.trialState.tasks.filter((task) => !normalized || `${task.wbs} ${task.name}`.toLowerCase().includes(normalized)),
-    [normalized, state.session.trialState.tasks]
+    () => selectTier1RoundTripTaskRows(state.session.trialState.tasks, query),
+    [query, state.session.trialState.tasks]
   );
+  const trackedLeafCount = rows.filter((task) => !task.summary).length;
+  const hierarchyRowCount = rows.length - trackedLeafCount;
   const identityByTaskId = useMemo(
     () => new Map(state.session.sourceTasks.map((task) => [task.trialTaskId, task])),
     [state.session.sourceTasks]
   );
+  const currentTrialState = useMemo(
+    () => projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute),
+    [currentMinute, state.session.trialState]
+  );
   return (
     <>
-      <PageHeading eyebrow="Tasks · imported round-trip schedule" title={state.session.trialState.project.name} description="Temporary hierarchy and execution truth derived from the selected Project XML source." status="Browser-local experimental trial" />
-      <section className="explorer-tools"><label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported trial tasks</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search WBS or task" /></label><span>Showing {Math.min(rowLimit, rows.length)} of {rows.length} matching rows</span></section>
-      <section className="table-panel"><div className="table-scroll"><table className="data-table task-table"><thead><tr><th>WBS / task</th><th>Project UID / ID</th><th>Execution state</th><th>Planned window</th><th>Imported / Tracker progress</th><th>Authority</th></tr></thead><tbody>{rows.slice(0, rowLimit).map((task) => {
-        const projection = selectTaskProjection(state.session.trialState, task.id);
-        const identity = identityByTaskId.get(task.id);
-        return <tr key={task.id} className={task.summary ? "summary-row" : ""}><td><div className="task-name-cell" style={{ paddingInlineStart: `${task.depth * 20}px` }}><span className="wbs">{task.wbs}</span><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.name}</button></div></td><td>UID {identity?.projectTaskUid ?? "—"}<small>ID {identity?.projectTaskId ?? "—"}</small></td><td><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{projection.attention.join(" · ") || "No attention"}</small></td><td>{formatImportedTrialMinute(task.plannedStart)}<small>to {formatImportedTrialMinute(task.plannedFinish)}</small></td><td><strong>{projection.progressPercent}%</strong><small>{projection.progressBasis}</small></td><td>{task.summary ? "Read-only summary" : "Tier 1 may execute"}</td></tr>;
-      })}</tbody></table></div>{rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more tasks</button><span>Large imported schedules stay responsive by rendering rows progressively.</span></div> : null}</section>
+      <PageHeading eyebrow="Tasks · imported round-trip schedule" title={state.session.trialState.project.name} description="Only imported leaf tasks are tracked. Summary rows remain non-operational Project hierarchy context." status="Browser-local experimental trial" />
+      <section className="explorer-tools"><label className="search-control"><Search size={17} aria-hidden="true" /><span className="sr-only">Search imported trial tasks</span><input value={query} onChange={(event) => { setQuery(event.target.value); setRowLimit(TASK_TABLE_PAGE_SIZE); }} placeholder="Search WBS or task" /></label><span>{trackedLeafCount} matching tracked leaf tasks · {hierarchyRowCount} hierarchy rows</span></section>
+      <section className="table-panel">
+        <div className="table-scroll">
+          <table className="data-table task-table">
+            <thead><tr><th>WBS / task</th><th>Project UID / ID</th><th>Tracking state</th><th>Planned window</th><th>Duration</th><th>Imported / Tracker progress</th><th>Authority</th></tr></thead>
+            <tbody>{rows.slice(0, rowLimit).map((task) => {
+              const identity = identityByTaskId.get(task.id);
+              if (task.summary) {
+                return (
+                  <tr key={task.id} className="summary-row">
+                    <td><div className="task-name-cell" style={{ paddingInlineStart: `${task.depth * 20}px` }}><span className="wbs">{task.wbs}</span><strong>{task.name}</strong></div></td>
+                    <td>UID {identity?.projectTaskUid ?? "—"}<small>ID {identity?.projectTaskId ?? "—"}</small></td>
+                    <td><strong>Hierarchy only</strong><small>Not a tracked task</small></td>
+                    <td>{formatImportedTrialMinute(task.plannedStart)}<small>to {formatImportedTrialMinute(task.plannedFinish)}</small></td>
+                    <td>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</td>
+                    <td>Not tracked</td>
+                    <td>No execution record</td>
+                  </tr>
+                );
+              }
+              const projection = selectTaskProjection(currentTrialState, task.id);
+              return (
+                <tr key={task.id}>
+                  <td><div className="task-name-cell" style={{ paddingInlineStart: `${task.depth * 20}px` }}><span className="wbs">{task.wbs}</span><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.name}</button></div></td>
+                  <td>UID {identity?.projectTaskUid ?? "—"}<small>ID {identity?.projectTaskId ?? "—"}</small></td>
+                  <td><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{projection.attention.join(" · ") || "No attention"}</small></td>
+                  <td>{formatImportedTrialMinute(task.plannedStart)}<small>to {formatImportedTrialMinute(task.plannedFinish)}</small></td>
+                  <td>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</td>
+                  <td><strong>{projection.progressPercent}%</strong><small>{projection.progressBasis}</small></td>
+                  <td>Tier 1 may execute</td>
+                </tr>
+              );
+            })}</tbody>
+          </table>
+        </div>
+        {rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more rows</button><span>Large imported schedules stay responsive by rendering source rows progressively.</span></div> : null}
+      </section>
     </>
   );
 }
 
-export function Tier1RoundTripTodayView({ state, onOpenTask }: { state: Tier1RoundTripWorkspaceState; onOpenTask: (taskId: string) => void }) {
+export function Tier1RoundTripTodayView({
+  state,
+  currentMinute,
+  onOpenTask
+}: {
+  state: Tier1RoundTripWorkspaceState;
+  currentMinute: number;
+  onOpenTask: (taskId: string) => void;
+}) {
   const [rowLimit, setRowLimit] = useState(TASK_TABLE_PAGE_SIZE);
-  const dayOffset = ((state.session.trialState.now - state.session.trialState.project.operationalDayStartMinute) % 1440 + 1440) % 1440;
-  const windowStart = state.session.trialState.now - dayOffset;
-  const windowEnd = windowStart + 1440;
+  const currentTrialState = useMemo(
+    () => projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute),
+    [currentMinute, state.session.trialState]
+  );
+  const { start: windowStart, end: windowEnd } = tier1RoundTripLocalDayWindow(
+    currentMinute,
+    currentTrialState.project.operationalDayStartMinute
+  );
   const rows = useMemo(() => {
-    const eventTaskIds = new Set(state.session.trialState.executionEvents.map((event) => event.taskId));
-    const eventInWindowTaskIds = new Set(state.session.trialState.executionEvents
+    const eventTaskIds = new Set(currentTrialState.executionEvents.map((event) => event.taskId));
+    const eventInWindowTaskIds = new Set(currentTrialState.executionEvents
       .filter((event) => event.at >= windowStart && event.at < windowEnd)
       .map((event) => event.taskId));
-    const openProblemTaskIds = new Set(state.session.trialState.problems
+    const openProblemTaskIds = new Set(currentTrialState.problems
       .filter((problem) => problem.status === "open")
       .map((problem) => problem.taskId));
-    return state.session.trialState.tasks.flatMap((task) => {
+    return currentTrialState.tasks.flatMap((task) => {
       if (task.summary) return [];
       const inPlannedWindow = task.plannedStart !== null && task.plannedFinish !== null
         && task.plannedStart < windowEnd && task.plannedFinish >= windowStart;
       const importedActive = task.importedActualFinish === undefined && task.importedProgress < 100
         && (task.importedActualStart !== undefined || task.importedProgress > 0);
       if (!inPlannedWindow && !eventTaskIds.has(task.id) && !openProblemTaskIds.has(task.id) && !importedActive) return [];
-      const executionState = selectExecutionState(state.session.trialState, task.id);
+      const executionState = selectExecutionState(currentTrialState, task.id);
       return inPlannedWindow || eventInWindowTaskIds.has(task.id) || executionState === "In Progress"
         || executionState === "Paused" || openProblemTaskIds.has(task.id)
         ? [{ task, executionState }]
         : [];
     });
-  }, [state.session.trialState, windowEnd, windowStart]);
+  }, [currentTrialState, windowEnd, windowStart]);
+  const identityByTaskId = useMemo(
+    () => new Map(state.session.sourceTasks.map((task) => [task.trialTaskId, task])),
+    [state.session.sourceTasks]
+  );
   const counts = new Map<ExecutionState, number>([["Not Started", 0], ["In Progress", 0], ["Paused", 0], ["Completed", 0]]);
   for (const { executionState } of rows) {
     const value = executionState;
@@ -306,31 +429,60 @@ export function Tier1RoundTripTodayView({ state, onOpenTask }: { state: Tier1Rou
   }
   return (
     <>
-      <PageHeading eyebrow="Today · imported round-trip schedule" title="24-hour trial projection" description={`${formatRoundTripMinute(windowStart).replace("T", " ")} to ${formatRoundTripMinute(windowEnd).replace("T", " ")}`} status="Browser-local experimental trial" />
+      <PageHeading eyebrow="Today · imported round-trip schedule" title="Local calendar-day projection" description={`${formatRoundTripMinute(windowStart).replace("T", " ")} to ${formatRoundTripMinute(windowEnd).replace("T", " ")} · ${state.session.locationTimeZone}`} status="Browser-local experimental trial" />
       <section className="status-strip roundtrip-status-strip">{["Not Started", "In Progress", "Paused", "Completed"].map((label) => <div key={label}><span>{label}</span><strong>{counts.get(label as ExecutionState) ?? 0}</strong></div>)}</section>
-      <section className="table-panel"><PanelHeading title="Imported work in period" detail="Planned passage creates attention only; it never creates In Progress." /><div className="table-scroll"><table className="data-table"><thead><tr><th>Task</th><th>State</th><th>Attention</th></tr></thead><tbody>{rows.slice(0, rowLimit).map(({ task, executionState }) => { const projection = selectTaskProjection(state.session.trialState, task.id); return <tr key={task.id}><td><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.wbs} · {task.name}</button></td><td>{executionState}</td><td>{projection.attention.join(" · ") || "None"}</td></tr>; })}</tbody></table></div>{rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {rows.length} tasks in this trial day.</span></div> : null}</section>
+      <section className="table-panel"><PanelHeading title="Tracked leaf work in period" detail="Summary hierarchy rows are excluded. Planned passage creates attention only; it never creates In Progress." /><div className="table-scroll"><table className="data-table"><thead><tr><th>Task</th><th>Duration</th><th>State</th><th>Attention</th></tr></thead><tbody>{rows.slice(0, rowLimit).map(({ task, executionState }) => { const projection = selectTaskProjection(currentTrialState, task.id); const identity = identityByTaskId.get(task.id); return <tr key={task.id}><td><button className="button-link" type="button" onClick={() => onOpenTask(task.id)}>{task.wbs} · {task.name}</button></td><td>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</td><td>{executionState}</td><td>{projection.attention.join(" · ") || "None"}</td></tr>; })}</tbody></table></div>{rows.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, rows.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {rows.length} tracked leaf tasks in this trial day.</span></div> : null}</section>
     </>
   );
 }
 
-export function Tier1RoundTripTaskDashboard({ state, taskId, onBack, onChange }: { state: Tier1RoundTripWorkspaceState; taskId: string; onBack: () => void; onChange: Tier1RoundTripChangeHandler }) {
-  const projection = selectTaskProjection(state.session.trialState, taskId);
+export function Tier1RoundTripTaskDashboard({
+  state,
+  currentMinute,
+  taskId,
+  onBack,
+  onChange
+}: {
+  state: Tier1RoundTripWorkspaceState;
+  currentMinute: number;
+  taskId: string;
+  onBack: () => void;
+  onChange: Tier1RoundTripChangeHandler;
+}) {
+  const currentTrialState = useMemo(
+    () => projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute),
+    [currentMinute, state.session.trialState]
+  );
+  const task = currentTrialState.tasks.find((item) => item.id === taskId);
   const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId);
   const [active, setActive] = useState("Overview");
   const tabs = ["Overview", "Execution", "People", "Discussion", "Delays / Problems", "Actions", "Evidence", "History", "Project context"];
+  if (!task || task.summary) {
+    return (
+      <>
+        <button className="back-link" type="button" onClick={onBack}>← Back to Tasks</button>
+        <section className="detail-panel roundtrip-empty-project">
+          <h1>{task?.name ?? "Task unavailable"}</h1>
+          <p>{task ? "This imported summary row is Project hierarchy context only. It has no tracked-task dashboard or execution record." : "The requested imported leaf task is unavailable in this temporary session."}</p>
+          <button className="button-primary" type="button" onClick={onBack}>Return to tracked leaf tasks</button>
+        </section>
+      </>
+    );
+  }
+  const projection = selectTaskProjection(currentTrialState, taskId);
   return (
     <>
       <button className="back-link" type="button" onClick={onBack}>← Back to Tasks</button>
-      <PageHeading eyebrow={`${projection.task.wbs} · Project UID ${identity?.projectTaskUid ?? "—"}`} title={projection.task.name} description={projection.task.summary ? "Imported summary task · not executable" : "Executable leaf · Tier 1 has unrestricted project authority"} status="Browser-local experimental trial" />
-      <section className="task-state-header"><div><span>Execution state</span><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{roundTripExecutionBasis(state, taskId)}</small></div><div><span>Schedule attention</span><strong>{projection.attention.join(" · ") || "None"}</strong><small>Attention remains separate from execution.</small></div><div><span>Tier 1 authority</span><strong>{projection.task.summary ? "Summary read-only" : "May execute this task"}</strong><small>No assignment/category restriction.</small></div></section>
+      <PageHeading eyebrow={`${projection.task.wbs} · Project UID ${identity?.projectTaskUid ?? "—"}`} title={projection.task.name} description="Tracked executable leaf · Tier 1 has unrestricted project authority" status="Browser-local experimental trial" />
+      <section className="task-state-header"><div><span>Execution state</span><StatusLabel tone={executionTone(projection.executionState)}>{projection.executionState}</StatusLabel><small>{roundTripExecutionBasis(state, taskId)}</small></div><div><span>Schedule attention</span><strong>{projection.attention.join(" · ") || "None"}</strong><small>Attention remains separate from execution.</small></div><div><span>Tier 1 authority</span><strong>May execute this task</strong><small>No assignment/category restriction.</small></div></section>
       <nav className="section-tabs roundtrip-dashboard-tabs" aria-label="Imported Task Dashboard sections">{tabs.map((tab) => <button type="button" className={active === tab ? "selected" : ""} aria-current={active === tab ? "page" : undefined} onClick={() => setActive(tab)} key={tab}>{tab}</button>)}</nav>
       <section className="detail-panel trial-dashboard-panel">
-        {active === "Overview" ? <RoundTripOverview state={state} taskId={taskId} /> : null}
-        {active === "Execution" ? <Tier1ExecutionPanel state={state} taskId={taskId} onChange={onChange} /> : null}
+        {active === "Overview" ? <RoundTripOverview state={state} currentMinute={currentMinute} taskId={taskId} /> : null}
+        {active === "Execution" ? <Tier1ExecutionPanel state={state} currentMinute={currentMinute} taskId={taskId} onChange={onChange} /> : null}
         {active === "People" ? <RoundTripPeople state={state} taskId={taskId} /> : null}
         {active === "Discussion" ? <RoundTripPlaceholder title="Discussion" detail="No discussion records have been created in this temporary session." /> : null}
-        {active === "Delays / Problems" ? <RoundTripProblems state={state} taskId={taskId} onChange={onChange} /> : null}
-        {active === "Actions" ? <RoundTripActions state={state} taskId={taskId} onChange={onChange} /> : null}
+        {active === "Delays / Problems" ? <RoundTripProblems state={state} currentMinute={currentMinute} taskId={taskId} onChange={onChange} /> : null}
+        {active === "Actions" ? <RoundTripActions state={state} currentMinute={currentMinute} taskId={taskId} onChange={onChange} /> : null}
         {active === "Evidence" ? <RoundTripPlaceholder title="Evidence" detail="Evidence attachment storage is outside this browser-local trial." /> : null}
         {active === "History" ? <RoundTripTaskHistory state={state} taskId={taskId} /> : null}
         {active === "Project context" ? <RoundTripProjectContext state={state} taskId={taskId} /> : null}
@@ -528,15 +680,30 @@ function RoundTripResultReview({ result, disposition, notes, onDisposition, onNo
   );
 }
 
-function Tier1ExecutionPanel({ state, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
-  const projection = selectTaskProjection(state.session.trialState, taskId);
+function Tier1ExecutionPanel({
+  state,
+  currentMinute,
+  taskId,
+  onChange
+}: {
+  state: Tier1RoundTripWorkspaceState;
+  currentMinute: number;
+  taskId: string;
+  onChange: Tier1RoundTripChangeHandler;
+}) {
+  const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId);
   const [error, setError] = useState("");
   const [open, setOpen] = useState("");
   const activePause = state.session.trialState.pauseIntervals.find((pause) => pause.taskId === taskId && pause.endedAt === undefined);
   const linkedProblem = activePause?.problemId ? state.session.trialState.problems.find((problem) => problem.id === activePause.problemId && problem.status === "open") : undefined;
   function apply(action: Parameters<typeof applyTier1RoundTripExecutionAction>[1]) {
     try {
-      onChange({ session: applyTier1RoundTripExecutionAction(state.session, action), candidate: null, projectResult: null, disposition: null });
+      onChange({
+        session: applyTier1RoundTripExecutionAction(state.session, action, readSessionCurrentMinute(state.session)),
+        candidate: null,
+        projectResult: null,
+        disposition: null
+      });
       setError(""); setOpen(""); return true;
     } catch (caught) { setError(caught instanceof Error ? caught.message : "The execution event could not be recorded."); return false; }
   }
@@ -544,27 +711,30 @@ function Tier1ExecutionPanel({ state, taskId, onChange }: { state: Tier1RoundTri
     event.preventDefault();
     const data = new FormData(event.currentTarget);
     try {
-      const session = recordTier1RoundTripProgress(state.session, { taskId, completionPercent: Number(data.get("completion")), remainingWork: required(data, "remaining"), nextIssue: optional(data, "issue"), note: optional(data, "note") });
+      const session = recordTier1RoundTripProgress(
+        state.session,
+        { taskId, completionPercent: Number(data.get("completion")), remainingWork: required(data, "remaining"), nextIssue: optional(data, "issue"), note: optional(data, "note") },
+        readSessionCurrentMinute(state.session)
+      );
       onChange({ session, candidate: null, projectResult: null, disposition: null });
       setError(""); event.currentTarget.reset();
     } catch (caught) { setError(caught instanceof Error ? caught.message : "The progress observation could not be recorded."); }
   }
   if (projection.task.summary) return <><PanelHeading title="Execution" detail="Summary tasks are not executable." /><p className="trial-placeholder">Open an imported leaf task to record Tier 1 execution.</p></>;
-  const current = formatRoundTripMinute(state.session.trialState.now).replace("T", " ");
+  const current = formatRoundTripMinute(currentMinute).replace("T", " ");
   const formId = (action: string) => `roundtrip-execution-${taskId}-${action}`;
   return (
-    <><PanelHeading title="Tier 1 execution" detail={`All actions use trial time ${current}; there is no manual date/time entry.`} />
+    <><PanelHeading title="Tier 1 execution" detail={`Actions capture current location time when submitted (${current} · ${state.session.locationTimeZone}); there is no manual date/time entry.`} />
       <div className="roundtrip-execution-actions">
         {projection.executionState === "Not Started" ? <><button type="button" aria-expanded={open === "cant"} aria-controls={formId("cant")} onClick={() => setOpen((currentOpen) => currentOpen === "cant" ? "" : "cant")}>Can't Start</button><button type="button" aria-expanded={open === "start"} aria-controls={formId("start")} onClick={() => setOpen((currentOpen) => currentOpen === "start" ? "" : "start")}>Start</button></> : null}
         {projection.executionState === "In Progress" ? <><button type="button" aria-expanded={open === "pause"} aria-controls={formId("pause")} onClick={() => setOpen((currentOpen) => currentOpen === "pause" ? "" : "pause")}>Pause</button><button type="button" aria-expanded={open === "finish"} aria-controls={formId("finish")} onClick={() => setOpen((currentOpen) => currentOpen === "finish" ? "" : "finish")}>Finish</button></> : null}
         {projection.executionState === "Paused" ? <button type="button" aria-expanded={open === "resume"} aria-controls={formId("resume")} onClick={() => setOpen((currentOpen) => currentOpen === "resume" ? "" : "resume")}>Resume</button> : null}
-        <button type="button" disabled={projection.task.plannedStart === null} title={projection.task.plannedStart === null ? "This imported task has no planned Start." : undefined} onClick={() => { try { onChange({ ...state, session: jumpTier1RoundTripClockToTaskStart(state.session, taskId), candidate: null, projectResult: null, disposition: null }); setError(""); } catch (caught) { setError(caught instanceof Error ? caught.message : "Cannot jump to this task start."); } }}>Jump to planned start</button>
       </div>
       {open === "cant" ? <form id={formId("cant")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "cant-start", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, reason: required(data, "reason"), whatIsNeeded: required(data, "needed"), createProblem: data.get("problem") === "yes", createAction: data.get("action") === "yes" }); }}><label>Structured reason<select name="reason" required defaultValue=""><option value="" disabled>Choose reason</option><option>Access or scaffold unavailable</option><option>Permit or isolation unavailable</option><option>Material unavailable</option><option>Other operational constraint</option></select></label><label>What needs to happen?<textarea name="needed" required rows={2} /></label><label><input type="checkbox" name="problem" value="yes" /> Create linked problem</label><label><input type="checkbox" name="action" value="yes" /> Create linked action</label><button type="submit">Record Can't Start</button></form> : null}
-      {open === "start" ? <form id={formId("start")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "start", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, lateCause: optional(data, "late"), actionStillNeeded: optional(data, "needed") }); }}>{projection.task.plannedStart !== null && state.session.trialState.now > projection.task.plannedStart ? <><label>Late-start cause<textarea name="late" required rows={2} /></label><label>What still needs action?<textarea name="needed" rows={2} /></label></> : <p>{projection.task.plannedStart === null ? "No planned Start was supplied; this trial does not infer lateness." : "Starting on time does not require a reason."}</p>}<button type="submit">Start at trial time</button></form> : null}
-      {open === "pause" ? <form id={formId("pause")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "pause", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, reason: required(data, "reason"), whatIsNeeded: required(data, "needed"), adverseDelay: data.get("classification") === "adverse", createAction: data.get("action") === "yes" }); }}><label>Pause reason<input name="reason" required /></label><label>Classification<select name="classification" defaultValue="normal"><option value="normal">Normal pause — not an adverse delay</option><option value="adverse">Adverse delay — create linked problem</option></select></label><label>What needs to happen?<textarea name="needed" required rows={2} /></label><label><input type="checkbox" name="action" value="yes" /> Create linked action</label><button type="submit">Pause at trial time</button></form> : null}
-      {open === "resume" ? <form id={formId("resume")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "resume", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, issueResolution: linkedProblem ? required(data, "resolution") as "resolved" | "remains-open" : "not-applicable" }); }}>{linkedProblem ? <label>Linked problem state<select name="resolution" required defaultValue=""><option value="" disabled>Choose explicitly</option><option value="resolved">Resolved</option><option value="remains-open">Work resumed; problem remains open</option></select></label> : <p>No open structured problem is linked.</p>}<button type="submit">Resume at trial time</button></form> : null}
-      {open === "finish" ? <form id={formId("finish")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); apply({ type: "finish", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID }); }}><p>Confirm the task is complete. The trial clock records completion automatically.</p><button type="submit">Confirm Finish</button></form> : null}
+      {open === "start" ? <form id={formId("start")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "start", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, lateCause: optional(data, "late"), actionStillNeeded: optional(data, "needed") }); }}>{projection.task.plannedStart !== null && currentMinute > projection.task.plannedStart ? <><label>Late-start cause<textarea name="late" required rows={2} /></label><label>What still needs action?<textarea name="needed" rows={2} /></label></> : <p>{projection.task.plannedStart === null ? "No planned Start was supplied; this trial does not infer lateness." : "Starting on time does not require a reason."}</p>}<button type="submit">Start now</button></form> : null}
+      {open === "pause" ? <form id={formId("pause")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "pause", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, reason: required(data, "reason"), whatIsNeeded: required(data, "needed"), adverseDelay: data.get("classification") === "adverse", createAction: data.get("action") === "yes" }); }}><label>Pause reason<input name="reason" required /></label><label>Classification<select name="classification" defaultValue="normal"><option value="normal">Normal pause — not an adverse delay</option><option value="adverse">Adverse delay — create linked problem</option></select></label><label>What needs to happen?<textarea name="needed" required rows={2} /></label><label><input type="checkbox" name="action" value="yes" /> Create linked action</label><button type="submit">Pause now</button></form> : null}
+      {open === "resume" ? <form id={formId("resume")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); const data = new FormData(event.currentTarget); apply({ type: "resume", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID, issueResolution: linkedProblem ? required(data, "resolution") as "resolved" | "remains-open" : "not-applicable" }); }}>{linkedProblem ? <label>Linked problem state<select name="resolution" required defaultValue=""><option value="" disabled>Choose explicitly</option><option value="resolved">Resolved</option><option value="remains-open">Work resumed; problem remains open</option></select></label> : <p>No open structured problem is linked.</p>}<button type="submit">Resume now</button></form> : null}
+      {open === "finish" ? <form id={formId("finish")} className="roundtrip-execution-form" onSubmit={(event) => { event.preventDefault(); apply({ type: "finish", taskId, actorId: TIER1_ROUNDTRIP_ACTOR_ID }); }}><p>Confirm the task is complete. Current location time is captured automatically.</p><button type="submit">Confirm Finish</button></form> : null}
       {projection.executionState === "Completed"
         ? <p className="trial-placeholder">This task is complete. Unfinished-progress observations are no longer available.</p>
         : <form className="roundtrip-progress-form" onSubmit={progress}><strong>How much of the task is complete?</strong><label>Completion percentage<input name="completion" type="number" min="0" max="100" required /></label><label>What remains?<textarea name="remaining" required rows={2} /></label><label>Next issue (enter None if none)<input name="issue" required /></label><label>Optional note<input name="note" /></label><button type="submit">Record Tracker progress observation</button><small>Progress alone does not silently create Start.</small></form>}
@@ -573,23 +743,27 @@ function Tier1ExecutionPanel({ state, taskId, onChange }: { state: Tier1RoundTri
   );
 }
 
-function RoundTripOverview({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const projection = selectTaskProjection(state.session.trialState, taskId); return <><PanelHeading title="Overview" detail="Imported Project facts and local Tracker truth." /><dl className="detail-list"><div><dt>Execution</dt><dd>{projection.executionState}</dd></div><div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div><div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div><div><dt>Active problems</dt><dd>{projection.activeProblems.length}</dd></div></dl></>; }
-function RoundTripPeople({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const task = state.session.trialState.tasks.find((item) => item.id === taskId); return <><PanelHeading title="People" detail="Authority is explicit and browser-local for this Tier 1-only trial." /><dl className="detail-list"><div><dt>Current operator</dt><dd>Tier 1 round-trip reviewer</dd></div><div><dt>Task authority</dt><dd>{task?.summary ? "Summary inspection only" : "May execute and update this leaf"}</dd></div><div><dt>Derived assignments</dt><dd>None — Project resource data never creates application authority</dd></div></dl></>; }
-function RoundTripProblems({ state, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
-  const projection = selectTaskProjection(state.session.trialState, taskId);
-  const [error, setError] = useState("");
-  return <><PanelHeading title="Delays / Problems" detail="Pause intervals remain distinct from adverse problems." /><ul className="record-list trial-action-records">{projection.activeProblems.length ? projection.activeProblems.map((problem) => <li key={problem.id}><strong>{problem.reason}</strong><span>{problem.whatIsNeeded}</span><button type="button" onClick={() => { try { onChange({ ...state, session: applyTier1RoundTripRecordAction(state.session, { type: "resolve-problem", problemId: problem.id, actorId: TIER1_ROUNDTRIP_ACTOR_ID }), candidate: null, projectResult: null, disposition: null }); setError(""); } catch (caught) { setError(caught instanceof Error ? caught.message : "The problem could not be resolved."); } }}>Resolve problem in trial</button></li>) : <li><strong>No open problem</strong><span>No structured adverse problem is active.</span></li>}</ul>{error ? <p className="trial-form-error" role="alert">{error}</p> : null}</>;
+function RoundTripOverview({ state, currentMinute, taskId }: { state: Tier1RoundTripWorkspaceState; currentMinute: number; taskId: string }) {
+  const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId);
+  const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId);
+  return <><PanelHeading title="Overview" detail="Imported Project facts and local Tracker truth." /><dl className="detail-list"><div><dt>Execution</dt><dd>{projection.executionState}</dd></div><div><dt>Imported duration</dt><dd>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</dd></div><div><dt>Progress</dt><dd>{projection.progressPercent}%</dd></div><div><dt>Progress basis</dt><dd>{projection.progressBasis}</dd></div><div><dt>Active problems</dt><dd>{projection.activeProblems.length}</dd></div></dl></>;
 }
-function RoundTripActions({ state, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
-  const projection = selectTaskProjection(state.session.trialState, taskId);
+function RoundTripPeople({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const task = state.session.trialState.tasks.find((item) => item.id === taskId); return <><PanelHeading title="People" detail="Authority is explicit and browser-local for this Tier 1-only trial." /><dl className="detail-list"><div><dt>Current operator</dt><dd>Tier 1 round-trip reviewer</dd></div><div><dt>Task authority</dt><dd>{task?.summary ? "Summary inspection only" : "May execute and update this leaf"}</dd></div><div><dt>Derived assignments</dt><dd>None — Project resource data never creates application authority</dd></div></dl></>; }
+function RoundTripProblems({ state, currentMinute, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; currentMinute: number; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
+  const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId);
   const [error, setError] = useState("");
-  return <><PanelHeading title="Actions" detail="Local actions linked from Can't Start or Pause." /><ul className="record-list trial-action-records">{projection.openActions.length ? projection.openActions.map((action) => <li key={action.id}><strong>{action.description}</strong><span>Open in this browser-memory trial</span><button type="button" onClick={() => { try { onChange({ ...state, session: applyTier1RoundTripRecordAction(state.session, { type: "complete-action", actionId: action.id, actorId: TIER1_ROUNDTRIP_ACTOR_ID }), candidate: null, projectResult: null, disposition: null }); setError(""); } catch (caught) { setError(caught instanceof Error ? caught.message : "The action could not be completed."); } }}>Complete action in trial</button></li>) : <li><strong>No open action</strong><span>No task action is currently outstanding.</span></li>}</ul>{error ? <p className="trial-form-error" role="alert">{error}</p> : null}</>;
+  return <><PanelHeading title="Delays / Problems" detail="Pause intervals remain distinct from adverse problems." /><ul className="record-list trial-action-records">{projection.activeProblems.length ? projection.activeProblems.map((problem) => <li key={problem.id}><strong>{problem.reason}</strong><span>{problem.whatIsNeeded}</span><button type="button" onClick={() => { try { onChange({ ...state, session: applyTier1RoundTripRecordAction(state.session, { type: "resolve-problem", problemId: problem.id, actorId: TIER1_ROUNDTRIP_ACTOR_ID }, readSessionCurrentMinute(state.session)), candidate: null, projectResult: null, disposition: null }); setError(""); } catch (caught) { setError(caught instanceof Error ? caught.message : "The problem could not be resolved."); } }}>Resolve problem now</button></li>) : <li><strong>No open problem</strong><span>No structured adverse problem is active.</span></li>}</ul>{error ? <p className="trial-form-error" role="alert">{error}</p> : null}</>;
+}
+function RoundTripActions({ state, currentMinute, taskId, onChange }: { state: Tier1RoundTripWorkspaceState; currentMinute: number; taskId: string; onChange: Tier1RoundTripChangeHandler }) {
+  const projection = selectTaskProjection(projectTier1RoundTripStateAtMinute(state.session.trialState, currentMinute), taskId);
+  const [error, setError] = useState("");
+  return <><PanelHeading title="Actions" detail="Local actions linked from Can't Start or Pause." /><ul className="record-list trial-action-records">{projection.openActions.length ? projection.openActions.map((action) => <li key={action.id}><strong>{action.description}</strong><span>Open in this browser-memory trial</span><button type="button" onClick={() => { try { onChange({ ...state, session: applyTier1RoundTripRecordAction(state.session, { type: "complete-action", actionId: action.id, actorId: TIER1_ROUNDTRIP_ACTOR_ID }, readSessionCurrentMinute(state.session)), candidate: null, projectResult: null, disposition: null }); setError(""); } catch (caught) { setError(caught instanceof Error ? caught.message : "The action could not be completed."); } }}>Complete action now</button></li>) : <li><strong>No open action</strong><span>No task action is currently outstanding.</span></li>}</ul>{error ? <p className="trial-form-error" role="alert">{error}</p> : null}</>;
 }
 function RoundTripPlaceholder({ title, detail }: { title: string; detail: string }) { return <><PanelHeading title={title} detail="Browser-local experimental trial" /><p className="trial-placeholder">{detail}</p></>; }
 function RoundTripTaskHistory({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const progressEvents = state.session.history.filter((item) => item.taskId === taskId && item.type === "progress-observation"); const events = [...state.session.trialState.history.filter((item) => item.taskId === taskId), ...progressEvents].sort((a, b) => b.at - a.at); return <><PanelHeading title="History" detail="Imported activation and local execution/progress events." /><ol className="activity-list trial-history-list">{events.map((event) => <li key={event.id}><strong>{formatRoundTripMinute(event.at).replace("T", " ")}</strong><span>{event.summary}</span></li>)}</ol></>; }
-function RoundTripProjectContext({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId); return <><PanelHeading title="Project context" detail="Immutable imported identity and source values." /><dl className="detail-list"><div><dt>Project task UID / ID</dt><dd>{identity?.projectTaskUid} / {identity?.projectTaskId ?? "—"}</dd></div><div><dt>WBS</dt><dd>{identity?.wbs ?? "—"}</dd></div><div><dt>Imported Actual Start</dt><dd>{identity?.sourceValues.actualStart ?? "Absent"}</dd></div><div><dt>Imported Actual Finish</dt><dd>{identity?.sourceValues.actualFinish ?? "Absent"}</dd></div><div><dt>Imported % Complete</dt><dd>{identity?.sourceValues.percentComplete ?? "Absent"}</dd></div></dl></>; }
-function TemporaryProjectSummary({ state }: { state: Tier1RoundTripWorkspaceState }) { return <section className="detail-panel"><PanelHeading title="Temporary round-trip trial active" detail="Imported source is the current browser-memory schedule context." /><dl className="detail-list"><div><dt>Source</dt><dd>{state.session.source.fileName}</dd></div><div><dt>Project</dt><dd>{state.session.trialState.project.name}</dd></div><div><dt>Initial time basis</dt><dd>{state.session.initialTimeSource}</dd></div><div><dt>Persistence</dt><dd>None</dd></div></dl></section>; }
-function RoundTripSourceTaskTable({ tasks }: { tasks: ProjectXmlPreview["tasks"] }) { return <div className="table-scroll"><table className="data-table import-task-table"><thead><tr><th>WBS / task</th><th>UID</th><th>ID</th><th>Type</th><th>Start</th><th>Finish</th><th>Imported progress</th></tr></thead><tbody>{tasks.map((task, index) => <tr key={`${task.uid ?? "no-uid"}:${task.id ?? "no-id"}:${index}`} className={task.summary ? "summary-row" : ""}><td>{task.wbs ?? task.outlineNumber ?? "—"} · {task.name}</td><td>{task.uid ?? "—"}</td><td>{task.id ?? "—"}</td><td>{task.summary ? "Summary" : "Leaf"}</td><td>{task.start ?? "—"}</td><td>{task.finish ?? "—"}</td><td>{task.percentComplete === null ? "—" : `${task.percentComplete}%`}</td></tr>)}</tbody></table></div>; }
+function RoundTripProjectContext({ state, taskId }: { state: Tier1RoundTripWorkspaceState; taskId: string }) { const identity = state.session.sourceTasks.find((item) => item.trialTaskId === taskId); return <><PanelHeading title="Project context" detail="Immutable imported identity and source values." /><dl className="detail-list"><div><dt>Project task UID / ID</dt><dd>{identity?.projectTaskUid} / {identity?.projectTaskId ?? "—"}</dd></div><div><dt>WBS</dt><dd>{identity?.wbs ?? "—"}</dd></div><div><dt>Imported Start</dt><dd>{identity?.sourceValues.start ?? "Absent"}</dd></div><div><dt>Imported Finish</dt><dd>{identity?.sourceValues.finish ?? "Absent"}</dd></div><div><dt>Imported Duration</dt><dd>{formatImportedProjectDuration(identity?.sourceValues.duration ?? null, identity?.sourceValues.durationFormat ?? null, state.session.source.preview)}</dd></div><div><dt>Imported Actual Start</dt><dd>{identity?.sourceValues.actualStart ?? "Absent"}</dd></div><div><dt>Imported Actual Finish</dt><dd>{identity?.sourceValues.actualFinish ?? "Absent"}</dd></div><div><dt>Imported % Complete</dt><dd>{identity?.sourceValues.percentComplete ?? "Absent"}</dd></div></dl></>; }
+function TemporaryProjectSummary({ state }: { state: Tier1RoundTripWorkspaceState }) { return <section className="detail-panel"><PanelHeading title="Temporary round-trip trial active" detail="Imported source is the current browser-memory schedule context." /><dl className="detail-list"><div><dt>Source</dt><dd>{state.session.source.fileName}</dd></div><div><dt>Project</dt><dd>{state.session.trialState.project.name}</dd></div><div><dt>Time source</dt><dd>{state.session.initialTimeSource} · {state.session.locationTimeZone}</dd></div><div><dt>Persistence</dt><dd>None</dd></div></dl></section>; }
+function RoundTripSourceTaskTable({ tasks, settings }: { tasks: ProjectXmlPreview["tasks"]; settings: ProjectXmlPreview }) { return <div className="table-scroll"><table className="data-table import-task-table"><thead><tr><th>WBS / task</th><th>UID</th><th>ID</th><th>Type</th><th>Start</th><th>Finish</th><th>Duration</th><th>Imported progress</th></tr></thead><tbody>{tasks.map((task, index) => <tr key={`${task.uid ?? "no-uid"}:${task.id ?? "no-id"}:${index}`} className={task.summary ? "summary-row" : ""}><td>{task.wbs ?? task.outlineNumber ?? "—"} · {task.name}</td><td>{task.uid ?? "—"}</td><td>{task.id ?? "—"}</td><td>{task.summary ? "Hierarchy summary" : "Tracked leaf"}</td><td>{task.start ?? "—"}</td><td>{task.finish ?? "—"}</td><td>{formatImportedProjectDuration(task.duration, task.durationFormat, settings)}</td><td>{task.percentComplete === null ? "—" : `${task.percentComplete}%`}</td></tr>)}</tbody></table></div>; }
 
 function stringifySourceValue(value: string | number | null) { return value === null ? null : String(value); }
 function normalizeComparableValue(field: ProjectXmlMappingField, value: string | number | null) { if (value === null) return null; return field === "PercentComplete" || field === "PhysicalPercentComplete" ? Number(value) : String(value); }
@@ -597,5 +771,6 @@ function roundTripExecutionBasis(state: Tier1RoundTripWorkspaceState, taskId: st
 function trialCandidateFileName(projectName: string) { const safe = projectName.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project"; return `${safe}-shutdown-tracker-trial.xml`; }
 function executionTone(state: ExecutionState) { return state === "Completed" ? "success" as const : state === "Paused" ? "warning" as const : state === "In Progress" ? "info" as const : "neutral" as const; }
 function formatImportedTrialMinute(value: number | null) { return value === null ? "Not supplied" : formatRoundTripMinute(value).replace("T", " "); }
+function readSessionCurrentMinute(session: Tier1RoundTripSession) { return readTier1RoundTripLocationClock(new Date(), session.locationTimeZone).minute; }
 function required(data: FormData, name: string) { const value = data.get(name); if (typeof value !== "string" || !value.trim()) throw new Error(`${name} is required.`); return value.trim(); }
 function optional(data: FormData, name: string) { const value = data.get(name); return typeof value === "string" && value.trim() ? value.trim() : undefined; }

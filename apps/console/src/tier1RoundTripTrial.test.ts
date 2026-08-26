@@ -1,26 +1,29 @@
-import { selectExecutionState, selectTaskProgress } from "@shutdown-tracker/trial-model";
-import { describe, expect, it } from "vitest";
+import { selectExecutionState, selectTaskProgress, selectTaskProjection } from "@shutdown-tracker/trial-model";
+import { describe, expect, it, vi } from "vitest";
 import type { ProjectXmlPreview, ProjectXmlTaskPreview } from "./projectXmlPreview";
 import {
-  ROUNDTRIP_FALLBACK_INITIAL_TIME,
   TIER1_ROUNDTRIP_ACTOR_ID,
-  advanceTier1RoundTripClock,
   applyTier1RoundTripExecutionAction,
   applyTier1RoundTripRecordAction,
-  chooseTier1RoundTripInitialClock,
   createTier1RoundTripSession,
   deriveTier1RoundTripMappingProposals,
   formatRoundTripMinute,
-  jumpTier1RoundTripClockToTaskStart,
   mergeTier1RoundTripMappingSelections,
   parseProjectIsoMinute,
+  projectTier1RoundTripStateAtMinute,
+  readTier1RoundTripLocationClock,
   recordTier1RoundTripProgress,
   resetTier1RoundTripSession,
+  selectTier1RoundTripTaskRows,
+  tier1RoundTripLocalDayWindow,
   updateTier1RoundTripMappingSelection,
   type Tier1RoundTripSession
 } from "./tier1RoundTripTrial";
 
 const SOURCE_XML = "<?xml version=\"1.0\"?><Project xmlns=\"http://schemas.microsoft.com/project\"><Name>Test imported schedule</Name><Tasks /></Project>";
+const TEST_TIME_ZONE = "Australia/Perth";
+const TEST_START = projectMinute("2026-01-05T06:00:00");
+const TEST_CLOCK = { minute: TEST_START, timeZone: TEST_TIME_ZONE };
 
 describe("Tier 1 imported Project round-trip session", () => {
   it("retains the exact source and adapts identity, hierarchy, planned facts, and Critical context", () => {
@@ -29,7 +32,8 @@ describe("Tier 1 imported Project round-trip session", () => {
     expect(session.source.xml).toBe(SOURCE_XML);
     expect(session.source.fileName).toBe("test-source.xml");
     expect(session.source.hash).toBe("source-sha256");
-    expect(session.initialTimeSource).toBe("Project StatusDate");
+    expect(session.initialTimeSource).toBe("Current device time");
+    expect(session.locationTimeZone).toBe(TEST_TIME_ZONE);
     expect(formatRoundTripMinute(session.trialState.now)).toBe("2026-01-05T06:00:00");
     expect(session.trialState.users).toEqual([{
       id: TIER1_ROUNDTRIP_ACTOR_ID,
@@ -55,10 +59,22 @@ describe("Tier 1 imported Project round-trip session", () => {
       sourceValues: {
         start: "2026-01-05T07:00:00",
         finish: "2026-01-05T12:00:00",
+        duration: "PT6H0M0S",
+        durationFormat: 5,
         percentComplete: 0,
         physicalPercentComplete: 15
       }
     });
+  });
+
+  it("keeps summary ancestry as hierarchy context when task search matches a leaf or work pack", () => {
+    const tasks = createSession().trialState.tasks;
+
+    expect(selectTier1RoundTripTaskRows(tasks, "Executable leaf").map((task) => task.name))
+      .toEqual(["Summary", "Executable leaf"]);
+    expect(selectTier1RoundTripTaskRows(tasks, "Summary").map((task) => task.name))
+      .toEqual(["Summary", "Executable leaf"]);
+    expect(selectTier1RoundTripTaskRows(tasks, "not present")).toEqual([]);
   });
 
   it("retains losslessly decoded source bytes, including a UTF-8 BOM", () => {
@@ -68,7 +84,8 @@ describe("Tier 1 imported Project round-trip session", () => {
       fileName: "bom-source.xml",
       sourceXml: xml,
       sourceBytes: bytes,
-      preview: preview()
+      preview: preview(),
+      clock: TEST_CLOCK
     });
     expect(session.source.xml).toBe(xml);
     expect([...session.source.bytes]).toEqual([...bytes]);
@@ -77,39 +94,161 @@ describe("Tier 1 imported Project round-trip session", () => {
       fileName: "mismatch.xml",
       sourceXml: SOURCE_XML,
       sourceBytes: new TextEncoder().encode(`${SOURCE_XML} `),
-      preview: preview()
+      preview: preview(),
+      clock: TEST_CLOCK
     })).toThrow("do not match the inspected XML text");
   });
 
-  it("uses StatusDate, then earliest planned start, then the explicit fixed fallback", () => {
-    expect(createSession().initialTimeSource).toBe("Project StatusDate");
+  it("converts an instant to current wall-clock time in the supplied IANA location", () => {
+    const perth = readTier1RoundTripLocationClock(
+      new Date("2026-08-26T10:42:59.999Z"),
+      "Australia/Perth"
+    );
+    const newYork = readTier1RoundTripLocationClock(
+      new Date("2026-08-26T10:42:59.999Z"),
+      "America/New_York"
+    );
 
-    const earliest = createTier1RoundTripSession({
-      fileName: "earliest.xml",
-      sourceXml: SOURCE_XML,
-      preview: preview({ statusDate: null })
-    });
-    expect(earliest.initialTimeSource).toBe("Earliest task planned start");
-    expect(formatRoundTripMinute(earliest.trialState.now)).toBe("2026-01-05T06:00:00");
+    expect(perth.timeZone).toBe("Australia/Perth");
+    expect(formatRoundTripMinute(perth.minute)).toBe("2026-08-26T18:42:00");
+    expect(formatRoundTripMinute(newYork.minute)).toBe("2026-08-26T06:42:00");
+    expect(() => readTier1RoundTripLocationClock(new Date(), "Not/A_Timezone"))
+      .toThrow("is not supported");
+  });
 
-    expect(formatRoundTripMinute(parseProjectIsoMinute(ROUNDTRIP_FALLBACK_INITIAL_TIME, "fallback")))
-      .toBe("2026-01-01T06:00:00");
-    const fallback = chooseTier1RoundTripInitialClock(preview({
-      statusDate: null,
-      tasks: [task({ start: null, finish: null })]
-    }));
-    expect(fallback.source).toBe("Fixed fallback");
-    expect(formatRoundTripMinute(fallback.minute)).toBe("2026-01-01T06:00:00");
-
-    const fallbackSession = createTier1RoundTripSession({
+  it("uses current device time even when StatusDate and planned dates are absent", () => {
+    const session = createTier1RoundTripSession({
       fileName: "unscheduled.xml",
       sourceXml: SOURCE_XML,
-      preview: preview({ statusDate: null, tasks: [task({ start: null, finish: null })] })
+      preview: preview({ statusDate: null, tasks: [task({ start: null, finish: null })] }),
+      clock: TEST_CLOCK
     });
-    expect(fallbackSession.initialTimeSource).toBe("Fixed fallback");
-    expect(fallbackSession.trialState.tasks[0]).toMatchObject({ plannedStart: null, plannedFinish: null });
-    expect(() => jumpTier1RoundTripClockToTaskStart(fallbackSession, "project-task-uid:1"))
-      .toThrow("has no imported planned Start");
+    expect(session.initialTimeSource).toBe("Current device time");
+    expect(session.locationTimeZone).toBe(TEST_TIME_ZONE);
+    expect(formatRoundTripMinute(session.trialState.now)).toBe("2026-01-05T06:00:00");
+    expect(session.trialState.tasks[0]).toMatchObject({ plannedStart: null, plannedFinish: null });
+  });
+
+  it("fails closed during a repeated daylight-saving wall-clock interval", () => {
+    const beforeRollback = readTier1RoundTripLocationClock(
+      new Date("2026-11-01T05:45:00Z"),
+      "America/New_York"
+    );
+    const afterRollback = readTier1RoundTripLocationClock(
+      new Date("2026-11-01T06:15:00Z"),
+      "America/New_York"
+    );
+    expect(formatRoundTripMinute(beforeRollback.minute)).toBe("2026-11-01T01:45:00");
+    expect(formatRoundTripMinute(afterRollback.minute)).toBe("2026-11-01T01:15:00");
+
+    const taskId = "project-task-uid:11";
+    const session = applyTier1RoundTripExecutionAction(createTier1RoundTripSession({
+      fileName: "dst-source.xml",
+      sourceXml: SOURCE_XML,
+      preview: preview(),
+      clock: beforeRollback
+    }), {
+      type: "cant-start",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+      reason: "DST safety check",
+      whatIsNeeded: "Wait through the repeated interval",
+      createProblem: false,
+      createAction: false
+    }, beforeRollback.minute);
+
+    expect(() => applyTier1RoundTripExecutionAction(session, {
+      type: "start",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+      lateCause: "Repeated local interval"
+    }, afterRollback.minute)).toThrow("precedes an existing Tracker event");
+  });
+
+  it("captures a fresh current location minute for execution, records, and progress", () => {
+    vi.useFakeTimers();
+    try {
+      const taskId = "project-task-uid:11";
+      vi.setSystemTime(new Date("2026-01-04T22:15:20Z"));
+      let session = applyTier1RoundTripExecutionAction(createSession(), {
+        type: "cant-start",
+        taskId,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+        reason: "Access unavailable",
+        whatIsNeeded: "Release access",
+        createProblem: true,
+        createAction: true
+      });
+      expect(formatRoundTripMinute(session.trialState.executionEvents[0].at)).toBe("2026-01-05T06:15:00");
+
+      vi.setSystemTime(new Date("2026-01-04T22:20:45Z"));
+      session = applyTier1RoundTripRecordAction(session, {
+        type: "resolve-problem",
+        problemId: session.trialState.problems[0].id,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID
+      });
+      expect(formatRoundTripMinute(session.trialState.problems[0].resolvedAt!)).toBe("2026-01-05T06:20:00");
+
+      vi.setSystemTime(new Date("2026-01-04T22:21:01Z"));
+      session = applyTier1RoundTripRecordAction(session, {
+        type: "complete-action",
+        actionId: session.trialState.actions[0].id,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID
+      });
+      expect(formatRoundTripMinute(session.trialState.actions[0].completedAt!)).toBe("2026-01-05T06:21:00");
+
+      vi.setSystemTime(new Date("2026-01-04T23:00:01Z"));
+      session = applyTier1RoundTripExecutionAction(session, {
+        type: "start",
+        taskId,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID
+      });
+      vi.setSystemTime(new Date("2026-01-04T23:05:59Z"));
+      session = recordTier1RoundTripProgress(session, {
+        taskId,
+        completionPercent: 10,
+        remainingWork: "Continue",
+        nextIssue: "None"
+      });
+      vi.setSystemTime(new Date("2026-01-04T23:10:00Z"));
+      session = applyTier1RoundTripExecutionAction(session, {
+        type: "pause",
+        taskId,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+        reason: "Routine pause",
+        adverseDelay: false,
+        whatIsNeeded: "Resume work",
+        createAction: false
+      });
+      vi.setSystemTime(new Date("2026-01-04T23:15:00Z"));
+      session = applyTier1RoundTripExecutionAction(session, {
+        type: "resume",
+        taskId,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+        issueResolution: "not-applicable"
+      });
+      vi.setSystemTime(new Date("2026-01-04T23:20:59Z"));
+      session = applyTier1RoundTripExecutionAction(session, {
+        type: "finish",
+        taskId,
+        actorId: TIER1_ROUNDTRIP_ACTOR_ID
+      });
+
+      expect(session.trialState.executionEvents.map((event) => [event.type, formatRoundTripMinute(event.at)]))
+        .toEqual([
+          ["cant-start", "2026-01-05T06:15:00"],
+          ["start", "2026-01-05T07:00:00"],
+          ["pause", "2026-01-05T07:10:00"],
+          ["resume", "2026-01-05T07:15:00"],
+          ["finish", "2026-01-05T07:20:00"]
+        ]);
+      expect(formatRoundTripMinute(session.trialState.progressObservations[0].at)).toBe("2026-01-05T07:05:00");
+      const mappings = deriveTier1RoundTripMappingProposals(session);
+      expect(mappings.find((mapping) => mapping.trackerFact === "start")?.proposedValue).toBe("2026-01-05T07:00:00");
+      expect(mappings.find((mapping) => mapping.trackerFact === "finish")?.proposedValue).toBe("2026-01-05T07:20:00");
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("keeps imported Actual Start, Actual Finish, and PercentComplete as execution evidence", () => {
@@ -127,24 +266,31 @@ describe("Tier 1 imported Project round-trip session", () => {
     expect(selectExecutionState(session.trialState, "project-task-uid:23")).toBe("In Progress");
   });
 
-  it("moves only through the explicit round-trip clock and planned passage never establishes In Progress", () => {
-    let session = createSession();
+  it("uses live passage for schedule attention without silently establishing In Progress", () => {
+    const session = createSession();
     const leafId = "project-task-uid:11";
     expect(selectExecutionState(session.trialState, leafId)).toBe("Not Started");
 
-    session = advanceTier1RoundTripClock(session, 60);
-    expect(formatRoundTripMinute(session.trialState.now)).toBe("2026-01-05T07:00:00");
-    expect(selectExecutionState(session.trialState, leafId)).toBe("Not Started");
+    const originalState = session.trialState;
+    const laterState = projectTier1RoundTripStateAtMinute(
+      session.trialState,
+      projectMinute("2026-01-05T07:15:00")
+    );
+    expect(selectExecutionState(laterState, leafId)).toBe("Not Started");
+    expect(selectTaskProjection(laterState, leafId).attention).toContain("Late to Start");
+    expect(session.trialState).toBe(originalState);
+    expect(session.trialState.now).toBe(TEST_START);
+    expect(session.trialState.executionEvents).toEqual([]);
 
-    session = advanceTier1RoundTripClock(session, 15);
-    expect(selectExecutionState(session.trialState, leafId)).toBe("Not Started");
-    expect(() => jumpTier1RoundTripClockToTaskStart(session, leafId)).toThrow("only forward");
+    const beforeMidnight = tier1RoundTripLocalDayWindow(projectMinute("2026-01-05T23:59:00"));
+    const afterMidnight = tier1RoundTripLocalDayWindow(projectMinute("2026-01-06T00:00:00"));
+    expect(formatRoundTripMinute(beforeMidnight.start)).toBe("2026-01-05T00:00:00");
+    expect(formatRoundTripMinute(afterMidnight.start)).toBe("2026-01-06T00:00:00");
   });
 
   it("lets the browser-local Tier 1 identity execute any imported leaf without an assignment", () => {
     let session = createSession();
     const taskId = "project-task-uid:11";
-    session = jumpTier1RoundTripClockToTaskStart(session, taskId);
     session = applyTier1RoundTripExecutionAction(session, {
       type: "cant-start",
       taskId,
@@ -153,17 +299,16 @@ describe("Tier 1 imported Project round-trip session", () => {
       whatIsNeeded: "Release the access point",
       createProblem: true,
       createAction: true
-    });
+    }, projectMinute("2026-01-05T07:00:00"));
     expect(selectExecutionState(session.trialState, taskId)).toBe("Not Started");
 
-    session = advanceTier1RoundTripClock(session, 15);
     session = applyTier1RoundTripExecutionAction(session, {
       type: "start",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID,
       lateCause: "Access was released after planned start",
       actionStillNeeded: "None"
-    });
+    }, projectMinute("2026-01-05T07:15:00"));
     expect(selectExecutionState(session.trialState, taskId)).toBe("In Progress");
 
     session = applyTier1RoundTripExecutionAction(session, {
@@ -174,7 +319,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       adverseDelay: false,
       whatIsNeeded: "Return after the break",
       createAction: false
-    });
+    }, projectMinute("2026-01-05T07:30:00"));
     expect(selectExecutionState(session.trialState, taskId)).toBe("Paused");
 
     session = applyTier1RoundTripExecutionAction(session, {
@@ -182,27 +327,54 @@ describe("Tier 1 imported Project round-trip session", () => {
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID,
       issueResolution: "not-applicable"
-    });
+    }, projectMinute("2026-01-05T07:45:00"));
     expect(selectExecutionState(session.trialState, taskId)).toBe("In Progress");
 
     session = applyTier1RoundTripExecutionAction(session, {
       type: "finish",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T08:00:00"));
     expect(selectExecutionState(session.trialState, taskId)).toBe("Completed");
     expect(session.trialState.executionEvents.map((event) => event.type))
       .toEqual(["cant-start", "start", "pause", "resume", "finish"]);
+    expect(session.trialState.executionEvents.map((event) => formatRoundTripMinute(event.at)))
+      .toEqual([
+        "2026-01-05T07:00:00",
+        "2026-01-05T07:15:00",
+        "2026-01-05T07:30:00",
+        "2026-01-05T07:45:00",
+        "2026-01-05T08:00:00"
+      ]);
+  });
+
+  it("fails closed when the device clock moves behind existing local evidence", () => {
+    const taskId = "project-task-uid:11";
+    const session = applyTier1RoundTripExecutionAction(createSession(), {
+      type: "start",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID
+    }, projectMinute("2026-01-05T07:00:00"));
+
+    expect(() => applyTier1RoundTripExecutionAction(session, {
+      type: "pause",
+      taskId,
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+      reason: "Clock check",
+      adverseDelay: false,
+      whatIsNeeded: "Correct the device clock",
+      createAction: false
+    }, projectMinute("2026-01-05T06:59:00"))).toThrow("precedes an existing Tracker event");
   });
 
   it("keeps an imported adverse-pause problem open when Tier 1 resumes without resolving it", () => {
     const taskId = "project-task-uid:11";
-    let session = jumpTier1RoundTripClockToTaskStart(createSession(), taskId);
+    let session = createSession();
     session = applyTier1RoundTripExecutionAction(session, {
       type: "start",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T07:00:00"));
     session = applyTier1RoundTripExecutionAction(session, {
       type: "pause",
       taskId,
@@ -211,7 +383,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       adverseDelay: true,
       whatIsNeeded: "Deliver replacement material",
       createAction: true
-    });
+    }, projectMinute("2026-01-05T07:15:00"));
     const problemId = session.trialState.pauseIntervals.at(-1)?.problemId;
     expect(problemId).toBeTruthy();
     expect(session.trialState.problems.find((problem) => problem.id === problemId)?.status).toBe("open");
@@ -222,7 +394,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID,
       issueResolution: "remains-open"
-    });
+    }, projectMinute("2026-01-05T07:30:00"));
     expect(selectExecutionState(session.trialState, taskId)).toBe("In Progress");
     expect(session.trialState.problems.find((problem) => problem.id === problemId)?.status).toBe("open");
   });
@@ -237,19 +409,19 @@ describe("Tier 1 imported Project round-trip session", () => {
       whatIsNeeded: "Release access",
       createProblem: true,
       createAction: true
-    });
+    }, projectMinute("2026-01-05T06:15:00"));
     const problemId = session.trialState.problems[0].id;
     const actionId = session.trialState.actions[0].id;
     session = applyTier1RoundTripRecordAction(session, {
       type: "resolve-problem",
       problemId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T06:30:00"));
     session = applyTier1RoundTripRecordAction(session, {
       type: "complete-action",
       actionId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T06:45:00"));
     expect(session.trialState.problems[0].status).toBe("resolved");
     expect(session.trialState.actions[0].status).toBe("completed");
     expect(() => applyTier1RoundTripRecordAction(session, {
@@ -282,7 +454,7 @@ describe("Tier 1 imported Project round-trip session", () => {
       remainingWork: "Complete the remaining inspection",
       nextIssue: "None",
       note: "Local trial observation"
-    });
+    }, projectMinute("2026-01-05T06:15:00"));
 
     expect(selectExecutionState(session.trialState, taskId)).toBe("Not Started");
     expect(selectTaskProgress(session.trialState, taskId)).toBe(45);
@@ -298,62 +470,62 @@ describe("Tier 1 imported Project round-trip session", () => {
       completionPercent: 101,
       remainingWork: "Invalid",
       nextIssue: "None"
-    })).toThrow("between 0 and 100");
+    }, projectMinute("2026-01-05T06:30:00"))).toThrow("between 0 and 100");
     expect(() => recordTier1RoundTripProgress(session, {
       taskId,
       completionPercent: 50,
       remainingWork: " ",
       nextIssue: "None"
-    })).toThrow("What remains is required");
+    }, projectMinute("2026-01-05T06:30:00"))).toThrow("What remains is required");
     expect(() => recordTier1RoundTripProgress(session, {
       taskId,
       completionPercent: 50,
       remainingWork: "Continue",
       nextIssue: " "
-    })).toThrow("Next issue is required");
+    }, projectMinute("2026-01-05T06:30:00"))).toThrow("Next issue is required");
   });
 
   it("rejects contradictory unfinished-progress observations after completion", () => {
     const taskId = "project-task-uid:11";
-    let session = jumpTier1RoundTripClockToTaskStart(createSession(), taskId);
+    let session = createSession();
     session = applyTier1RoundTripExecutionAction(session, {
       type: "start",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T07:00:00"));
     session = applyTier1RoundTripExecutionAction(session, {
       type: "finish",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T08:00:00"));
 
     expect(() => recordTier1RoundTripProgress(session, {
       taskId,
       completionPercent: 40,
       remainingWork: "Contradictory remaining work",
       nextIssue: "None"
-    })).toThrow("Completed tasks cannot receive an unfinished-progress observation");
+    }, projectMinute("2026-01-05T08:15:00"))).toThrow("Completed tasks cannot receive an unfinished-progress observation");
   });
 
   it("derives unresolved experimental mappings excluded by default and preserves explicit reviewer choices", () => {
     const taskId = "project-task-uid:11";
-    let session = jumpTier1RoundTripClockToTaskStart(createSession(), taskId);
+    let session = createSession();
     session = applyTier1RoundTripExecutionAction(session, {
       type: "start",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T07:00:00"));
     session = recordTier1RoundTripProgress(session, {
       taskId,
       completionPercent: 45,
       remainingWork: "Complete inspection",
       nextIssue: "None"
-    });
+    }, projectMinute("2026-01-05T07:30:00"));
     session = applyTier1RoundTripExecutionAction(session, {
       type: "finish",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T08:00:00"));
 
     const proposals = deriveTier1RoundTripMappingProposals(session);
     const start = proposals.find((mapping) => mapping.trackerFact === "start");
@@ -363,12 +535,14 @@ describe("Tier 1 imported Project round-trip session", () => {
       projectTaskUid: "11",
       projectField: "ActualStart",
       sourceValue: null,
+      proposedValue: "2026-01-05T07:00:00",
       included: false
     });
     expect(finish).toMatchObject({
       projectTaskUid: "11",
       projectField: "ActualFinish",
       sourceValue: null,
+      proposedValue: "2026-01-05T08:00:00",
       included: false
     });
     expect(progress).toMatchObject({
@@ -417,21 +591,45 @@ describe("Tier 1 imported Project round-trip session", () => {
       .toThrow("Unknown experimental mapping");
   });
 
+  it("never proposes or accepts an experimental mapping for a summary hierarchy row", () => {
+    const session = createSession();
+    const malformed = structuredClone(session);
+    malformed.trialState.executionEvents.push({
+      id: "malformed-summary-start",
+      taskId: "project-task-uid:10",
+      actorId: TIER1_ROUNDTRIP_ACTOR_ID,
+      type: "start",
+      at: TEST_START
+    });
+    expect(deriveTier1RoundTripMappingProposals(malformed)).toEqual([]);
+
+    expect(() => updateTier1RoundTripMappingSelection(session, [{
+      id: "summary-mapping",
+      trackerFactId: "malformed-summary-start",
+      trialTaskId: "project-task-uid:10",
+      projectTaskUid: "10",
+      trackerFact: "start",
+      projectField: "ActualStart",
+      sourceValue: null,
+      proposedValue: "2026-01-05T06:00:00",
+      included: false
+    }], "summary-mapping", { included: true })).toThrow("only to tracked leaf tasks");
+  });
+
   it("resets repeatably without changing the imported source", () => {
     const taskId = "project-task-uid:11";
     let session = createSession();
-    session = jumpTier1RoundTripClockToTaskStart(session, taskId);
     session = applyTier1RoundTripExecutionAction(session, {
       type: "start",
       taskId,
       actorId: TIER1_ROUNDTRIP_ACTOR_ID
-    });
+    }, projectMinute("2026-01-05T07:00:00"));
     session = recordTier1RoundTripProgress(session, {
       taskId,
       completionPercent: 20,
       remainingWork: "Continue",
       nextIssue: "None"
-    });
+    }, projectMinute("2026-01-05T07:15:00"));
     session = {
       ...session,
       mappings: [{
@@ -450,7 +648,8 @@ describe("Tier 1 imported Project round-trip session", () => {
       disposition: { value: "Works as expected", notes: "Trial only" }
     };
 
-    const reset = resetTier1RoundTripSession(session);
+    const resetAt = projectMinute("2026-01-05T09:00:00");
+    const reset = resetTier1RoundTripSession(session, resetAt);
     expect(reset.source.xml).toBe(SOURCE_XML);
     expect(reset.source.hash).toBe("source-sha256");
     expect(reset.trialState).toEqual(reset.initialTrialState);
@@ -461,10 +660,23 @@ describe("Tier 1 imported Project round-trip session", () => {
     expect(reset.result).toBeNull();
     expect(reset.disposition).toBeNull();
     expect(reset.history).toHaveLength(1);
-    expect(resetTier1RoundTripSession(reset)).toEqual(reset);
+    expect(reset.trialState.now).toBe(resetAt);
+    expect(resetTier1RoundTripSession(reset, resetAt)).toEqual(reset);
   });
 
   it("fails safely for missing or duplicate Project task identity and invalid source facts", () => {
+    expect(() => createTier1RoundTripSession({
+      fileName: "invalid-clock.xml",
+      sourceXml: SOURCE_XML,
+      preview: preview(),
+      clock: { minute: TEST_START + 0.5, timeZone: TEST_TIME_ZONE }
+    })).toThrow("whole minute");
+    expect(() => createTier1RoundTripSession({
+      fileName: "invalid-zone.xml",
+      sourceXml: SOURCE_XML,
+      preview: preview(),
+      clock: { minute: TEST_START, timeZone: "Not/A_Timezone" }
+    })).toThrow("is not supported");
     expect(() => createTier1RoundTripSession({
       fileName: "missing-uid.xml",
       sourceXml: SOURCE_XML,
@@ -531,8 +743,13 @@ function createSession(): Tier1RoundTripSession {
     fileName: "test-source.xml",
     sourceXml: SOURCE_XML,
     sourceHash: "source-sha256",
-    preview: preview()
+    preview: preview(),
+    clock: TEST_CLOCK
   });
+}
+
+function projectMinute(value: string) {
+  return parseProjectIsoMinute(value, "Test time");
 }
 
 function preview(overrides: Partial<ProjectXmlPreview> = {}): ProjectXmlPreview {
@@ -540,6 +757,10 @@ function preview(overrides: Partial<ProjectXmlPreview> = {}): ProjectXmlPreview 
     projectName: "Test imported schedule",
     projectUid: "11111111-1111-1111-1111-111111111111",
     statusDate: "2026-01-05T06:00:00",
+    defaultDurationFormat: 5,
+    minutesPerDay: 480,
+    minutesPerWeek: 2400,
+    daysPerMonth: 20,
     taskCount: 2,
     summaryTaskCount: 1,
     leafTaskCount: 1,
@@ -563,6 +784,7 @@ function task(overrides: Partial<ProjectXmlTaskPreview & { critical: boolean }> 
     start: "2026-01-05T06:00:00",
     finish: "2026-01-05T12:00:00",
     duration: "PT6H0M0S",
+    durationFormat: 5,
     actualStart: null,
     actualFinish: null,
     percentComplete: 0,

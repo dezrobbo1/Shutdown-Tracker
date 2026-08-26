@@ -200,8 +200,13 @@ export function assertCandidatePreviewPreserved(
       && normalizeProjectUid(source.projectUid) !== normalizeProjectUid(candidate.projectUid))) {
     throw new Error("The generated candidate did not preserve the imported Project identity.");
   }
-  if (source.projectName !== candidate.projectName || source.statusDate !== candidate.statusDate) {
-    throw new Error("The generated candidate did not preserve the imported Project name or StatusDate context.");
+  if (source.projectName !== candidate.projectName
+    || source.statusDate !== candidate.statusDate
+    || source.defaultDurationFormat !== candidate.defaultDurationFormat
+    || source.minutesPerDay !== candidate.minutesPerDay
+    || source.minutesPerWeek !== candidate.minutesPerWeek
+    || source.daysPerMonth !== candidate.daysPerMonth) {
+    throw new Error("The generated candidate did not preserve the imported Project name, StatusDate, or duration-display context.");
   }
 
   for (const sourceTask of source.tasks) {
@@ -215,7 +220,7 @@ export function assertCandidatePreviewPreserved(
     }
     const candidateTask = matches[0];
     const identityFields: Array<keyof ProjectXmlTaskPreview> = [
-      "id", "name", "wbs", "outlineNumber", "outlineLevel", "summary", "start", "finish"
+      "id", "name", "wbs", "outlineNumber", "outlineLevel", "summary", "start", "finish", "duration", "durationFormat"
     ];
     for (const field of identityFields) {
       if (!sameValue(sourceTask[field] as ComparablePreviewValue, candidateTask[field] as ComparablePreviewValue)) {
@@ -251,6 +256,7 @@ export function buildConservativeProjectDifferences(input: {
     ["Start", "start"],
     ["Finish", "finish"],
     ["Duration", "duration"],
+    ["DurationFormat", "durationFormat"],
     ["ActualStart", "actualStart"],
     ["ActualFinish", "actualFinish"],
     ["PercentComplete", "percentComplete"],
@@ -259,9 +265,13 @@ export function buildConservativeProjectDifferences(input: {
   ];
   const differences: StructuralDifference[] = [];
 
-  const projectFields: Array<[string, "projectName" | "statusDate"]> = [
+  const projectFields: Array<[string, "projectName" | "statusDate" | "defaultDurationFormat" | "minutesPerDay" | "minutesPerWeek" | "daysPerMonth"]> = [
     ["Name", "projectName"],
-    ["StatusDate", "statusDate"]
+    ["StatusDate", "statusDate"],
+    ["DurationFormat", "defaultDurationFormat"],
+    ["MinutesPerDay", "minutesPerDay"],
+    ["MinutesPerWeek", "minutesPerWeek"],
+    ["DaysPerMonth", "daysPerMonth"]
   ];
   for (const [label, field] of projectFields) {
     if (!sameValue(candidate[field], projectResult[field])) {

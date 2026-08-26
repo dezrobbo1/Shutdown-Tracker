@@ -2,9 +2,9 @@
 
 This document is primary product authority for the central task record, assignments, execution state, task-owned operational records, and summary-task work-pack views.
 
-## One operational centre per task
+## One operational centre per tracked leaf task
 
-Each imported task has one central Shutdown Tracker operational record presented as a Task Dashboard in the Console and a permission-limited Task Detail in the Mobile App.
+Each imported executable leaf has one central Shutdown Tracker operational record presented as a Task Dashboard in the Console and a permission-limited Task Detail in the Mobile App. Imported summary rows preserve Project hierarchy and may anchor separately configured aggregate work-pack/reporting context, but import alone does not create a tracked task record for a summary.
 
 The Task Dashboard contains:
 
@@ -162,9 +162,9 @@ Today is a high-signal 24-hour project view. Inclusion in Today changes neither 
 
 ## Summary tasks and work packs
 
-Summary tasks use the same Task Dashboard as aggregate work-pack views. Their Overview, People, Discussion, Delays / Problems, Actions, Evidence, History, and Project context may summarize or link descendant activity.
+Summary tasks are hierarchy/reporting containers, not tracked execution tasks. A selected summary may anchor an aggregate work-pack view whose content summarizes or links descendant activity, but it does not gain its own leaf execution state, field-progress record, or ordinary Task Dashboard merely because it was imported.
 
-Can't Start, Start, Pause, Resume, and Finish normally apply to executable leaf tasks. Summary progress and schedule roll-ups remain Microsoft Project-calculated context unless an explicit future product decision says otherwise.
+Can't Start, Start, Pause, Resume, and Finish apply to executable leaf tasks. Summary progress, duration, dates, and schedule roll-ups remain read-only Microsoft Project-calculated context unless an explicit future product decision says otherwise.
 
 ## Discussion is contextual only
 

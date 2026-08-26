@@ -8,6 +8,7 @@ import { ImportExportView } from "./ImportExportView";
 import { buildTier1RoundTripConfig } from "./roundTripTrialMode";
 import {
   activateTier1RoundTripSource,
+  Tier1RoundTripCurrentTime,
   type Tier1RoundTripWorkspaceState
 } from "./Tier1RoundTripTrialViews";
 
@@ -125,7 +126,31 @@ describe("Tier 1 Project round-trip trial boundary", () => {
     expect(html).toContain("Imported fixture leaf");
     expect(html).toContain("Browser-local experimental trial");
     expect(html).toContain("Tier 1 may execute");
+    expect(html).toContain("Current location time");
+    expect(html).toContain("Device clock");
+    expect(html).toContain(workspace.session.locationTimeZone);
+    expect(html).not.toContain("+15 minutes");
+    expect(html).not.toContain("+1 hour");
+    expect(html).not.toContain("Round-trip trial time");
     expect(html).not.toContain("No active project");
+  });
+
+  it("shows imported duration while keeping summary rows outside tracked-task navigation and counts", () => {
+    const workspace = importedRoundTripWorkspace();
+    const tasks = renderToString(<App initialView="console" initialSection="Tasks" initialRoundTripState={workspace} />);
+    const summaryRoute = renderToString(<App initialView="console" initialSection="Tasks" initialTaskId="project-task-uid:1" initialRoundTripState={workspace} />);
+    const critical = renderToString(<App initialView="console" initialSection="Critical" initialRoundTripState={workspace} />);
+
+    expect(tasks).toMatch(/1(?:<!-- -->)? matching tracked leaf tasks · (?:<!-- -->)?1(?:<!-- -->)? hierarchy rows/u);
+    expect(tasks).toContain("Hierarchy only");
+    expect(tasks).toContain("Not a tracked task");
+    expect(tasks).toContain("1h");
+    expect(tasks).toMatch(/<button[^>]*>Imported fixture leaf<\/button>/u);
+    expect(tasks).not.toMatch(/<button[^>]*>Imported fixture summary<\/button>/u);
+    expect(summaryRoute).toContain("This imported summary row is Project hierarchy context only");
+    expect(summaryRoute).toContain("no tracked-task dashboard or execution record");
+    expect(summaryRoute).not.toContain("Imported Task Dashboard sections");
+    expect(critical).toMatch(/1(?:<!-- -->)? imported leaf task(?:<!-- -->)? is(?:<!-- -->)? marked Critical/u);
   });
 
   it("promotes the exact inspected source and signals navigation only through explicit Start", () => {
@@ -149,7 +174,22 @@ describe("Tier 1 Project round-trip trial boundary", () => {
     expect([...workspace.session.source.bytes]).toEqual([...draft.bytes]);
     expect(workspace.session.source.hash).toBe(draft.sha256);
     expect(workspace.session.source.preview).toEqual(draft.preview);
-    expect(workspace.session.trialState.tasks[0]?.name).toBe("Imported fixture leaf");
+    expect(workspace.session.initialTimeSource).toBe("Current device time");
+    expect(workspace.session.locationTimeZone).toBeTruthy();
+    expect(workspace.session.trialState.tasks[1]?.name).toBe("Imported fixture leaf");
+  });
+
+  it("warns and blocks updates when local wall time is behind retained evidence", () => {
+    const workspace = importedRoundTripWorkspace();
+    const html = renderToString(
+      <Tier1RoundTripCurrentTime
+        state={workspace}
+        clock={{ minute: workspace.session.trialState.now - 30, timeZone: workspace.session.locationTimeZone }}
+        onChange={() => undefined}
+      />
+    );
+    expect(html).toContain("Current local wall time is earlier than existing trial evidence");
+    expect(html).toContain("daylight-saving rollback");
   });
 
   it("is explicit, browser-local, and keeps ordinary Export deferred", () => {
@@ -254,25 +294,47 @@ function importedSourceDraft() {
       projectName: "Imported fixture schedule",
       projectUid: "11111111-1111-1111-1111-111111111111",
       statusDate: "2026-08-24T06:00:00",
-      taskCount: 1,
-      summaryTaskCount: 0,
+      defaultDurationFormat: 5,
+      minutesPerDay: 480,
+      minutesPerWeek: 2400,
+      daysPerMonth: 20,
+      taskCount: 2,
+      summaryTaskCount: 1,
       leafTaskCount: 1,
       tasks: [{
         uid: "1",
         id: "1",
-        name: "Imported fixture leaf",
+        name: "Imported fixture summary",
         wbs: "1",
         outlineNumber: "1",
         outlineLevel: 1,
-        summary: false,
+        summary: true,
         start: "2026-08-24T07:00:00",
-        finish: "2026-08-24T08:00:00",
-        duration: "PT1H0M0S",
+        finish: "2026-08-24T10:00:00",
+        duration: "PT3H0M0S",
+        durationFormat: 21,
         actualStart: null,
         actualFinish: null,
         percentComplete: 0,
         physicalPercentComplete: null,
-        critical: false
+        critical: true
+      }, {
+        uid: "2",
+        id: "2",
+        name: "Imported fixture leaf",
+        wbs: "1.1",
+        outlineNumber: "1.1",
+        outlineLevel: 2,
+        summary: false,
+        start: "2026-08-24T07:00:00",
+        finish: "2026-08-24T08:00:00",
+        duration: "PT1H0M0S",
+        durationFormat: 5,
+        actualStart: null,
+        actualFinish: null,
+        percentComplete: 0,
+        physicalPercentComplete: null,
+        critical: true
       }]
     }
   };
