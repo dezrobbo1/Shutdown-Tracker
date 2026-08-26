@@ -16,10 +16,11 @@ import {
 } from "./ConsoleViews";
 import { ImportExportView } from "./ImportExportView";
 import {
-  Tier1RoundTripClock,
+  Tier1RoundTripCurrentTime,
   Tier1RoundTripTaskDashboard,
   Tier1RoundTripTasksView,
   Tier1RoundTripTodayView,
+  useTier1RoundTripLiveClock,
   type Tier1RoundTripWorkspaceState
 } from "./Tier1RoundTripTrialViews";
 import { tier1RoundTripRuntimeConfig } from "./roundTripTrialMode";
@@ -44,6 +45,10 @@ export function App({
 }: AppProps) {
   const roundTripConfigured = roundTripTrialMode ?? tier1RoundTripRuntimeConfig.enabled;
   const [roundTripState, setRoundTripState] = useState<Tier1RoundTripWorkspaceState | null>(initialRoundTripState);
+  const roundTripClock = useTier1RoundTripLiveClock(roundTripState?.session.locationTimeZone ?? null);
+  const currentRoundTripMinute = roundTripState
+    ? Math.max(roundTripClock?.minute ?? roundTripState.session.trialState.now, roundTripState.session.trialState.now)
+    : null;
   const roundTripEnabled = roundTripConfigured || roundTripState !== null;
   const [view, setView] = useState<ConsoleView>(initialView);
   const [activeSection, setActiveSection] = useState<ConsoleSection>(
@@ -175,7 +180,7 @@ export function App({
           <div><span>{selectedProject.site}</span><strong>{selectedProject.code}</strong></div>
           <div>
             <span>{roundTripState
-              ? `Trial time · ${formatRoundTripMinute(roundTripState.session.trialState.now).replace("T", " ")}`
+              ? `Current location time · ${formatRoundTripMinute(roundTripClock?.minute ?? roundTripState.session.trialState.now).replace("T", " ")} · ${roundTripState.session.locationTimeZone}`
               : roundTripEnabled
                 ? "Choose a disposable XML source"
                 : "No schedule loaded"}</span>
@@ -184,24 +189,24 @@ export function App({
         </header>
 
         <div className="workspace-content">
-          {roundTripEnabled && roundTripState
-            ? <Tier1RoundTripClock state={roundTripState} onChange={setRoundTripState} />
+          {roundTripEnabled && roundTripState && roundTripClock
+            ? <Tier1RoundTripCurrentTime state={roundTripState} clock={roundTripClock} onChange={setRoundTripState} />
             : null}
           {taskId ? (
             roundTripEnabled && !roundTripState
               ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
               : roundTripState
-                ? <Tier1RoundTripTaskDashboard state={roundTripState} taskId={taskId} onBack={() => setTaskId(null)} onChange={setRoundTripState} />
+                ? <Tier1RoundTripTaskDashboard state={roundTripState} currentMinute={currentRoundTripMinute ?? roundTripState.session.trialState.now} taskId={taskId} onBack={() => setTaskId(null)} onChange={setRoundTripState} />
                 : <NoActiveProjectView section="Tasks" onOpenImport={() => navigate("Import / Export")} />
           ) : (
             <>
               {activeSection === "Today" && (roundTripState
-                ? <Tier1RoundTripTodayView state={roundTripState} onOpenTask={openTask} />
+                ? <Tier1RoundTripTodayView state={roundTripState} currentMinute={currentRoundTripMinute ?? roundTripState.session.trialState.now} onOpenTask={openTask} />
                 : roundTripEnabled
                   ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
                   : <NoActiveProjectView section="Today" onOpenImport={() => navigate("Import / Export")} />)}
               {activeSection === "Tasks" && (roundTripState
-                ? <Tier1RoundTripTasksView state={roundTripState} onOpenTask={openTask} />
+                ? <Tier1RoundTripTasksView state={roundTripState} currentMinute={currentRoundTripMinute ?? roundTripState.session.trialState.now} onOpenTask={openTask} />
                 : roundTripEnabled
                   ? <RoundTripNoScheduleView onOpenImport={() => navigate("Import / Export")} />
                   : <NoActiveProjectView section="Tasks" onOpenImport={() => navigate("Import / Export")} />)}
@@ -277,7 +282,8 @@ export function RoundTripSettingsBoundary({ state, onOpenImport }: { state: Tier
         <div><dt>Project</dt><dd>{state.session.source.preview.projectName}</dd></div>
         <div><dt>Project UID</dt><dd>{state.session.source.preview.projectUid ?? "Not supplied"}</dd></div>
         <div><dt>Source</dt><dd>{state.session.source.fileName}</dd></div>
-        <div><dt>Initial time basis</dt><dd>{state.session.initialTimeSource}</dd></div>
+        <div><dt>Time source</dt><dd>{state.session.initialTimeSource}</dd></div>
+        <div><dt>Time zone captured at trial start</dt><dd>{state.session.locationTimeZone}</dd></div>
         <div><dt>Authority</dt><dd>Browser-local Tier 1 reviewer · whole temporary imported project</dd></div>
         <div><dt>Persistence</dt><dd>Browser memory only · resettable and disposable</dd></div>
       </dl>

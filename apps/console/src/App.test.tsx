@@ -8,6 +8,7 @@ import { ImportExportView } from "./ImportExportView";
 import { buildTier1RoundTripConfig } from "./roundTripTrialMode";
 import {
   activateTier1RoundTripSource,
+  Tier1RoundTripCurrentTime,
   type Tier1RoundTripWorkspaceState
 } from "./Tier1RoundTripTrialViews";
 
@@ -125,6 +126,12 @@ describe("Tier 1 Project round-trip trial boundary", () => {
     expect(html).toContain("Imported fixture leaf");
     expect(html).toContain("Browser-local experimental trial");
     expect(html).toContain("Tier 1 may execute");
+    expect(html).toContain("Current location time");
+    expect(html).toContain("Device clock");
+    expect(html).toContain(workspace.session.locationTimeZone);
+    expect(html).not.toContain("+15 minutes");
+    expect(html).not.toContain("+1 hour");
+    expect(html).not.toContain("Round-trip trial time");
     expect(html).not.toContain("No active project");
   });
 
@@ -149,7 +156,22 @@ describe("Tier 1 Project round-trip trial boundary", () => {
     expect([...workspace.session.source.bytes]).toEqual([...draft.bytes]);
     expect(workspace.session.source.hash).toBe(draft.sha256);
     expect(workspace.session.source.preview).toEqual(draft.preview);
+    expect(workspace.session.initialTimeSource).toBe("Current device time");
+    expect(workspace.session.locationTimeZone).toBeTruthy();
     expect(workspace.session.trialState.tasks[0]?.name).toBe("Imported fixture leaf");
+  });
+
+  it("warns and blocks updates when local wall time is behind retained evidence", () => {
+    const workspace = importedRoundTripWorkspace();
+    const html = renderToString(
+      <Tier1RoundTripCurrentTime
+        state={workspace}
+        clock={{ minute: workspace.session.trialState.now - 30, timeZone: workspace.session.locationTimeZone }}
+        onChange={() => undefined}
+      />
+    );
+    expect(html).toContain("Current local wall time is earlier than existing trial evidence");
+    expect(html).toContain("daylight-saving rollback");
   });
 
   it("is explicit, browser-local, and keeps ordinary Export deferred", () => {
