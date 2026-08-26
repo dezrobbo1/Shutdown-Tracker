@@ -1,35 +1,35 @@
-# Active Goal: Remove Fictional Frontend Review Content
+# Active Goal: Start the Tier 1 Round-Trip Trial from Import
 
 ## Outcome
 
-Remove the remaining fictional project, task, person, execution, Critical, activity, settings, persona, and sync data from the ordinary Console and Mobile applications. Preserve neutral empty product shells and the separate imported Tier 1 Project round-trip trial.
+Remove the dead end between ordinary browser-local Project XML inspection and the existing Tier 1 round-trip trial. A reviewer who selects a valid XML/MSPDI source must be able to review it and explicitly start the temporary browser-memory trial from that same retained source.
 
 ## Success criteria
 
-- Ordinary Console mode starts without a fabricated project or operational day.
-- Projects Home and ordinary Today, Tasks, Critical, Task Dashboard, and Project Settings show honest unconfigured/empty states rather than fictional records.
-- Ordinary Import / Export retains browser-local MSPDI/XML inspection, optional configured read-only snapshot GETs, and visibly deferred Export.
-- Mobile retains `Assigned Tasks` as its only top-level operational destination but shows no fictional persona, assignment, task, execution, Critical, history, or sync state.
-- The ordinary Console review client describes a missing project configuration as unconfigured, not synthetic.
-- The explicit `VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true` evidence workflow remains unchanged and uses only the schedule selected by the reviewer.
-- Documentation and tests distinguish empty runtime shells from safe synthetic test fixtures.
+- Ordinary Import uses the lossless XML reader, exact source bytes/text, SHA-256, parser, and adapter already used by the Tier 1 round-trip trial.
+- Selecting a file inspects it but does not activate a trial automatically.
+- A visible `Start round-trip trial` action becomes available for a valid inspected source.
+- Explicit Start promotes that exact source into temporary round-trip state and opens the imported Tasks hierarchy.
+- The environment flag remains available as a direct-entry shortcut rather than the only usable activation path.
+- Discard returns a session-started trial to the ordinary empty Console when the direct-entry flag is off.
+- Ordinary Export remains deferred until a round-trip session is explicitly active.
+- Large local sources expose an honest inspecting/ready state.
 
 ## Non-goals
 
-- Mobile information-architecture redesign or production Mobile execution.
-- Production backend, API, authentication, persistence, audit, offline, database, or migration work.
-- New Tracker execution, assignment, Critical reporting, or project-lifecycle product behaviour.
-- Removal of synthetic test fixtures or fixture-safety rules; those prevent real operational schedules from entering the repository.
+- Production import, persistence, backend, API, authentication, audit, database, or migration work.
+- Automatic activation on file selection.
 - A final Tracker-to-Project mapping or export/round-trip contract.
 - PR #48's candidate approval, sealed preview, batch approval, review bootstrap, or mandatory acceptance workflow.
 - Native `.mpp`, automatic Microsoft Project operation, Project recalculation inside Shutdown Tracker, scheduling, CPM, or dependency consequences.
+- Mobile changes.
 
 ## Required validation
 
 - Run `npm ci`, `npm test`, `npm run build`, repository-standard TypeScript checks, and `git diff --check`.
 - Validate changed Markdown links and repository paths.
-- Confirm former fictional project, task, person, persona, activity, Critical, and sync content is absent from active frontend source.
-- Re-run the Tier 1 Project round-trip tests and confirm imported hierarchy, execution, mapping, source-preserving candidate generation, result comparison, and reset remain intact.
+- Exercise the import/start path against the supplied XML sources locally without committing them.
+- Re-run all Tier 1 round-trip source, execution, mapping, candidate, result-comparison, and reset tests.
 - Confirm no backend Java, worker, migration, API-contract, authentication, real Project data, or generated artifact changes.
 
 ## Safety constraints
@@ -38,8 +38,8 @@ Remove the remaining fictional project, task, person, execution, Critical, activ
 - Do not modify `main` directly, rewrite history, force-push, rebase, amend, squash, or use destructive cleanup commands.
 - Keep Microsoft Project as schedule calculation and master-file authority.
 - Never overwrite an imported source or imply a trial disposition is production approval.
-- Keep Mobile's approved top-level model fixed to Assigned Tasks; the empty state is a data removal, not a redesign.
+- Keep all selected source and trial state in browser memory only.
 
 ## Completion conditions
 
-The slice is complete when runtime code, tests, and documentation agree that ordinary frontend shells contain no fictional operational data; the imported Tier 1 round-trip trial remains functional and explicitly bounded; required validation passes; and a draft `frontend/remove-synthetic-review-content -> main` pull request reports the correction without claiming production behaviour or a final Project export contract.
+The slice is complete when ordinary Import can explicitly start the existing browser-local Tier 1 round-trip workflow from the exact inspected source; the trial boundaries remain visible; required validation passes; and a draft `frontend/enable-roundtrip-from-import -> main` pull request reports the correction without claiming production behaviour or a final Project export contract.

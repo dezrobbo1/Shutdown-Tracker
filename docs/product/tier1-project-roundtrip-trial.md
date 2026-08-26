@@ -17,19 +17,21 @@ It is not the superseded PR #48 workflow. It has no candidate approval lifecycle
 
 ## Activation
 
-Enable the Console trial only with the exact value `true`:
+The ordinary Console Import page is the primary activation path. A reviewer selects Microsoft Project XML/MSPDI, waits for local inspection and hashing, reviews the source identity/task rows, and selects `Start round-trip trial`. File selection alone does not activate a project. Explicit Start promotes the exact retained source bytes/text into a temporary browser-memory session and opens the imported Tasks hierarchy.
+
+The exact-value environment flag remains as an optional direct-entry shortcut that opens the Console at the trial source chooser:
 
 ```text
 VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
 ```
 
-This is the only interactive frontend trial currently retained. Outside the explicit round-trip mode, ordinary Export remains not finalised and the ordinary Console/Mobile review shells do not gain write behaviour.
+This is the only interactive frontend trial currently retained. Outside an explicitly started or direct-entry round-trip session, ordinary Export remains not finalised and the ordinary Console/Mobile shells do not gain write behaviour.
 
 ## Source import and temporary project
 
-The Import view accepts Microsoft Project XML/MSPDI only. Native `.mpp` is unsupported. The selected file is read locally as bytes, decoded with fatal UTF-8 handling, and both the original bytes and exact losslessly decoded XML text are retained unchanged in browser memory. A UTF-8 byte-order mark is retained; invalid or non-UTF-8 bytes fail closed. Nothing is uploaded or persisted.
+The Import view accepts Microsoft Project XML/MSPDI only. Native `.mpp` is unsupported. The selected file is read locally as bytes, decoded with fatal UTF-8 handling, and both the original bytes and exact losslessly decoded XML text are retained unchanged in browser memory. A UTF-8 byte-order mark is retained; invalid or non-UTF-8 bytes fail closed. The UI announces inspection/hashing progress for larger sources. Nothing is uploaded or persisted.
 
-The inspector extracts the bounded source facts it can support safely, including project identity/status date and task UID, ID, WBS/outline, summary status, planned dates, imported Actual Start/Finish, `% Complete`, `Physical % Complete`, and Project Critical context where supplied. Starting the trial adapts those facts into a temporary schedule while preserving source identity and hierarchy. Project resources never create application authority. A clearly synthetic Tier 1 reviewer may operate every executable leaf task.
+The inspector extracts the bounded source facts it can support safely, including project identity/status date and task UID, ID, WBS/outline, summary status, planned dates, imported Actual Start/Finish, `% Complete`, `Physical % Complete`, and Project Critical context where supplied. Starting the trial adapts those facts into a temporary schedule while preserving source identity and hierarchy. Project resources never create application authority. A browser-local Tier 1 trial identity may operate every executable leaf task.
 
 This first adapter requires every imported task row used by the temporary hierarchy to have one unique UID and a valid, continuous Outline Level. Planned Start and Finish remain nullable imported facts; the adapter does not invent them. Contradictory supplied dates, unsupported values, duplicate identity, or discontinuous hierarchy stop the trial with an explicit error rather than being inferred. That bounded admission rule is not a claim of complete MSPDI semantic support.
 
