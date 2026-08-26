@@ -31,6 +31,7 @@ export type AppProps = {
   initialView?: ConsoleView;
   initialSection?: ConsoleSection;
   initialTaskId?: string | null;
+  initialRoundTripState?: Tier1RoundTripWorkspaceState | null;
   roundTripTrialMode?: boolean;
 };
 
@@ -38,10 +39,12 @@ export function App({
   initialView = "login",
   initialSection = "Import / Export",
   initialTaskId = null,
+  initialRoundTripState = null,
   roundTripTrialMode
 }: AppProps) {
-  const roundTripEnabled = roundTripTrialMode ?? tier1RoundTripRuntimeConfig.enabled;
-  const [roundTripState, setRoundTripState] = useState<Tier1RoundTripWorkspaceState | null>(null);
+  const roundTripConfigured = roundTripTrialMode ?? tier1RoundTripRuntimeConfig.enabled;
+  const [roundTripState, setRoundTripState] = useState<Tier1RoundTripWorkspaceState | null>(initialRoundTripState);
+  const roundTripEnabled = roundTripConfigured || roundTripState !== null;
   const [view, setView] = useState<ConsoleView>(initialView);
   const [activeSection, setActiveSection] = useState<ConsoleSection>(
     roundTripEnabled && initialSection === "Today" ? "Import / Export" : initialSection
@@ -213,6 +216,10 @@ export function App({
                   onRoundTripChange={(next) => {
                     setRoundTripState(next);
                     setTaskId(null);
+                  }}
+                  onRoundTripStarted={() => {
+                    setTaskId(null);
+                    setActiveSection("Tasks");
                   }}
                   reviewData={reviewData}
                   loadState={loadState}

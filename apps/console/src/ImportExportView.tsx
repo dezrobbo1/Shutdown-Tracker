@@ -1,14 +1,9 @@
-import { RefreshCw, Search } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { ConsoleReviewData, ConsoleReviewLoadState } from "./apiReviewClient";
 import { reviewApiRuntimeConfig } from "./apiReviewClient";
 import { buildReviewRows, importExportSections } from "./consoleData";
 import { PageHeading, PanelHeading, StatusLabel } from "./ConsoleViews";
-import {
-  parseProjectXmlPreview,
-  type ProjectXmlPreview,
-  type ProjectXmlTaskPreview
-} from "./projectXmlPreview";
 import {
   Tier1RoundTripBoundary,
   Tier1RoundTripExportPanel,
@@ -27,7 +22,8 @@ export function ImportExportView({
   initialSection = "Import",
   roundTripTrialMode = false,
   roundTripState = null,
-  onRoundTripChange = () => undefined
+  onRoundTripChange = () => undefined,
+  onRoundTripStarted = () => undefined
 }: {
   reviewData: ConsoleReviewData | null;
   loadState: ConsoleReviewLoadState;
@@ -36,6 +32,7 @@ export function ImportExportView({
   roundTripTrialMode?: boolean;
   roundTripState?: Tier1RoundTripWorkspaceState | null;
   onRoundTripChange?: Tier1RoundTripChangeHandler;
+  onRoundTripStarted?: () => void;
 }) {
   const [active, setActive] = useState<ImportExportSection>(initialSection);
   const reviewRows = useMemo(() => buildReviewRows(reviewData), [reviewData]);
@@ -48,13 +45,13 @@ export function ImportExportView({
       <PageHeading
         eyebrow={roundTripTrialMode ? "Import / Export · Tier 1 Project round-trip trial" : "Import / Export · product-trial foundation"}
         title="Project schedule exchange"
-        description={roundTripTrialMode ? "Exercise a temporary Project XML schedule and gather evidence for the deferred export contract." : "Review incoming Microsoft Project schedule sources. The final export and round-trip contract is intentionally deferred pending evidence review."}
+        description={roundTripTrialMode ? "Exercise a temporary Project XML schedule and gather evidence for the deferred export contract." : "Inspect a local Microsoft Project XML source and explicitly start a temporary round-trip trial when ready. The final export contract remains deferred."}
         status={ordinaryMode}
       />
       {roundTripTrialMode ? <Tier1RoundTripBoundary /> : null}
       <div className="handoff-boundary">
         <strong>Current direction</strong>
-        <span>{roundTripTrialMode ? "This opt-in browser-local trial generates an experimental complete-source candidate for evidence only. It is not production export authority and adds no approval lifecycle." : "Import inspection remains useful for the product trial. Export is not finalised and no candidate, approval, or Microsoft Project acceptance workflow is presented as required product behaviour."}</span>
+        <span>{roundTripTrialMode ? "This opt-in browser-local trial generates an experimental complete-source candidate for evidence only. It is not production export authority and adds no approval lifecycle." : "Selecting XML inspects it locally; only the separate Start action creates a temporary browser-memory trial. Nothing activates or persists a production project, and Export remains unfinalised."}</span>
       </div>
       {liveEnabled && (
         <div className="review-context-warning" role="note">
@@ -67,6 +64,7 @@ export function ImportExportView({
           <button
             type="button"
             className={active === section ? "selected" : ""}
+            aria-current={active === section ? "page" : undefined}
             onClick={() => setActive(section)}
             key={section}
           >
@@ -113,24 +111,31 @@ export function ImportExportView({
             <ol className="sequence-list">
               <li>Choose a Project XML/MSPDI source.</li>
               <li>Inspect its identity and task structure.</li>
-              <li>{roundTripTrialMode ? "Start a temporary browser-memory schedule from the inspected hierarchy." : "Validate the source and operational mapping in a future production import flow."}</li>
-              <li>{roundTripTrialMode ? "Exercise Tier 1 execution and review only explicitly selected experimental field mappings." : "Activate or simulate the imported schedule only through a separately implemented workflow."}</li>
-              <li>{roundTripTrialMode ? "Use Microsoft Project manually, then re-import a new result XML for conservative comparison." : "Revisit export only after imported-schedule evidence supports a separately approved contract."}</li>
+              <li>{roundTripTrialMode ? "Start a temporary browser-memory schedule from the inspected hierarchy." : "Choose Start round-trip trial only after reviewing the inspected source."}</li>
+              <li>{roundTripTrialMode ? "Exercise Tier 1 execution and review only explicitly selected experimental field mappings." : "Use the imported hierarchy in the explicitly labelled browser-memory trial; no production project is activated."}</li>
+              <li>{roundTripTrialMode ? "Use Microsoft Project manually, then re-import a new result XML for conservative comparison." : "Keep production import/export decisions deferred while gathering local trial evidence."}</li>
             </ol>
           </article>
         </section>
       )}
 
-      {active === "Import" && (roundTripTrialMode ? (
-        <Tier1RoundTripImportPanel state={roundTripState} onChange={onRoundTripChange} />
-      ) : (
-        <ImportReview
-          reviewRows={reviewRows}
-          loadState={loadState}
-          liveEnabled={liveEnabled}
-          onRefresh={onRefresh}
-        />
-      ))}
+      {active === "Import" && (
+        <div className="import-review-stack">
+          <Tier1RoundTripImportPanel
+            state={roundTripState}
+            onChange={onRoundTripChange}
+            onStarted={onRoundTripStarted}
+          />
+          {!roundTripTrialMode ? (
+            <PersistedImportReview
+              reviewRows={reviewRows}
+              loadState={loadState}
+              liveEnabled={liveEnabled}
+              onRefresh={onRefresh}
+            />
+          ) : null}
+        </div>
+      )}
 
       {active === "Export" && (roundTripTrialMode ? (
         <Tier1RoundTripExportPanel state={roundTripState} onChange={onRoundTripChange} />
@@ -162,7 +167,7 @@ export function ImportExportView({
   );
 }
 
-function ImportReview({
+function PersistedImportReview({
   reviewRows,
   loadState,
   liveEnabled,
@@ -173,132 +178,20 @@ function ImportReview({
   liveEnabled: boolean;
   onRefresh: () => void;
 }) {
-  const [fileName, setFileName] = useState("");
-  const [preview, setPreview] = useState<ProjectXmlPreview | null>(null);
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-  const [leafOnly, setLeafOnly] = useState(false);
-
-  const visibleTasks = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    return (preview?.tasks ?? []).filter((task) => {
-      if (leafOnly && task.summary) return false;
-      if (!normalized) return true;
-      return [task.name, task.wbs, task.outlineNumber, task.uid, task.id]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalized));
-    });
-  }, [leafOnly, preview, query]);
-
-  async function inspectFile(file: File | null) {
-    setFileName(file?.name ?? "");
-    setPreview(null);
-    setError("");
-    setQuery("");
-    setLeafOnly(false);
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".xml")) {
-      setError("Choose a Microsoft Project XML or MSPDI XML file. Native .mpp inspection is not available in the browser.");
-      return;
-    }
-    try {
-      setPreview(parseProjectXmlPreview(await file.text()));
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "The selected source could not be inspected.");
-    }
-  }
-
   return (
-    <div className="import-review-stack">
-      <section className="table-panel">
-        <PanelHeading title="Browser Project XML inspection" detail="Functional technical foundation · the selected file stays in this browser and is not uploaded." />
-        <label className="import-file-zone">
-          <input
-            type="file"
-            accept=".xml,.mspdi.xml"
-            onChange={(event) => void inspectFile(event.target.files?.[0] ?? null)}
-          />
-          <span><strong>{fileName || "Choose Project XML/MSPDI"}</strong><small>Checks XML structure, Project namespace, schedule identity, and task rows.</small></span>
-        </label>
-        <p className="surface-caption">This is lightweight source inspection, not complete MSPDI semantic validation or production import acceptance.</p>
-        {error && <p className="import-error" role="alert">{error}</p>}
-
-        {preview && (
-          <>
-            <dl className="import-summary-grid">
-              <div><dt>Project</dt><dd>{preview.projectName}</dd></div>
-              <div><dt>Project UID</dt><dd>{preview.projectUid ?? "Not supplied"}</dd></div>
-              <div><dt>Status date</dt><dd>{formatProjectDate(preview.statusDate)}</dd></div>
-              <div><dt>Tasks</dt><dd>{preview.taskCount}</dd></div>
-              <div><dt>Summary tasks</dt><dd>{preview.summaryTaskCount}</dd></div>
-              <div><dt>Leaf tasks</dt><dd>{preview.leafTaskCount}</dd></div>
-            </dl>
-            <div className="import-task-tools">
-              <label className="search-control">
-                <Search size={17} aria-hidden="true" />
-                <span className="sr-only">Search imported tasks</span>
-                <input
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                  placeholder="Search task, WBS, UID, or ID"
-                />
-              </label>
-              <label className="checkbox-control">
-                <input type="checkbox" checked={leafOnly} onChange={(event) => setLeafOnly(event.target.checked)} />
-                <span>Leaf tasks only</span>
-              </label>
-              <span>{visibleTasks.length} of {preview.tasks.length} tasks</span>
-            </div>
-            <ProjectTaskTable tasks={visibleTasks} />
-          </>
-        )}
-      </section>
-
-      <section className="table-panel">
-        <div className="panel-heading import-review-heading">
-          <div><h2>Persisted import review</h2><p>Configured snapshot list/detail reads only.</p></div>
-          <StatusLabel tone={liveEnabled ? "info" : "warning"}>{liveEnabled ? "Read-only API-wired" : "Not configured"}</StatusLabel>
-        </div>
-        <ReviewRows rows={reviewRows} />
-        <div className="disabled-action-row">
-          <button type="button" onClick={onRefresh} disabled={!liveEnabled || loadState.status === "loading"}>Refresh read-only snapshots</button>
-          <button type="button" disabled>Persist imported schedule</button>
-          <button type="button" disabled>Validate Operational Mapping</button>
-          <button type="button" disabled>Activate trial schedule</button>
-          <span>Production import writes and activation are not implemented.</span>
-        </div>
-      </section>
-    </div>
-  );
-}
-
-function ProjectTaskTable({ tasks }: { tasks: ProjectXmlTaskPreview[] }) {
-  return (
-    <div className="table-scroll">
-      <table className="data-table import-task-table">
-        <thead>
-          <tr><th>WBS / task</th><th>UID</th><th>ID</th><th>Type</th><th>Planned start</th><th>Planned finish</th><th>Imported progress</th></tr>
-        </thead>
-        <tbody>
-          {tasks.map((task, index) => (
-            <tr key={task.uid ?? task.id ?? `task-${index}`} className={task.summary ? "summary-row" : ""}>
-              <td>
-                <div className="import-task-name" style={{ paddingInlineStart: `${Math.max(0, (task.outlineLevel ?? 1) - 1) * 18}px` }}>
-                  <span>{task.wbs ?? task.outlineNumber ?? "—"}</span>
-                  <strong>{task.name}</strong>
-                </div>
-              </td>
-              <td>{task.uid ?? "—"}</td>
-              <td>{task.id ?? "—"}</td>
-              <td>{task.summary ? "Summary" : "Leaf"}</td>
-              <td>{formatProjectDate(task.start)}</td>
-              <td>{formatProjectDate(task.finish)}</td>
-              <td>{task.percentComplete === null ? "—" : `${task.percentComplete}%`}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <section className="table-panel">
+      <div className="panel-heading import-review-heading">
+        <div><h2>Persisted import review</h2><p>Configured snapshot list/detail reads only.</p></div>
+        <StatusLabel tone={liveEnabled ? "info" : "warning"}>{liveEnabled ? "Read-only API-wired" : "Not configured"}</StatusLabel>
+      </div>
+      <ReviewRows rows={reviewRows} />
+      <div className="disabled-action-row">
+        <button type="button" onClick={onRefresh} disabled={!liveEnabled || loadState.status === "loading"}>Refresh read-only snapshots</button>
+        <button type="button" disabled>Persist imported schedule</button>
+        <button type="button" disabled>Validate Operational Mapping</button>
+        <span>Production import writes and activation are not implemented.</span>
+      </div>
+    </section>
   );
 }
 
@@ -317,8 +210,4 @@ function ReviewRows({ rows }: { rows: ReturnType<typeof buildReviewRows> }) {
       </table>
     </div>
   );
-}
-
-function formatProjectDate(value: string | null) {
-  return value ? value.replace("T", " ").replace(/Z$/, "") : "—";
 }

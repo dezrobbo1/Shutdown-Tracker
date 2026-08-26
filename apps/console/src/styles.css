@@ -200,10 +200,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .import-summary-grid dd { margin: 5px 0 0; overflow-wrap: anywhere; font-weight: 700; }
 .import-task-tools { display: flex; align-items: center; gap: 14px; padding: 0 15px 12px; color: #65727a; font-size: 11px; }
 .import-task-tools .search-control { flex: 1; }
-.checkbox-control { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
 .import-task-table { min-width: 950px; }
-.import-task-name { display: grid; grid-template-columns: 70px minmax(180px, 1fr); gap: 8px; }
-.import-task-name span { color: #6b777f; font-variant-numeric: tabular-nums; }
 .import-error { margin: 12px 15px; padding: 10px 12px; border-left: 4px solid #a24b4b; background: #f8eaea; color: #762f2f; }
 .import-review-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .export-deferred-panel > p { margin: 15px; color: #516068; line-height: 1.55; }

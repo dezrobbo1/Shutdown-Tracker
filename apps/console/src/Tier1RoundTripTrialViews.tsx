@@ -61,6 +61,37 @@ export type Tier1RoundTripWorkspaceState = {
 
 export type Tier1RoundTripChangeHandler = Dispatch<SetStateAction<Tier1RoundTripWorkspaceState | null>>;
 
+export type Tier1RoundTripSourceDraft = {
+  fileName: string;
+  xml: string;
+  bytes: Uint8Array;
+  preview: ProjectXmlPreview;
+  sha256: string;
+};
+
+export function activateTier1RoundTripSource(
+  draft: Tier1RoundTripSourceDraft,
+  onChange: Tier1RoundTripChangeHandler,
+  onStarted: () => void
+) {
+  const session = createTier1RoundTripSession({
+    fileName: draft.fileName,
+    sourceXml: draft.xml,
+    sourceBytes: draft.bytes,
+    preview: draft.preview,
+    sourceHash: draft.sha256
+  });
+  const workspace: Tier1RoundTripWorkspaceState = {
+    session,
+    candidate: null,
+    projectResult: null,
+    disposition: null
+  };
+  onChange(workspace);
+  onStarted();
+  return workspace;
+}
+
 const TASK_TABLE_PAGE_SIZE = 250;
 
 export function Tier1RoundTripBoundary() {
@@ -72,9 +103,19 @@ export function Tier1RoundTripBoundary() {
   );
 }
 
-export function Tier1RoundTripImportPanel({ state, onChange }: { state: Tier1RoundTripWorkspaceState | null; onChange: Tier1RoundTripChangeHandler }) {
-  const [draft, setDraft] = useState<{ fileName: string; xml: string; bytes: Uint8Array; preview: ProjectXmlPreview; sha256: string } | null>(null);
+export function Tier1RoundTripImportPanel({
+  state,
+  onChange,
+  onStarted = () => undefined
+}: {
+  state: Tier1RoundTripWorkspaceState | null;
+  onChange: Tier1RoundTripChangeHandler;
+  onStarted?: () => void;
+}) {
+  const [draft, setDraft] = useState<Tier1RoundTripSourceDraft | null>(null);
   const [error, setError] = useState("");
+  const [inspectionStatus, setInspectionStatus] = useState<"idle" | "inspecting" | "ready">("idle");
+  const [inspectingFileName, setInspectingFileName] = useState("");
   const [query, setQuery] = useState("");
   const [rowLimit, setRowLimit] = useState(TASK_TABLE_PAGE_SIZE);
   const inspectionSequence = useRef(0);
@@ -92,10 +133,15 @@ export function Tier1RoundTripImportPanel({ state, onChange }: { state: Tier1Rou
     inspectionSequence.current = requestId;
     setDraft(null);
     setError("");
+    setInspectionStatus(file ? "inspecting" : "idle");
+    setInspectingFileName(file?.name ?? "");
     setRowLimit(TASK_TABLE_PAGE_SIZE);
     if (!file) return;
     if (!file.name.toLowerCase().endsWith(".xml")) {
       setError("Choose Microsoft Project XML/MSPDI. Native .mpp is not supported in this browser trial.");
+      setInspectionStatus("idle");
+      setInspectingFileName("");
+      if (fileInput.current) fileInput.current.value = "";
       return;
     }
     try {
@@ -104,17 +150,25 @@ export function Tier1RoundTripImportPanel({ state, onChange }: { state: Tier1Rou
       const sha256 = await sha256Hex(bytes);
       if (inspectionSequence.current !== requestId) return;
       setDraft({ fileName: file.name, xml, bytes, preview, sha256 });
+      setInspectionStatus("ready");
+      setInspectingFileName("");
     } catch (caught) {
       if (inspectionSequence.current !== requestId) return;
       setError(caught instanceof Error ? caught.message : "The source could not be inspected.");
+      setInspectionStatus("idle");
+      setInspectingFileName("");
+      if (fileInput.current) fileInput.current.value = "";
     }
   }
 
   function startTrial() {
     if (!draft) return;
     try {
-      const session = createTier1RoundTripSession({ fileName: draft.fileName, sourceXml: draft.xml, sourceBytes: draft.bytes, preview: draft.preview, sourceHash: draft.sha256 });
-      onChange({ session, candidate: null, projectResult: null, disposition: null });
+      activateTier1RoundTripSource(draft, onChange, onStarted);
+      setDraft(null);
+      setInspectionStatus("idle");
+      setInspectingFileName("");
+      if (fileInput.current) fileInput.current.value = "";
       setError("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The temporary round-trip trial could not start.");
@@ -124,14 +178,23 @@ export function Tier1RoundTripImportPanel({ state, onChange }: { state: Tier1Rou
   const source = draft ?? (state ? { fileName: state.session.source.fileName, xml: state.session.source.xml, bytes: state.session.source.bytes, preview: state.session.source.preview, sha256: state.session.source.hash ?? "Unavailable" } : null);
   return (
     <div className="import-review-stack">
-      <section className="table-panel">
+      <section className="table-panel" aria-busy={inspectionStatus === "inspecting"}>
         <PanelHeading title="Choose a disposable Project XML source" detail="The complete original text stays in browser memory and is never uploaded or overwritten." />
         <label className="import-file-zone">
           <input ref={fileInput} type="file" accept=".xml,.mspdi.xml" onChange={(event) => void inspect(event.target.files?.[0] ?? null)} />
-          <span><strong>{source?.fileName ?? "Choose Project XML/MSPDI"}</strong><small>Browser-local inspection only. Native .mpp is unsupported.</small></span>
+          <span><strong>{inspectionStatus === "inspecting" ? inspectingFileName : source?.fileName ?? "Choose Project XML/MSPDI"}</strong><small>Browser-local inspection only. Native .mpp is unsupported.</small></span>
         </label>
+        <p className="surface-caption" role="status" aria-live="polite">
+          {inspectionStatus === "inspecting"
+            ? "Inspecting and hashing the selected source locally…"
+            : inspectionStatus === "ready"
+              ? "Source inspection complete. Review the identity and task rows, then start the explicit trial when ready."
+              : state
+                ? "The active source is retained unchanged in this browser-memory trial."
+                : "Select a Microsoft Project XML/MSPDI source to inspect it locally."}
+        </p>
         {error ? <p className="import-error" role="alert">{error}</p> : null}
-        {source ? (
+        {source && inspectionStatus !== "inspecting" ? (
           <>
             <dl className="import-summary-grid">
               <div><dt>Project</dt><dd>{source.preview.projectName}</dd></div>
@@ -147,13 +210,13 @@ export function Tier1RoundTripImportPanel({ state, onChange }: { state: Tier1Rou
             </div>
             <RoundTripSourceTaskTable tasks={visibleTasks.slice(0, rowLimit)} />
             {visibleTasks.length > rowLimit ? <div className="disabled-action-row"><button type="button" onClick={() => setRowLimit((current) => current + TASK_TABLE_PAGE_SIZE)}>Show {Math.min(TASK_TABLE_PAGE_SIZE, visibleTasks.length - rowLimit)} more tasks</button><span>Showing {rowLimit} of {visibleTasks.length} matching rows.</span></div> : null}
-            <div className="disabled-action-row">
-              <button className="button-primary" type="button" disabled={!draft} onClick={startTrial}>Start round-trip trial</button>
-              {state ? <button type="button" onClick={() => { inspectionSequence.current += 1; onChange(null); setDraft(null); setQuery(""); setRowLimit(TASK_TABLE_PAGE_SIZE); if (fileInput.current) fileInput.current.value = ""; }}>Discard temporary trial</button> : null}
-              <span>{state ? "Starting again replaces only this temporary browser-memory session." : "Creates no production project record."}</span>
-            </div>
           </>
         ) : null}
+        <div className="disabled-action-row">
+          <button className="button-primary" type="button" disabled={!draft || inspectionStatus === "inspecting"} onClick={startTrial}>{state ? "Replace temporary round-trip trial" : "Start round-trip trial"}</button>
+          {state ? <button type="button" onClick={() => { inspectionSequence.current += 1; onChange(null); setDraft(null); setInspectionStatus("idle"); setInspectingFileName(""); setQuery(""); setRowLimit(TASK_TABLE_PAGE_SIZE); if (fileInput.current) fileInput.current.value = ""; }}>Discard temporary trial</button> : null}
+          <span>{state ? "Starting again replaces only this temporary browser-memory session." : "Explicit browser-local trial only · no production persistence · no approved export contract."}</span>
+        </div>
       </section>
       {state ? <TemporaryProjectSummary state={state} /> : null}
     </div>
