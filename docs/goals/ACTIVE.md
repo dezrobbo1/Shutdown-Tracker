@@ -1,8 +1,8 @@
-# Active Goal: Use Current Location Time in the Console Trial
+# Active Goal: Use Current Location Time and Leaf-Only Tracking in the Console Trial
 
 ## Outcome
 
-Replace the Tier 1 XML round-trip trial's manually advanced synthetic clock with the browser/device's actual current date and time in the IANA time zone detected when the session starts. Every execution, progress, problem, and action event must capture a fresh current timestamp when the operator submits the action.
+Replace the Tier 1 XML round-trip trial's manually advanced synthetic clock with the browser/device's actual current date and time in the IANA time zone detected when the session starts. Every execution, progress, problem, and action event must capture a fresh current timestamp when the operator submits the action. Show each imported leaf task's Microsoft Project Duration and keep summary rows as non-operational hierarchy context rather than tracked tasks.
 
 ## Success criteria
 
@@ -14,6 +14,9 @@ Replace the Tier 1 XML round-trip trial's manually advanced synthetic clock with
 - Project `StatusDate` and planned dates remain immutable imported schedule facts; neither becomes the execution clock.
 - Mapping proposals retain the captured local wall-clock values expected by timezone-neutral MSPDI task fields.
 - A device clock change that would place a new event before existing local evidence fails closed.
+- Imported Task `Duration` and `DurationFormat` plus the Project duration-display settings are retained and rendered without deriving duration from Start/Finish.
+- Tasks, Today, Task Dashboard navigation, operational counts, Critical task counts, mapping proposals, and candidate inputs treat executable leaves as the only tracked tasks.
+- Summary rows remain available for immutable source inspection, hierarchy, comparison, and future work-pack/reporting context, but expose no tracked-task state, progress, authority, Dashboard, or action controls in this trial.
 
 ## Trial boundary
 
@@ -28,11 +31,14 @@ Replace the Tier 1 XML round-trip trial's manually advanced synthetic clock with
 - Schedule calculation, automatic Microsoft Project operation, or changes to the complete-source candidate contract.
 - A final Tracker-to-Project mapping/export contract.
 - Mobile changes.
+- A production summary-work-pack reporting implementation or change to the approved Critical Work Pack source model.
 
 ## Required validation
 
 - Run all repository frontend tests, builds, and TypeScript checks plus `git diff --check`.
 - Verify fixed instants in multiple IANA zones, exact per-action timestamps, live projections, mapping output, reset, backward-clock rejection, and the documented daylight-saving limitation.
+- Verify duration parsing/default-unit rendering, duration retention, leaf-only operational counts/navigation, summary route guards, and leaf-only Critical counts.
+- Smoke-check the three supplied XML schedules without committing them or any generated artifact.
 - Validate changed Markdown links and repository paths.
 - Confirm no backend Java, worker, migration, API-contract, authentication, real Project data, generated artifact, or Mobile changes.
 
@@ -45,4 +51,4 @@ Replace the Tier 1 XML round-trip trial's manually advanced synthetic clock with
 
 ## Completion conditions
 
-The slice is complete when the Console trial displays and uses current browser-local date/time, every local action captures its submission time, synthetic time controls and stale documentation are gone, validation passes, and a draft `frontend/console-location-aware-clock -> main` pull request reports the bounded change accurately.
+The slice is complete when the Console trial displays and uses current browser-local date/time, every local action captures its submission time, imported leaf duration is visible, summaries are hierarchy-only rather than tracked tasks, synthetic time controls and stale documentation are gone, validation passes, and draft `frontend/console-location-aware-clock -> main` pull request #72 reports the bounded change accurately.

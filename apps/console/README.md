@@ -37,7 +37,9 @@ The environment flag remains available as a direct-entry shortcut:
 VITE_SHUTDOWN_TRACKER_TIER1_ROUNDTRIP_TRIAL=true
 ```
 
-The shared Import path retains the original UTF-8 bytes and losslessly decoded text of a Microsoft Project XML/MSPDI source in memory, adapts its hierarchy into a temporary Tier 1 schedule after explicit Start, captures local Can't Start / Start / Pause / Resume / Finish and progress facts, and offers reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. Invalid or non-UTF-8 input fails closed, and no mapping is included by default.
+The shared Import path retains the original UTF-8 bytes and losslessly decoded text of a Microsoft Project XML/MSPDI source in memory, adapts its hierarchy into a temporary Tier 1 schedule after explicit Start, captures local Can't Start / Start / Pause / Resume / Finish and progress facts for executable leaves, and offers reviewed optional mappings to Actual Start, Actual Finish, `% Complete`, or `Physical % Complete`. Invalid or non-UTF-8 input fails closed, and no mapping is included by default.
+
+Imported leaf Duration is shown from the source `Duration`/`DurationFormat` values using the source Project's duration-display settings. It is never inferred from Start/Finish or recalculated by Shutdown Tracker. Summary rows remain visible in source inspection and the Tasks hierarchy, but are labelled hierarchy-only and have no tracked-task state, progress, authority, Task Dashboard, mapping, or candidate input.
 
 During the active trial, the Console displays the current browser/device date and time in the IANA time zone detected at session start and captures a fresh whole-minute value whenever an operator submits an execution, progress, problem, or action update. Project `StatusDate` and planned dates remain imported facts; there are no synthetic `+15 minutes`, `+1 hour`, or planned-start jump controls. In this frontend-only boundary, “location” means that captured device time zone—it is not inferred from Project XML, GPS, or IP and is not server-verified production time. Discard and restart after changing device location/time zone; daylight-saving fall-back updates fail closed during the repeated local interval.
 
@@ -47,7 +49,7 @@ This is an experimental product trial, not PR #48's approval workflow or a final
 
 ## Task execution and Critical reporting
 
-The ordinary Console has no Task Dashboard record without an active project. In the round-trip trial, an imported executable leaf exposes the approved Can't Start / Start / Pause / Resume / Finish actions and derives their events from browser-memory state. It does not persist them or provide ordinary manual correction/backdating.
+The ordinary Console has no Task Dashboard record without an active project. In the round-trip trial, only an imported executable leaf exposes a Task Dashboard and the approved Can't Start / Start / Pause / Resume / Finish actions. Summary rows remain non-clickable Project hierarchy context. The trial does not persist events or provide ordinary manual correction/backdating.
 
 Execution state and schedule attention are separate. A passed planned start never establishes `In Progress` without a Tracker Start/Resume event or accepted imported Actual Start/progress evidence.
 
@@ -59,8 +61,8 @@ Import / Export includes a functional browser-only Project XML/MSPDI inspector. 
 
 - checks for XML content with the Microsoft Project MSPDI namespace;
 - reads project identity and status date where supplied;
-- counts summary and leaf tasks;
-- presents searchable task, WBS, UID/ID, planned date, and imported progress context;
+- distinguishes source task rows, tracked leaf tasks, and summary hierarchy rows;
+- presents searchable task, WBS, UID/ID, planned date, imported Duration, and imported progress context;
 - keeps the selected source in the browser and does not upload or mutate it; and
 - enables explicit creation of a temporary round-trip session from that exact retained source.
 

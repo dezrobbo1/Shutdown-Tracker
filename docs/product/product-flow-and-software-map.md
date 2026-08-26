@@ -48,7 +48,7 @@ Project lifecycle meaning and project-creation rules are defined in [Project Lif
 The Console top-level sections are:
 
 1. **Today** — high-signal view of the configured 24-hour operational day, attention conditions, due reporting, and exceptions.
-2. **Tasks** — project task explorer, filters, saved views, and entry to each Task Dashboard.
+2. **Tasks** — project hierarchy, tracked-leaf explorer, filters, saved views, and entry to each tracked leaf Task Dashboard.
 3. **Critical** — Tier 1 configuration and oversight of selected operational reporting items, their versioned per-item policies/templates, timing/triggers, supported required content, and report history.
 4. **Import / Export** — schedule intake, browser import inspection, immutable snapshot history, and an explicitly deferred Project export design.
 5. **Project Settings** — membership, direct-report relationships, operational mappings, timezone, operational-day settings, and lifecycle controls.
@@ -78,9 +78,10 @@ Tasks is the full Project-like explorer for the accepted project task set. It su
 - configurable columns, including mapping-derived context;
 - search, filter, group, and sort;
 - Saved Views; and
-- entry to the Task Dashboard for leaf and summary tasks.
+- entry to the Task Dashboard for tracked leaf tasks; and
+- hierarchy/work-pack context for summary rows without treating them as tracked execution tasks.
 
-Summary tasks remain aggregate work-pack views. The ordinary Can't Start, Start, Pause, Resume, and Finish actions apply to executable leaf tasks. Can't Start leaves execution Not Started; a blocked/delayed condition is linked operational context rather than another way to establish In Progress.
+Selected summary tasks may anchor aggregate work-pack/reporting views, but they do not become tracked execution tasks. The ordinary Can't Start, Start, Pause, Resume, and Finish actions apply to executable leaf tasks. Can't Start leaves execution Not Started; a blocked/delayed condition is linked operational context rather than another way to establish In Progress.
 
 ### Project Settings
 
