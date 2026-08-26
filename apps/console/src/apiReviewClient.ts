@@ -17,7 +17,7 @@ export type ConsoleReviewRuntimeConfig = {
 };
 
 export type ConsoleReviewData = {
-  mode: "synthetic" | "live";
+  mode: "unconfigured" | "live";
   projectId: string | null;
   snapshots: ImportReviewSnapshotSummary[];
   selectedSnapshotId: string | null;
@@ -26,7 +26,7 @@ export type ConsoleReviewData = {
 };
 
 export type ConsoleReviewLoadState = {
-  status: "synthetic" | "loading" | "loaded" | "error";
+  status: "unconfigured" | "loading" | "loaded" | "error";
   message: string;
 };
 
@@ -45,7 +45,7 @@ const importReadSurfaces = shutdownTrackerReviewApiSurfaces.filter((surface) =>
 export const reviewApiConnection = {
   baseUrlLabel: reviewApiRuntimeConfig.baseUrl || "Relative API",
   projectIdLabel: reviewApiRuntimeConfig.projectId || "No project configured",
-  modeLabel: reviewApiRuntimeConfig.liveEnabled ? "Live review data" : "Synthetic review data",
+  modeLabel: reviewApiRuntimeConfig.liveEnabled ? "Live review data" : "Not configured",
   operationCount: importReadSurfaces.length,
   highlightedSurfaces: importReadSurfaces,
   surfaces: importReadSurfaces
@@ -73,8 +73,8 @@ export function initialConsoleReviewLoadState(config = reviewApiRuntimeConfig): 
   }
 
   return {
-    status: "synthetic",
-    message: "Synthetic review data. Set a project id to fetch live review data."
+    status: "unconfigured",
+    message: "No project is configured. Set a project id to fetch read-only review data."
   };
 }
 
@@ -84,12 +84,12 @@ export async function loadConsoleReviewData(
 ): Promise<ConsoleReviewData> {
   if (!config.liveEnabled) {
     return {
-      mode: "synthetic",
+      mode: "unconfigured",
       projectId: null,
       snapshots: [],
       selectedSnapshotId: null,
       snapshotDetail: null,
-      message: "Synthetic review data. Set VITE_SHUTDOWN_TRACKER_PROJECT_ID to fetch live review data."
+      message: "No project is configured. Set VITE_SHUTDOWN_TRACKER_PROJECT_ID to fetch read-only review data."
     };
   }
 

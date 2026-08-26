@@ -2,7 +2,7 @@
 
 Purpose: React/Vite mobile-first PWA satellite for Tier 2 and Tier 3 assigned work.
 
-Current status: static/synthetic `Assigned Tasks -> Task Detail` visual shell. It does not enable assignment, execution, end-of-shift progress, or Critical reporting writes.
+Current status: empty `Assigned Tasks` application frame. It has no fictional operational data and does not enable assignment, execution, end-of-shift progress, Critical reporting, or sync behaviour.
 
 ## Approved application target
 
@@ -11,34 +11,28 @@ Assigned Tasks
   Task Detail
 ```
 
-Assigned Tasks is the only top-level operational destination.
+Assigned Tasks remains the only top-level operational destination. The current frame shows an honest zero-task state because production identity, assignment, and task APIs are not connected.
+
+The approved future boundary remains:
 
 - Tier 2 sees tasks explicitly assigned by Tier 1 for tracking.
 - Tier 2 may assign those tasks to direct-report Tier 3 while retaining tracking responsibility.
 - Tier 3 sees tasks explicitly assigned by Tier 2 as `WORKING_ON` or `FIELD_CONTROL`.
 - Neither tier may browse the whole project.
+- Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical reporting obligations belong inside Task Detail.
+- Sync remains transport/recovery state inside assigned work, not a separate destination.
 
-Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical reporting obligations belong inside Task Detail. There is no separate Mobile Today, Problems, Evidence, Sync, or Critical destination.
-
-Sync is a compact, persistent transport/recovery state. Queued, sending, server-received, failed, and conflict states must remain visible without becoming an operational page.
-
-## Default visual shell
+## Current application frame
 
 - `Assigned Tasks` is the only top-level operational destination.
-- A local visual-review persona selector distinguishes Tier 2 tracking responsibility from Tier 3 `WORKING_ON` and `FIELD_CONTROL` assignments.
-- Opening a synthetic assigned task uses local React view state and reveals its Task Detail. This transition is not routing, authentication, project membership, or assignment persistence.
-- Task Detail keeps Execution, People, Discussion, Delays / Problems, Actions, Evidence, History, and assigned Critical context attached to the task.
-- Execution state and schedule attention are presented separately. The visual `Not Started` / `Late to Start` example has no Tracker Start/Resume event, no imported Actual Start, and imported progress of zero.
-- Execution represents Can't Start, Start, Pause, Resume, and Finish with system-recorded timestamps. It does not provide ordinary editable execution date/time fields or manual backdating.
-- Can't Start remains Not Started; Pause is shown separately from any linked adverse delay/problem; Resume does not silently close that problem; Finish uses confirmation/configured-evidence semantics.
-- End-of-shift unfinished work is represented as a Tracker field observation asking how much is complete, what remains, what may affect the next shift, and for optional note/evidence.
-- Ordinary progress is separate from formal Critical reporting. The Tier 2 example shows a contextual policy version/template, due state, controlled required content, pre-populated task facts, judgement inputs, and history. Tier 3 sees context only.
-- Sync is a compact status with embedded recovery examples, not a navigation destination.
-- All write-like controls are disabled. Only visual persona selection and local list/detail navigation are interactive.
+- No persona selector, example project, fictional task, task event, progress record, Critical report, or sync state is supplied.
+- Task Detail is not implemented in the current application frame.
+- No write-like controls are exposed.
+- Reloading does not create or restore task data.
 
 ## Implementation boundary
 
-The current Mobile App does not implement these production capabilities:
+The current Mobile App does not implement:
 
 - OIDC/login;
 - Tier 2/Tier 3 project membership;
@@ -57,20 +51,7 @@ The current Mobile App does not implement these production capabilities:
 - Critical policy/template configuration or arbitrary report schemas;
 - import/export or Microsoft Project write-back.
 
-There is no service worker, IndexedDB store, replay client, background sync implementation, or Mobile API wiring. The web manifest supplies install/display metadata only. All displayed task and sync data is synthetic and must not be treated as operational state.
-
-## Required offline copy
-
-```text
-Saved locally.
-Queued on this device. Not yet sent.
-Could not send. Still saved on this device.
-Server received.
-This progress update is not submitted until the server receives it.
-Last synced at [time].
-```
-
-Use `Thread may be out of date. Last synced at [time].` only for future Task Detail discussion, not for task progress.
+There is no service worker, IndexedDB store, replay client, background sync implementation, or Mobile API wiring. The web manifest supplies install/display metadata only.
 
 ## Product authority
 

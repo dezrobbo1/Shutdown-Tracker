@@ -16,7 +16,7 @@ Project Console
   Project Settings
 ```
 
-Outside the explicitly flagged Tier 1 Project round-trip trial, the Login transition, Projects Home/project switcher, Today, Tasks explorer, Task Dashboard, Critical, and Project Settings use sanitized synthetic data and local React view state. OIDC, production project APIs, lifecycle persistence, task execution, assignment, Critical, mapping, and operational-record writes are not implemented. Write-like controls remain disabled.
+Outside the explicitly flagged Tier 1 Project round-trip trial, the Console starts without an active project. Projects Home provides an honest empty state and directs the reviewer to Import / Export. Today, Tasks, Critical, and Project Settings remain visible as the approved information architecture but show no project records until a real project path exists. No fictional projects, tasks, people, Critical records, activity, or settings are preloaded. OIDC, production project APIs, lifecycle persistence, task execution, assignment, Critical, mapping, and operational-record writes are not implemented.
 
 Problems, Discussion, Actions, Evidence, and History belong to the relevant Task Dashboard rather than project-level navigation.
 
@@ -36,11 +36,11 @@ This is an experimental product trial, not PR #48's approval workflow or a final
 
 ## Task execution and Critical reporting
 
-The ordinary static Task Dashboard represents the approved Can't Start / Start / Pause / Resume / Finish action vocabulary and system-captured timestamp boundary without enabling writes. In the round-trip trial, an imported executable leaf derives those events from browser-memory state. It does not persist them or provide ordinary manual correction/backdating.
+The ordinary Console has no Task Dashboard record without an active project. In the round-trip trial, an imported executable leaf exposes the approved Can't Start / Start / Pause / Resume / Finish actions and derives their events from browser-memory state. It does not persist them or provide ordinary manual correction/backdating.
 
 Execution state and schedule attention are separate. A passed planned start never establishes `In Progress` without a Tracker Start/Resume event or accepted imported Actual Start/progress evidence.
 
-The Critical shell statically represents selected leaf/work-pack items, Tier 2 ownership, reusable templates, effective policy versions, supported timing/trigger combinations, controlled required content, due state, condition, and history. Its configuration controls are disabled. It does not implement a Critical API, arbitrary field schemas, or a second execution-state model.
+The ordinary Critical destination shows no records without an active project. The round-trip trial may show imported Project Critical flags as read-only schedule context, but it does not derive Critical ownership or reporting configuration. No Critical API, configuration persistence, arbitrary field schema, or second execution-state model is implemented.
 
 ## Import review
 
@@ -62,7 +62,7 @@ VITE_SHUTDOWN_TRACKER_PROJECT_ID=<review-project-id>
 VITE_SHUTDOWN_TRACKER_IMPORT_SNAPSHOT_ID=<optional-snapshot-id>
 ```
 
-Without `VITE_SHUTDOWN_TRACKER_PROJECT_ID`, no backend request is made. Persistence, Operational Mapping validation, comparison/reconciliation, activation, and production project switching remain disabled or unimplemented.
+Without `VITE_SHUTDOWN_TRACKER_PROJECT_ID`, the read-only review state is shown as unconfigured and no backend request is made. Persistence, Operational Mapping validation, comparison/reconciliation, activation, and production project switching remain disabled or unimplemented.
 
 ## Export boundary
 
