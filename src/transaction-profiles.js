@@ -1,5 +1,4 @@
 import { buildTaskScalarDiagnosticPatch } from "./execution.js";
-import { generateAssignedCompletionNativeV0 } from "./native-completion-v0.js";
 import { applyTaskScalarDiagnostic } from "./project-xml.js";
 
 export const EXPORT_PROFILES = Object.freeze([
@@ -16,13 +15,6 @@ export const EXPORT_PROFILES = Object.freeze([
     classification: "diagnostic",
     warning:
       "This profile writes only task PercentComplete, ActualStart and ActualFinish. The BOILER trial disproved it as a coherent assigned-task completion transaction. Use it only to reproduce and compare the failed mechanism."
-  },
-  {
-    id: "assigned-completion-native-v0",
-    label: "Assigned completion at planned window — native-evidence v0",
-    classification: "native-evidence-derived",
-    warning:
-      "Experimental and not yet Microsoft Project-verified. It supports exactly one active, unstarted leaf task with one assignment and one Type 1 assignment timephased row. Start and completion must equal the imported planned Start and Finish. Open, recalculate, save and reopen the candidate in Microsoft Project before treating the result as evidence."
   }
 ]);
 
@@ -68,13 +60,6 @@ export function generateCandidateText({ sourceXml, project, events, profileId })
       patchEntries: [],
       changedTaskUids: [],
       changedAssignmentUids: []
-    };
-  }
-
-  if (profile.id === "assigned-completion-native-v0") {
-    return {
-      profile,
-      ...generateAssignedCompletionNativeV0({ sourceXml, project, events })
     };
   }
 
