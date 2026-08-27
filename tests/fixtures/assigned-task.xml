@@ -21,6 +21,7 @@
     <Task>
       <UID>43</UID>
       <ID>7</ID>
+      <GUID>SOURCE-TASK-GUID</GUID>
       <Name>Assigned leaf</Name>
       <WBS>1.1</WBS>
       <OutlineNumber>1.1</OutlineNumber>
