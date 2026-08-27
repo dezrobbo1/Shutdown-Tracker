@@ -1,5 +1,5 @@
 import { buildTaskScalarDiagnosticPatch } from "./execution.js";
-import { generateAssignedCompletionNativeV0 } from "./native-completion-v0.js";
+import { generateAssignedCompletionNativeV0 } from "./native-completion-v0-guarded.js";
 import { applyTaskScalarDiagnostic } from "./project-xml.js";
 
 export const EXPORT_PROFILES = Object.freeze([
@@ -22,7 +22,7 @@ export const EXPORT_PROFILES = Object.freeze([
     label: "Assigned completion at planned window — native-evidence v0",
     classification: "native-evidence-derived",
     warning:
-      "Experimental and not yet Microsoft Project-verified. It supports exactly one active, unstarted leaf task with one assignment and one Type 1 assignment timephased row. Start and completion must equal the imported planned Start and Finish. Open, recalculate, save and reopen the candidate in Microsoft Project before treating the result as evidence."
+      "Experimental and not yet Microsoft Project-verified. It supports exactly one active, unstarted leaf task with one non-zero Resource UID assignment and one matching Unit 1, Type 1 assignment timephased row. Start and completion must equal the imported planned Start and Finish. Open, recalculate, save and reopen the candidate in Microsoft Project before treating the result as evidence."
   }
 ]);
 
