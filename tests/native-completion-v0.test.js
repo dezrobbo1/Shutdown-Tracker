@@ -103,10 +103,15 @@ function completionEvents(options = {}) {
 }
 
 function blockFor(xml, elementName, identityField, identityValue) {
-  const expression = new RegExp(`<${elementName}>[\\s\\S]*?<${identityField}>${identityValue}<\\/${identityField}>[\\s\\S]*?<\\/${elementName}>`);
-  const match = expression.exec(xml);
-  assert.ok(match, `${elementName} ${identityField} ${identityValue} was not found`);
-  return match[0];
+  const blocks = [...xml.matchAll(new RegExp(`<${elementName}>[\\s\\S]*?<\\/${elementName}>`, "g"))].map(
+    (match) => match[0]
+  );
+  const identity = new RegExp(
+    `<${identityField}>\\s*${String(identityValue).replace(/[.*+?^${}()|[\\]\\\\]/g, "\\$&")}\\s*<\\/${identityField}>`
+  );
+  const block = blocks.find((candidate) => identity.test(candidate));
+  assert.ok(block, `${elementName} ${identityField} ${identityValue} was not found`);
+  return block;
 }
 
 test("native-evidence v0 writes one complete task and assignment transaction", () => {
