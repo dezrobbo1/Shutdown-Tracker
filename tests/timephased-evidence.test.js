@@ -15,13 +15,15 @@ function timephased(parentType, ownerUid, type, value) {
   };
 }
 
-function task(timephasedData = []) {
+function task(timephasedData = [], overrides = {}) {
+  const uid = String(overrides.uid ?? "43");
   return {
-    uid: "43",
-    id: "7",
-    name: "Assigned leaf",
-    wbs: "1.1",
-    outlineNumber: "1.1",
+    uid,
+    id: String(overrides.id ?? uid),
+    guid: overrides.guid ?? `GUID-${uid}`,
+    name: overrides.name ?? `Task ${uid}`,
+    wbs: overrides.wbs ?? uid,
+    outlineNumber: overrides.outlineNumber ?? uid,
     summary: false,
     start: "2026-01-05T08:00:00",
     finish: "2026-01-05T16:00:00",
@@ -40,14 +42,17 @@ function task(timephasedData = []) {
     critical: "0",
     totalSlack: "0",
     freeSlack: "0",
-    timephasedData
+    timephasedData,
+    ...overrides,
+    uid
   };
 }
 
 function project(taskRows, assignmentRows, resourceRows = []) {
-  const taskValue = task(taskRows);
+  const taskValue = task(taskRows, { uid: "43", id: "7", name: "Assigned leaf", wbs: "1.1", outlineNumber: "1.1" });
   const assignment = {
     uid: "91",
+    resourceUid: "5",
     percentWorkComplete: "100",
     work: "PT16H0M0S",
     actualWork: "PT16H0M0S",
@@ -102,4 +107,38 @@ test("comparison exposes task Type 11 and broad timephased normalization", () =>
   assert.notEqual(allRow.candidate, allRow.result);
   assert.ok(taskRow);
   assert.match(taskRow.result, /11=1/);
+});
+
+test("an unrelated task is selected when only its task timephasing changes", () => {
+  const stable = task([], { uid: "43", id: "7", name: "Tracked", wbs: "1.1", outlineNumber: "1.1" });
+  const unrelatedSource = task([], { uid: "44", id: "8", name: "Unrelated", wbs: "1.2", outlineNumber: "1.2" });
+  const unrelatedResult = task([timephased("Task", 44, 11, "100")], {
+    uid: "44",
+    id: "8",
+    name: "Unrelated",
+    wbs: "1.2",
+    outlineNumber: "1.2"
+  });
+
+  const source = {
+    project: { name: "Plan" },
+    taskByUid: new Map([["43", stable], ["44", unrelatedSource]]),
+    assignmentsByTaskUid: new Map(),
+    timephasedData: []
+  };
+  const candidate = {
+    project: { name: "Plan" },
+    taskByUid: new Map([["43", stable], ["44", unrelatedSource]]),
+    assignmentsByTaskUid: new Map(),
+    timephasedData: []
+  };
+  const result = {
+    project: { name: "Plan" },
+    taskByUid: new Map([["43", stable], ["44", unrelatedResult]]),
+    assignmentsByTaskUid: new Map(),
+    timephasedData: unrelatedResult.timephasedData
+  };
+
+  const rows = buildComparisonRows({ source, candidate, result, taskUids: ["43"] });
+  assert.ok(rows.some((row) => row.key === "44-task-timephased"));
 });
