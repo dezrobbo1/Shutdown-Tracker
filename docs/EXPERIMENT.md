@@ -2,24 +2,17 @@
 
 ## Objective
 
-Determine the native Microsoft Project XML transaction required to represent assigned-task execution progress coherently.
+Determine whether the evidence-derived Microsoft Project XML transaction can complete one real assigned task coherently.
 
-The current repository is an evidence laboratory. It imports source XML, records execution intent, generates explicitly labelled candidates, accepts Microsoft Project-saved results or Project-authored reference schedules, and compares task, assignment, timephased, summary, project, and wider changed-task facts.
+The repository is an evidence laboratory. It imports source XML, records execution intent, generates explicitly labelled candidates, accepts Microsoft Project-saved results or Project-authored reference schedules, and compares task, assignment, timephased, summary, project, and wider changed-task facts.
 
-It does not yet contain an approved native-semantic completion writer.
+Draft PR #75 implements one experimental writer:
 
-## User trial
+```text
+assigned-completion-native-v0
+```
 
-1. Export a disposable schedule from Microsoft Project as XML.
-2. Import it into the browser lab.
-3. Record execution events on one or more executable leaf tasks.
-4. Generate a candidate using one explicitly labelled profile.
-5. Open the candidate in the same identified Microsoft Project desktop build.
-6. Allow Project to recalculate.
-7. Save As a separate XML file.
-8. Import the Project-saved result into the lab.
-9. Review source, candidate, and result values.
-10. Record the outcome in `NATIVE-EVIDENCE.md` without committing real schedule files.
+It is not approved as a native-semantic transaction. The deployed `main` registry does not expose it while the native trial is pending.
 
 ## Result classifications
 
@@ -54,99 +47,96 @@ A file is rejected when a touched task is missing or its UID/ID/name/WBS/summary
 | Serialization normalization | Formatting, ordering, identity, or volatile output written by Project |
 | Unexpected difference | A difference requiring further investigation |
 
-## Required native cases
+## Implemented v0 boundary
 
-Run each case separately on an assigned task with non-zero Work:
+The writer fails closed unless:
 
-- unchanged open/save baseline;
-- Actual Start only;
-- Mark on Track through a controlled status date/time;
-- partial progress at 50% or 75%;
-- Finish / 100% complete;
-- Skip to the planned finish;
-- expected progress at shift end.
+- exactly one task is touched;
+- the task is active, non-null, non-summary, and unstarted;
+- task Duration and Work are positive;
+- task remaining Duration and Work equal planned Duration and Work;
+- the task has exactly one assignment;
+- the assignment has a non-zero Resource UID;
+- assignment Work, Start, and Finish align with the task;
+- the assignment is unstarted and has full Remaining Work;
+- the assignment contains exactly one Unit 1, Type 1 timephased row matching its UID, interval, and Work value;
+- execution history contains exactly one Start and one Finish or Skip to planned finish event; and
+- Actual Start equals planned Start and Actual Finish equals planned Finish.
 
-Also repeat partial progress and completion on an unassigned task so assignment effects can be isolated.
+The writer changes only the selected Task and Assignment blocks and verifies that all remaining source XML is byte-for-byte unchanged.
 
-## Next bounded implementation
+Pause, Resume, observed percentage, Mark on Track, shift-end progress, off-plan dates, split tasks, multiple assignments, partial progress, and already-progressed tasks are outside v0.
 
-After the reset PR merges, the first implementation PR should add one profile only:
+## Evidence-derived completion shape
 
-```text
-assigned-task-completion-native-v0
-```
-
-Label it:
-
-> Native-evidence-derived experimental profile — not yet Project-verified.
-
-The profile should initially fail closed unless the task:
-
-- is an active leaf;
-- has exactly one assignment;
-- has non-zero Duration;
-- has non-zero Work;
-- has valid Start and Finish values;
-- has no contradictory pre-existing actuals; and
-- has the source assignment and timephased shape supported by the evidence.
-
-The profile must preserve source task UID, task GUID, assignment UID, Resource UID, dependencies, calendars, baselines, and all unrelated XML content. It must not copy regenerated identifiers or calculated schedule fields from the Project-authored reference.
-
-### Evidence-derived task completion shape
-
-For a completed assigned task, the first experimental profile should reproduce only the repeated Project-authored completion facts:
+For the task:
 
 - `PercentComplete = 100`;
 - `PercentWorkComplete = 100`;
-- approved Actual Start and Actual Finish;
-- Actual Duration equal to full Duration;
-- Remaining Duration equal to zero;
-- Actual Work equal to full Work;
-- Remaining Work equal to zero;
-- Stop and Resume equal to Actual Finish;
-- one direct task Type 11 timephased progress row with Unit 2 and Value 100.
+- Actual Start and Actual Finish equal the planned window;
+- Actual Duration equals Duration;
+- Remaining Duration equals zero;
+- Actual Work equals Work;
+- Remaining Work equals zero;
+- Stop and Resume equal Actual Finish;
+- one direct task Type 11 timephased row with Unit 2 and Value 100.
 
 For the existing source assignment:
 
 - `PercentWorkComplete = 100`;
-- Actual Start and Actual Finish equal to the task actual dates;
-- Actual Work equal to full assignment Work;
-- Remaining Work equal to zero;
-- Stop and Resume equal to Actual Finish;
-- source Type 1 assignment timephased work transformed to Type 2 actual work while retaining the source assignment UID, Resource UID, interval, unit, and value.
+- Actual Start and Actual Finish equal the task actual dates;
+- Actual Work equals assignment Work;
+- Remaining Work equals zero;
+- Stop and Resume equal Actual Finish;
+- the existing Type 1 assignment timephased row becomes Type 2 while preserving source assignment UID, Resource UID, interval, Unit, and Value.
 
-Do not independently write summary progress, slack, criticality, early/late dates, successor dates, project finish, Project GUID, task GUID, assignment UID, Resource UID, new tasks, or new assignments.
+The writer does not independently alter Project GUID, task GUID, assignment UID, Resource UID, summary progress, slack, criticality, early/late dates, successor dates, project finish, tasks, resources, calendars, dependencies, or baselines.
 
 ## First native completion trial
 
-Trial only task UID `43` first:
+Trial only BOILER task UID `43`:
 
 ```text
 source XML
-→ assigned-task-completion-native-v0 candidate
+→ assigned-completion-native-v0 candidate
 → open in Microsoft Project build 16.0.20228.20188
 → recalculate
 → Save As XML
-→ reopen the saved XML
+→ close and reopen the saved result
 → import the result into the lab
 ```
+
+Exact user steps are in `ASSIGNED-COMPLETION-NATIVE-V0-TRIAL.md`.
 
 Pass conditions:
 
 - task displays 100% complete;
-- task actual dates are correct;
-- Actual Duration equals Duration;
+- Actual Start is `2026-08-17T07:30:00`;
+- Actual Finish is `2026-08-17T15:30:00`;
+- Actual Duration equals `PT8H0M0S`;
 - Remaining Duration equals zero;
-- assignment displays 100% work complete;
-- Actual Work equals Work;
-- Remaining Work equals zero;
-- task Type 11 and assignment Type 2 timephased evidence survive or are coherently normalized by Project;
-- no contradictory remaining work remains;
+- assignment Actual Work equals `PT16H0M0S`;
+- assignment Remaining Work equals zero;
+- task Type 11 and assignment Type 2 evidence survive or are coherently normalized by Project;
+- no contradictory remaining work or duration remains;
+- source task, assignment, and resource identities remain attributable;
 - the source file remains unchanged; and
 - the Project-saved result reopens stably.
 
 Only after UID `43` passes should the same profile be tried on UIDs `318` and `319`.
 
+## Later native cases
+
+After the completion case is proven, separately investigate:
+
+- Actual Start only;
+- Mark on Track through a controlled status date/time;
+- partial progress at 50% or 75%;
+- off-plan completion;
+- pause/resume;
+- multiple assignments; and
+- unassigned tasks.
+
 ## Stop condition
 
-Do not rebuild backend, approvals, roles, Mobile, reporting, messaging, or production persistence until one assigned-task partial-progress case and one assigned-task completion case reopen and save coherently in Microsoft Project.
+Do not merge PR #75, expand the writer, or rebuild backend, approvals, roles, Mobile, reporting, messaging, or production persistence until task UID `43` passes the Microsoft Project open, recalculate, save, close, reopen, and result-import trial.
