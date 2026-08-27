@@ -1,19 +1,15 @@
 {
-  "name": "shutdown-tracker",
-  "private": true,
+  "name": "shutdown-tracker-xml-roundtrip-lab",
   "version": "0.1.0",
-  "description": "Shutdown Tracker monorepo frontend workspace.",
-  "workspaces": [
-    "apps/console",
-    "apps/mobile-pwa",
-    "packages/api-client",
-    "packages/trial-model"
-  ],
+  "private": true,
+  "type": "module",
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "check": "node scripts/validate.mjs",
+    "test": "node --test",
+    "build": "node scripts/build.mjs",
+    "serve": "node scripts/serve.mjs"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22"
   }
 }

@@ -1,103 +1,69 @@
-# Shutdown Tracker
+# Shutdown Tracker XML Round-Trip Lab
 
-Shutdown Tracker is a shutdown, turnaround, outage, and major-overhaul execution-control platform. It uses exactly three project user tiers across a Tier 1 Master Console and a Tier 2/Tier 3 assigned-task Mobile App while Microsoft Project remains schedule calculation and master-file authority.
+This repository is now a deliberately small browser-local laboratory for proving Microsoft Project XML progress behaviour.
 
-## Product boundary
+The previous application architecture, backend, database, approval lifecycle, Mobile app, simulation framework, and extensive product governance were removed from the active tree. Their history remains available in Git and on `archive/pre-roundtrip-lab-reset-2026-08-27`.
 
-Shutdown Tracker owns operational execution truth, assignments, Critical reporting, task-owned records, and immutable imported Project snapshots. Microsoft Project remains the schedule calculation and master-file authority.
-
-The active product path is:
+## Current workflow
 
 ```text
-import immutable Project schedule
--> validate product structure and operational mappings
--> assign tracking responsibility
--> validate Tier 1, Tier 2, and Tier 3 workflows
--> validate execution, progress, Today, task, and Critical reporting behaviour
--> revisit the Project export/round-trip contract with trial evidence
+Microsoft Project XML
+        ↓
+Import locally in the browser
+        ↓
+Review executable leaf tasks
+        ↓
+Record execution intent
+Start / Pause / Resume / Finish / observed progress
+        ↓
+Use optional trial helpers
+Mark on Track / progress to shift end / skip to planned finish
+        ↓
+Select an experimental export profile
+        ↓
+Download a separate candidate XML
+        ↓
+Open, recalculate and Save As XML in Microsoft Project
+        ↓
+Import the Project-saved result
+        ↓
+Compare source → intent → candidate → Project result
 ```
 
-Shutdown Tracker must not independently calculate CPM, critical path, float, resource levelling, recovery scheduling, dependency consequences, planned dates, or other schedule results. It must not silently update, overwrite, or merge into the accepted master `.mpp`, and it does not provide a server-side native `.mpp` writer.
+No file is uploaded. State is held in browser memory and is lost on reload.
 
-The exact Project export, approval, candidate, adoption, and round-trip workflow is intentionally **not finalised**. Earlier PR #48 candidate/export work is retained only in its original branch and as explicitly identified technical research or pre-existing infrastructure; it is not a prerequisite or current product authority. See [ADR-012](docs/adr/ADR-012-product-trial-foundation-and-export-deferral.md) and the [Trial Foundation Retention Map](docs/product/trial-foundation-retention-map.md).
+## Export profiles
 
-## Applications
+### Intent log only
 
-- **Master Console** — Tier 1-only project-control application with Projects Home and the top-level sections Today, Tasks, Critical, Import / Export, and Project Settings.
-- **Mobile App** — Tier 2/Tier 3 assigned-task satellite application. Assigned Tasks is its only top-level operational destination; sync remains visible state rather than navigation.
+The downloaded XML is byte-for-byte identical to the imported source. A separate JSON file records execution intent. Use this for baseline open/save comparisons.
 
-Problems, discussion, actions, evidence, and history live in the relevant Task Dashboard. The Mobile App is not a responsive version of the Console.
+### Task scalar diagnostic
 
-## Current maturity
+Applies only task-level `PercentComplete`, `ActualStart`, and `ActualFinish` values to a complete-source candidate. This profile is deliberately retained as a **diagnostic known to be insufficient for assigned tasks**. It exists so native Project behaviour can be compared against the previously failed mechanism.
 
-Implemented and experimental areas vary by branch. The durable product direction includes:
+No profile is currently claimed to implement a complete native Microsoft Project progress transaction.
 
-- Java 21 Spring Boot API and project-worker architecture;
-- PostgreSQL and migration-managed persistence;
-- immutable Project source/snapshot handling;
-- MPXJ-based Project parsing and MSPDI/XML interchange;
-- browser-only MSPDI/XML inspection for import review;
-- Master Console and Mobile App React/Vite applications;
-- Project Operational Mapping, Critical reporting, task-owned Delays / Problems, Actions, Evidence, Discussion, History, and offline execution as product domains;
-- append-only audit and explicit Tier 1 review boundaries.
+## Trial helpers
 
-Do not infer runtime completeness from this overview. App/service READMEs, source code, migrations, tests, and the current branch/PR define implemented behaviour.
+- **Mark on Track** records the intent to progress according to the planned window at the selected trial time. The displayed percentage is a simple wall-clock estimate, not a Microsoft Project calendar calculation.
+- **Progress to expected shift end** records the estimated planned percentage at the configured shift end.
+- **Skip to planned finish** moves the local trial time to the imported planned finish and records 100% expected progress.
 
-## Architecture
+These helpers accelerate user trials. They do not claim to reproduce the native Project commands until native evidence is captured and implemented as a separate profile.
 
-- Monorepo.
-- Frontend: React + Vite.
-- Field delivery: mobile-first PWA, with installable delivery allowed without forking the product model.
-- Backend: Java Spring Boot.
-- Database: PostgreSQL.
-- Microsoft Project processing: MPXJ plus Microsoft Project itself where Project-native recalculation is required.
-- Interchange: MSPDI/XML remains the primary open format; native `.mpp` writing by the server is out of scope.
-- Export/candidate processing already present on main is experimental technical infrastructure, not the settled product workflow.
-- File/evidence architecture: provider-neutral storage abstractions and immutable artifact provenance.
-- Offline field direction: IndexedDB queue, service worker, explicit sync state, idempotency keys.
-- Communications direction: entity-linked Discussion around structured records, not generic chat as the source of truth.
-
-## Repository structure
+## Run locally
 
 ```text
-apps/
-services/
-packages/
-infra/
-scripts/
-fixtures/
-docs/
-```
-
-## Documentation authority
-
-Use documentation by purpose:
-
-- [Product Flow and Software Map](docs/product/product-flow-and-software-map.md), [User Tier and Assignment Model](docs/product/user-tier-and-assignment-model.md), [Task Operational Model](docs/product/task-operational-model.md), [Critical Reporting Model](docs/product/critical-reporting-model.md), [Project Lifecycle and Import / Export](docs/product/project-lifecycle-and-import-export.md), and [Implementation Status Map](docs/product/implementation-status-map.md) — primary product authority.
-- [docs/concept](docs/concept/README.md) — high-level product definition and MVP boundary.
-- [docs/product](docs/product/README.md) — current product behavior and workflows.
-- [docs/architecture](docs/architecture/README.md) — durable system structure.
-- [docs/adr](docs/adr/README.md) — architecture decisions.
-- [docs/research](docs/research/README.md) — supporting evidence and provenance.
-- [docs/testing](docs/testing/README.md) — verification procedures.
-- GitHub pull requests and commit history — implementation chronology.
-
-`AGENTS.md` contains repository-specific implementation guidance for coding agents.
-
-## Development and validation
-
-From the repository root:
-
-```text
-mvn test
+npm install
+npm run check
 npm test
 npm run build
+npm run serve
 ```
 
-Migration validation:
+Then open the displayed local address.
 
-```text
-./scripts/db/validate-migrations.sh
-```
+## Repository boundary
 
-The repository must not contain real customer Project files, real schedule archives, generated candidate schedules, evidence uploads, secrets, local databases, or operational artifacts unless an explicit fixture policy permits a fully synthetic asset.
+The current task is feasibility, not product completion. Do not reintroduce the old architecture until assigned-task partial progress and completion have been proven through Microsoft Project-authored XML evidence.
