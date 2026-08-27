@@ -3,16 +3,26 @@
 <head><meta charset="utf-8"><title>Browser regression</title></head>
 <body data-result="running">running
 <script type="module">
-import { parseProjectXml, buildComparisonRows, assertProjectIdentityCompatible } from "../src/project-xml.js";
+import {
+  buildComparisonRows,
+  classifyProjectResultCompatibility,
+  parseProjectXml
+} from "../src/project-xml.js";
 import { EXECUTION_EVENT_TYPES, createExecutionEvent, deriveExecutionState } from "../src/execution.js";
 import { generateCandidateText } from "../src/transaction-profiles.js";
 
 try {
-  const xml = await fetch("./fixtures/assigned-task.xml").then((response) => response.text());
-  const parsed = parseProjectXml(xml);
+  const [sourceXml, projectResultXml] = await Promise.all([
+    fetch("./fixtures/assigned-task.xml").then((response) => response.text()),
+    fetch("./fixtures/project-authored-result.xml").then((response) => response.text())
+  ]);
+  const parsed = parseProjectXml(sourceXml);
+  const projectResult = parseProjectXml(projectResultXml);
+
   if (parsed.leafTasks.length !== 2) throw new Error("leaf parsing failed");
   if (parsed.taskByUid.get("43").hierarchyPath !== "Work Package") throw new Error("hierarchy context failed");
-  if (parsed.assignmentsByTaskUid.get("43")?.[0]?.timephasedData?.length !== 1) throw new Error("timephased parsing failed");
+  if (parsed.assignmentsByTaskUid.get("43")?.[0]?.timephasedData?.length !== 1) throw new Error("assignment timephased parsing failed");
+  if (projectResult.taskByUid.get("43")?.timephasedData?.[0]?.type !== "11") throw new Error("task Type 11 parsing failed");
 
   const effective = new Date(2026, 0, 5, 8, 0);
   const events = [
@@ -21,12 +31,30 @@ try {
   ];
   if (deriveExecutionState(events, "43") !== "Completed") throw new Error("same-time ordering failed");
 
-  const generated = generateCandidateText({ sourceXml: xml, project: parsed, events, profileId: "task-scalar-diagnostic" });
+  const generated = generateCandidateText({ sourceXml, project: parsed, events, profileId: "task-scalar-diagnostic" });
   if (!generated.candidateText.includes("<PercentComplete>100</PercentComplete>")) throw new Error("candidate generation failed");
   const candidate = parseProjectXml(generated.candidateText);
-  assertProjectIdentityCompatible(parsed, candidate);
-  const rows = buildComparisonRows({ source: parsed, candidate, result: candidate, taskUids: ["43"] });
-  if (!rows.some((row) => row.label.includes("Assignment progress"))) throw new Error("comparison failed");
+
+  const strict = classifyProjectResultCompatibility({ candidate, result: projectResult, touchedTaskUids: ["43"] });
+  if (strict.classification !== "strict-result") throw new Error("strict result classification failed");
+  if (!strict.warnings.some((warning) => warning.includes("Project GUID changed"))) throw new Error("Project GUID warning failed");
+
+  const rows = buildComparisonRows({ source: parsed, candidate, result: projectResult, taskUids: ["43"] });
+  const taskTimephased = rows.find((row) => row.key === "43-task-timephased");
+  const allTimephased = rows.find((row) => row.key === "project-timephased-all");
+  if (!taskTimephased?.result.includes("11=1")) throw new Error("task timephased comparison failed");
+  if (!allTimephased || allTimephased.candidate === allTimephased.result) throw new Error("broad timephased comparison failed");
+
+  const referenceXml = projectResultXml.replace(
+    "  </Tasks>",
+    "    <Task><UID>45</UID><ID>9</ID><Name>Added reference task</Name><WBS>1.3</WBS><OutlineNumber>1.3</OutlineNumber><OutlineLevel>2</OutlineLevel><Summary>0</Summary></Task>\n  </Tasks>"
+  );
+  const reference = classifyProjectResultCompatibility({
+    candidate,
+    result: parseProjectXml(referenceXml),
+    touchedTaskUids: ["43"]
+  });
+  if (reference.classification !== "reference") throw new Error("reference classification failed");
 
   document.body.dataset.result = "pass";
   document.body.textContent = "pass";
