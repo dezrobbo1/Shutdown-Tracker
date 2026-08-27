@@ -28,108 +28,83 @@ const ACTUAL_STATE_EVENTS = new Set([
 ]);
 
 export function parseProjectTimestamp(value) {
-  if (!value || typeof value !== "string") {
-    return null;
-  }
-
+  if (!value || typeof value !== "string") return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
 export function toProjectLocalTimestamp(value) {
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    throw new Error("Cannot format an invalid date as a Project timestamp.");
-  }
-
+  if (Number.isNaN(date.getTime())) throw new Error("Cannot format an invalid date as a Project timestamp.");
   const pad = (number) => String(number).padStart(2, "0");
-  return [
-    date.getFullYear(),
-    "-",
-    pad(date.getMonth() + 1),
-    "-",
-    pad(date.getDate()),
-    "T",
-    pad(date.getHours()),
-    ":",
-    pad(date.getMinutes()),
-    ":",
-    pad(date.getSeconds())
-  ].join("");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 }
 
 export function toDateTimeLocalValue(value) {
   const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-
-  return toProjectLocalTimestamp(date).slice(0, 16);
+  return Number.isNaN(date.getTime()) ? "" : toProjectLocalTimestamp(date).slice(0, 16);
 }
 
 export function clampPercent(value) {
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-  return Math.max(0, Math.min(100, value));
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : null;
 }
 
 export function calculateExpectedPercent(task, instant) {
   const start = parseProjectTimestamp(task?.start);
   const finish = parseProjectTimestamp(task?.finish);
   const point = instant instanceof Date ? instant : new Date(instant);
-
-  if (!start || !finish || Number.isNaN(point.getTime()) || finish <= start) {
-    return null;
-  }
-
-  const fraction = (point.getTime() - start.getTime()) / (finish.getTime() - start.getTime());
-  return clampPercent(fraction * 100);
+  if (!start || !finish || Number.isNaN(point.getTime()) || finish <= start) return null;
+  return clampPercent(((point.getTime() - start.getTime()) / (finish.getTime() - start.getTime())) * 100);
 }
 
 export function resolveShiftEndInstant(referenceInstant, shiftEnd) {
   const reference = referenceInstant instanceof Date ? new Date(referenceInstant) : new Date(referenceInstant);
-  if (Number.isNaN(reference.getTime())) {
-    return null;
-  }
-
+  if (Number.isNaN(reference.getTime())) return null;
   const match = /^(\d{2}):(\d{2})$/.exec(String(shiftEnd ?? ""));
-  if (!match) {
-    return null;
-  }
-
+  if (!match) return null;
   const hours = Number(match[1]);
   const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) {
-    return null;
-  }
-
+  if (hours > 23 || minutes > 59) return null;
   const result = new Date(reference);
   result.setHours(hours, minutes, 0, 0);
-  if (result < reference) {
-    result.setDate(result.getDate() + 1);
-  }
+  if (result < reference) result.setDate(result.getDate() + 1);
   return result;
 }
 
-export function createExecutionEvent({ taskUid, type, timestamp, expectedPercent = null, observedPercent = null }) {
-  if (!taskUid) {
-    throw new Error("A task UID is required for an execution event.");
+function browserTimeZone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "unknown";
+  } catch {
+    return "unknown";
   }
-  if (!Object.values(EXECUTION_EVENT_TYPES).includes(type)) {
-    throw new Error(`Unsupported execution event type: ${type}`);
-  }
+}
 
-  const instant = timestamp instanceof Date ? timestamp : new Date(timestamp);
-  if (Number.isNaN(instant.getTime())) {
-    throw new Error("Execution event timestamp is invalid.");
-  }
-
+export function createExecutionEvent({
+  taskUid,
+  type,
+  timestamp,
+  recordedAt = new Date(),
+  sequence = null,
+  expectedPercent = null,
+  observedPercent = null
+}) {
+  if (!taskUid) throw new Error("A task UID is required for an execution event.");
+  if (!Object.values(EXECUTION_EVENT_TYPES).includes(type)) throw new Error(`Unsupported execution event type: ${type}`);
+  const effective = timestamp instanceof Date ? timestamp : new Date(timestamp);
+  if (Number.isNaN(effective.getTime())) throw new Error("Execution event timestamp is invalid.");
+  const recorded = recordedAt instanceof Date ? recordedAt : new Date(recordedAt);
+  if (Number.isNaN(recorded.getTime())) throw new Error("Execution recorded-at timestamp is invalid.");
+  const effectiveProjectLocalTime = toProjectLocalTimestamp(effective);
   return {
-    id: globalThis.crypto?.randomUUID?.() ?? `${taskUid}-${type}-${instant.getTime()}-${Math.random()}`,
+    id: globalThis.crypto?.randomUUID?.() ?? `${taskUid}-${type}-${recorded.getTime()}-${Math.random()}`,
+    sequence: Number.isInteger(sequence) ? sequence : null,
     taskUid: String(taskUid),
     type,
-    timestamp: toProjectLocalTimestamp(instant),
+    timestamp: effectiveProjectLocalTime,
+    effectiveProjectLocalTime,
+    recordedAtUtc: recorded.toISOString(),
+    recordedTimeZone: browserTimeZone(),
+    recordedOffsetMinutes: -recorded.getTimezoneOffset(),
     expectedPercent: expectedPercent == null ? null : Math.round(clampPercent(Number(expectedPercent))),
     observedPercent: observedPercent == null ? null : Math.round(clampPercent(Number(observedPercent)))
   };
@@ -137,33 +112,25 @@ export function createExecutionEvent({ taskUid, type, timestamp, expectedPercent
 
 export function eventsForTask(events, taskUid) {
   return events
-    .filter((event) => String(event.taskUid) === String(taskUid))
-    .slice()
+    .map((event, insertionOrder) => ({ event, insertionOrder }))
+    .filter(({ event }) => String(event.taskUid) === String(taskUid))
     .sort((left, right) => {
-      const timeDifference = new Date(left.timestamp).getTime() - new Date(right.timestamp).getTime();
-      return timeDifference || String(left.id).localeCompare(String(right.id));
-    });
+      const timeDifference = new Date(left.event.effectiveProjectLocalTime ?? left.event.timestamp).getTime() - new Date(right.event.effectiveProjectLocalTime ?? right.event.timestamp).getTime();
+      if (timeDifference) return timeDifference;
+      const leftSequence = Number.isInteger(left.event.sequence) ? left.event.sequence : left.insertionOrder;
+      const rightSequence = Number.isInteger(right.event.sequence) ? right.event.sequence : right.insertionOrder;
+      return leftSequence - rightSequence;
+    })
+    .map(({ event }) => event);
 }
 
 export function deriveExecutionState(events, taskUid) {
-  const actualEvents = eventsForTask(events, taskUid).filter((event) => ACTUAL_STATE_EVENTS.has(event.type));
-  const latest = actualEvents.at(-1);
-
-  if (!latest) {
-    return "Not started";
-  }
-
-  switch (latest.type) {
-    case EXECUTION_EVENT_TYPES.START:
-    case EXECUTION_EVENT_TYPES.RESUME:
-      return "In progress";
-    case EXECUTION_EVENT_TYPES.PAUSE:
-      return "Paused";
-    case EXECUTION_EVENT_TYPES.FINISH:
-      return "Completed";
-    default:
-      return "Not started";
-  }
+  const latest = eventsForTask(events, taskUid).filter((event) => ACTUAL_STATE_EVENTS.has(event.type)).at(-1);
+  if (!latest) return "Not started";
+  if (latest.type === EXECUTION_EVENT_TYPES.START || latest.type === EXECUTION_EVENT_TYPES.RESUME) return "In progress";
+  if (latest.type === EXECUTION_EVENT_TYPES.PAUSE) return "Paused";
+  if (latest.type === EXECUTION_EVENT_TYPES.FINISH) return "Completed";
+  return "Not started";
 }
 
 export function allowedExecutionActions(events, taskUid) {
@@ -177,14 +144,12 @@ export function allowedExecutionActions(events, taskUid) {
 }
 
 function latestProgressEvent(taskEvents) {
-  return taskEvents
-    .filter((event) =>
-      event.type === EXECUTION_EVENT_TYPES.OBSERVED_PROGRESS ||
-      event.type === EXECUTION_EVENT_TYPES.MARK_ON_TRACK ||
-      event.type === EXECUTION_EVENT_TYPES.PROGRESS_TO_SHIFT_END ||
-      event.type === EXECUTION_EVENT_TYPES.SKIP_TO_PLANNED_FINISH
-    )
-    .at(-1);
+  return taskEvents.filter((event) => [
+    EXECUTION_EVENT_TYPES.OBSERVED_PROGRESS,
+    EXECUTION_EVENT_TYPES.MARK_ON_TRACK,
+    EXECUTION_EVENT_TYPES.PROGRESS_TO_SHIFT_END,
+    EXECUTION_EVENT_TYPES.SKIP_TO_PLANNED_FINISH
+  ].includes(event.type)).at(-1);
 }
 
 export function buildTaskScalarDiagnosticPatch(events, taskUid) {
@@ -193,26 +158,13 @@ export function buildTaskScalarDiagnosticPatch(events, taskUid) {
   const finishEvent = taskEvents.findLast((event) => event.type === EXECUTION_EVENT_TYPES.FINISH);
   const skipEvent = taskEvents.findLast((event) => event.type === EXECUTION_EVENT_TYPES.SKIP_TO_PLANNED_FINISH);
   const progressEvent = latestProgressEvent(taskEvents);
-
   let percentComplete = null;
-  if (finishEvent || skipEvent) {
-    percentComplete = 100;
-  } else if (progressEvent?.observedPercent != null) {
-    percentComplete = progressEvent.observedPercent;
-  } else if (progressEvent?.expectedPercent != null) {
-    percentComplete = progressEvent.expectedPercent;
-  }
-
+  if (finishEvent || skipEvent) percentComplete = 100;
+  else if (progressEvent?.observedPercent != null) percentComplete = progressEvent.observedPercent;
+  else if (progressEvent?.expectedPercent != null) percentComplete = progressEvent.expectedPercent;
   const patch = {};
-  if (startEvent) {
-    patch.ActualStart = startEvent.timestamp;
-  }
-  if (finishEvent || skipEvent) {
-    patch.ActualFinish = (finishEvent ?? skipEvent).timestamp;
-  }
-  if (percentComplete != null) {
-    patch.PercentComplete = String(Math.round(clampPercent(percentComplete)));
-  }
-
+  if (startEvent) patch.ActualStart = startEvent.effectiveProjectLocalTime ?? startEvent.timestamp;
+  if (finishEvent || skipEvent) patch.ActualFinish = (finishEvent ?? skipEvent).effectiveProjectLocalTime ?? (finishEvent ?? skipEvent).timestamp;
+  if (percentComplete != null) patch.PercentComplete = String(Math.round(clampPercent(percentComplete)));
   return patch;
 }

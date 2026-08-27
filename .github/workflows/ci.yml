@@ -17,4 +17,21 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm test
+      - uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+      - name: Browser regression
+        run: |
+          node scripts/serve.mjs >/tmp/xml-lab-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID' EXIT
+          sleep 1
+          "${{ steps.setup-chrome.outputs.chrome-path }}" \
+            --headless=new \
+            --disable-gpu \
+            --no-sandbox \
+            --virtual-time-budget=5000 \
+            --dump-dom \
+            http://127.0.0.1:4173/tests/browser-regression.html > /tmp/browser-regression.html
+          cat /tmp/browser-regression.html
+          grep -q 'data-result="pass"' /tmp/browser-regression.html
       - run: npm run build

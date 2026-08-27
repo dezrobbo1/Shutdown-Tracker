@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Browser regression</title></head>
+<body data-result="running">running
+<script type="module">
+import { parseProjectXml, buildComparisonRows, assertProjectIdentityCompatible } from "../src/project-xml.js";
+import { EXECUTION_EVENT_TYPES, createExecutionEvent, deriveExecutionState } from "../src/execution.js";
+import { generateCandidateText } from "../src/transaction-profiles.js";
+
+try {
+  const xml = await fetch("./fixtures/assigned-task.xml").then((response) => response.text());
+  const parsed = parseProjectXml(xml);
+  if (parsed.leafTasks.length !== 2) throw new Error("leaf parsing failed");
+  if (parsed.taskByUid.get("43").hierarchyPath !== "Work Package") throw new Error("hierarchy context failed");
+  if (parsed.assignmentsByTaskUid.get("43")?.[0]?.timephasedData?.length !== 1) throw new Error("timephased parsing failed");
+
+  const effective = new Date(2026, 0, 5, 8, 0);
+  const events = [
+    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.START, timestamp: effective, sequence: 1, recordedAt: new Date("2026-01-05T00:00:01Z") }),
+    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.FINISH, timestamp: effective, sequence: 2, recordedAt: new Date("2026-01-05T00:00:02Z") })
+  ];
+  if (deriveExecutionState(events, "43") !== "Completed") throw new Error("same-time ordering failed");
+
+  const generated = generateCandidateText({ sourceXml: xml, project: parsed, events, profileId: "task-scalar-diagnostic" });
+  if (!generated.candidateText.includes("<PercentComplete>100</PercentComplete>")) throw new Error("candidate generation failed");
+  const candidate = parseProjectXml(generated.candidateText);
+  assertProjectIdentityCompatible(parsed, candidate);
+  const rows = buildComparisonRows({ source: parsed, candidate, result: candidate, taskUids: ["43"] });
+  if (!rows.some((row) => row.label.includes("Assignment progress"))) throw new Error("comparison failed");
+
+  document.body.dataset.result = "pass";
+  document.body.textContent = "pass";
+} catch (error) {
+  document.body.dataset.result = "fail";
+  document.body.textContent = error instanceof Error ? error.stack : String(error);
+}
+</script>
+</body>
+</html>
