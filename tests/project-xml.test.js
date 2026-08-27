@@ -107,6 +107,7 @@ test("duplicate targeted task UIDs fail closed", () => {
       <Name>Duplicate</Name>
       <WBS>9.9</WBS>
       <Summary>0</Summary>
+      <ActualDuration>PT0H0M0S</ActualDuration>
     </Task>
   </Tasks>`);
 
