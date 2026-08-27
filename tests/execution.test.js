@@ -75,3 +75,9 @@ test("diagnostic patch is derived from execution intent without inventing durati
     PercentComplete: "65"
   });
 });
+
+test("shift end remains on the current day when trial time equals shift end", () => {
+  const reference = new Date(2026, 0, 5, 18, 0);
+  const shiftEnd = resolveShiftEndInstant(reference, "18:00");
+  assert.equal(toProjectLocalTimestamp(shiftEnd), "2026-01-05T18:00:00");
+});

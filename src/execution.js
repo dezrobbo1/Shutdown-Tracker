@@ -106,7 +106,7 @@ export function resolveShiftEndInstant(referenceInstant, shiftEnd) {
 
   const result = new Date(reference);
   result.setHours(hours, minutes, 0, 0);
-  if (result <= reference) {
+  if (result < reference) {
     result.setDate(result.getDate() + 1);
   }
   return result;

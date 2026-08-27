@@ -1,22 +1,26 @@
-export const MSPDI_NAMESPACE = "http://schemas.microsoft.com/project";
+import {
+  MSPDI_NAMESPACE,
+  applyTaskScalarDiagnostic as applyTaskScalarDiagnosticCore,
+  candidateFilename,
+  decodeXmlBytes,
+  encodeXmlText,
+  parseProjectXml as parseProjectXmlCore,
+  sha256Hex
+} from "./project-xml-core.js";
 
-const TASK_FIELD_INSERT_ANCHORS = Object.freeze({
-  PercentComplete: [
-    "PercentWorkComplete",
-    "Cost",
-    "OvertimeCost",
-    "OvertimeWork",
-    "ActualStart",
-    "ActualFinish",
-    "ActualDuration",
-    "RemainingDuration"
-  ],
-  ActualStart: ["ActualFinish", "ActualDuration", "ActualCost", "ActualWork", "RemainingDuration"],
-  ActualFinish: ["ActualDuration", "ActualCost", "ActualWork", "RemainingDuration"]
-});
+export { MSPDI_NAMESPACE, candidateFilename, decodeXmlBytes, encodeXmlText, sha256Hex };
 
 const COMPARISON_TASK_FIELDS = Object.freeze([
+  ["Task ID", "id"],
+  ["Task name", "name"],
+  ["WBS", "wbs"],
+  ["Outline number", "outlineNumber"],
+  ["Summary", "summary"],
+  ["Start", "start"],
+  ["Finish", "finish"],
+  ["Duration", "duration"],
   ["Percent complete", "percentComplete"],
+  ["Percent work complete", "percentWorkComplete"],
   ["Actual start", "actualStart"],
   ["Actual finish", "actualFinish"],
   ["Actual duration", "actualDuration"],
@@ -24,95 +28,10 @@ const COMPARISON_TASK_FIELDS = Object.freeze([
   ["Work", "work"],
   ["Actual work", "actualWork"],
   ["Remaining work", "remainingWork"],
-  ["Start", "start"],
-  ["Finish", "finish"]
+  ["Critical", "critical"],
+  ["Total slack", "totalSlack"],
+  ["Free slack", "freeSlack"]
 ]);
-
-function asUint8Array(input) {
-  if (input instanceof Uint8Array) {
-    return input;
-  }
-  if (input instanceof ArrayBuffer) {
-    return new Uint8Array(input);
-  }
-  throw new TypeError("Expected an ArrayBuffer or Uint8Array.");
-}
-
-export function decodeXmlBytes(input) {
-  const bytes = asUint8Array(input);
-  let encoding = "utf-8";
-  let offset = 0;
-  let hadBom = false;
-
-  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) {
-    encoding = "utf-8";
-    offset = 3;
-    hadBom = true;
-  } else if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) {
-    encoding = "utf-16le";
-    offset = 2;
-    hadBom = true;
-  } else if (bytes.length >= 2 && bytes[0] === 0xfe && bytes[1] === 0xff) {
-    encoding = "utf-16be";
-    offset = 2;
-    hadBom = true;
-  } else if (bytes.length >= 2 && bytes[0] === 0x3c && bytes[1] === 0x00) {
-    encoding = "utf-16le";
-  } else if (bytes.length >= 2 && bytes[0] === 0x00 && bytes[1] === 0x3c) {
-    encoding = "utf-16be";
-  }
-
-  const decoder = new TextDecoder(encoding, { fatal: true });
-  const text = decoder.decode(bytes.subarray(offset));
-  return {
-    text,
-    encoding,
-    hadBom,
-    bytes: bytes.slice()
-  };
-}
-
-function utf16Bytes(text, littleEndian) {
-  const output = new Uint8Array(text.length * 2);
-  for (let index = 0; index < text.length; index += 1) {
-    const code = text.charCodeAt(index);
-    if (littleEndian) {
-      output[index * 2] = code & 0xff;
-      output[index * 2 + 1] = code >>> 8;
-    } else {
-      output[index * 2] = code >>> 8;
-      output[index * 2 + 1] = code & 0xff;
-    }
-  }
-  return output;
-}
-
-function withBom(bytes, bom) {
-  const output = new Uint8Array(bom.length + bytes.length);
-  output.set(bom, 0);
-  output.set(bytes, bom.length);
-  return output;
-}
-
-export function encodeXmlText(text, encoding = "utf-8", hadBom = false) {
-  if (encoding === "utf-16le") {
-    const bytes = utf16Bytes(text, true);
-    return hadBom ? withBom(bytes, [0xff, 0xfe]) : bytes;
-  }
-  if (encoding === "utf-16be") {
-    const bytes = utf16Bytes(text, false);
-    return hadBom ? withBom(bytes, [0xfe, 0xff]) : bytes;
-  }
-
-  const bytes = new TextEncoder().encode(text);
-  return hadBom ? withBom(bytes, [0xef, 0xbb, 0xbf]) : bytes;
-}
-
-export async function sha256Hex(input) {
-  const bytes = asUint8Array(input);
-  const digest = await globalThis.crypto.subtle.digest("SHA-256", bytes);
-  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
-}
 
 function directChildText(element, localName) {
   for (const child of element.children) {
@@ -123,128 +42,58 @@ function directChildText(element, localName) {
   return null;
 }
 
-function directChildNumber(element, localName) {
-  const value = directChildText(element, localName);
-  if (value == null || value === "") {
-    return null;
+function buildUniqueIndex(items, keySelector, label) {
+  const index = new Map();
+  for (const item of items) {
+    const rawKey = keySelector(item);
+    if (rawKey == null || rawKey === "") {
+      continue;
+    }
+    const key = String(rawKey);
+    if (index.has(key)) {
+      throw new Error(`Duplicate ${label} ${key} in Project XML.`);
+    }
+    index.set(key, item);
   }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
+  return index;
 }
 
-function parseTimephasedData(assignmentElement) {
-  return Array.from(assignmentElement.children)
-    .filter((child) => child.localName === "TimephasedData")
-    .map((element) => ({
-      uid: directChildText(element, "UID"),
-      type: directChildText(element, "Type"),
-      start: directChildText(element, "Start"),
-      finish: directChildText(element, "Finish"),
-      unit: directChildText(element, "Unit"),
-      value: directChildText(element, "Value")
-    }));
+function enrichParsedProject(parsed) {
+  const taskElements = Array.from(parsed.document.getElementsByTagNameNS(MSPDI_NAMESPACE, "Task"));
+  for (let index = 0; index < parsed.tasks.length; index += 1) {
+    const task = parsed.tasks[index];
+    const element = taskElements[index];
+    if (!element) {
+      continue;
+    }
+    task.isNull = directChildText(element, "IsNull") === "1";
+    task.critical = directChildText(element, "Critical");
+    task.totalSlack = directChildText(element, "TotalSlack");
+    task.freeSlack = directChildText(element, "FreeSlack");
+  }
+
+  const assignmentElements = Array.from(parsed.document.getElementsByTagNameNS(MSPDI_NAMESPACE, "Assignment"));
+  for (let index = 0; index < parsed.assignments.length; index += 1) {
+    const assignment = parsed.assignments[index];
+    const element = assignmentElements[index];
+    if (!element) {
+      continue;
+    }
+    assignment.stop = directChildText(element, "Stop");
+    assignment.resume = directChildText(element, "Resume");
+    assignment.actualOvertimeWork = directChildText(element, "ActualOvertimeWork");
+    assignment.remainingOvertimeWork = directChildText(element, "RemainingOvertimeWork");
+  }
+
+  parsed.taskByUid = buildUniqueIndex(parsed.tasks, (task) => task.uid, "task UID");
+  buildUniqueIndex(parsed.assignments, (assignment) => assignment.uid, "assignment UID");
+  parsed.leafTasks = parsed.tasks.filter((task) => !task.isNull && !task.summary && task.active);
+  parsed.summaryTasks = parsed.tasks.filter((task) => task.summary);
+  return parsed;
 }
 
 export function parseProjectXml(xmlText) {
-  if (typeof DOMParser === "undefined") {
-    throw new Error("DOMParser is unavailable. Project XML parsing runs in a browser.");
-  }
-
-  const document = new DOMParser().parseFromString(xmlText, "application/xml");
-  const parserError = document.querySelector("parsererror");
-  if (parserError) {
-    throw new Error(`XML parse failed: ${parserError.textContent?.trim() ?? "unknown parser error"}`);
-  }
-
-  const root = document.documentElement;
-  if (root.localName !== "Project" || root.namespaceURI !== MSPDI_NAMESPACE) {
-    throw new Error(`Expected Microsoft Project MSPDI root namespace ${MSPDI_NAMESPACE}.`);
-  }
-
-  const tasks = Array.from(root.getElementsByTagNameNS(MSPDI_NAMESPACE, "Task")).map((element) => {
-    const uid = directChildText(element, "UID");
-    return {
-      uid,
-      id: directChildText(element, "ID"),
-      guid: directChildText(element, "GUID"),
-      name: directChildText(element, "Name") || `Task UID ${uid ?? "unknown"}`,
-      wbs: directChildText(element, "WBS"),
-      outlineNumber: directChildText(element, "OutlineNumber"),
-      outlineLevel: directChildNumber(element, "OutlineLevel"),
-      summary: directChildText(element, "Summary") === "1",
-      active: directChildText(element, "Active") !== "0",
-      start: directChildText(element, "Start"),
-      finish: directChildText(element, "Finish"),
-      duration: directChildText(element, "Duration"),
-      durationFormat: directChildText(element, "DurationFormat"),
-      work: directChildText(element, "Work"),
-      percentComplete: directChildText(element, "PercentComplete"),
-      percentWorkComplete: directChildText(element, "PercentWorkComplete"),
-      actualStart: directChildText(element, "ActualStart"),
-      actualFinish: directChildText(element, "ActualFinish"),
-      actualDuration: directChildText(element, "ActualDuration"),
-      remainingDuration: directChildText(element, "RemainingDuration"),
-      actualWork: directChildText(element, "ActualWork"),
-      remainingWork: directChildText(element, "RemainingWork")
-    };
-  });
-
-  const assignments = Array.from(root.getElementsByTagNameNS(MSPDI_NAMESPACE, "Assignment")).map((element) => ({
-    uid: directChildText(element, "UID"),
-    taskUid: directChildText(element, "TaskUID"),
-    resourceUid: directChildText(element, "ResourceUID"),
-    percentWorkComplete: directChildText(element, "PercentWorkComplete"),
-    start: directChildText(element, "Start"),
-    finish: directChildText(element, "Finish"),
-    actualStart: directChildText(element, "ActualStart"),
-    actualFinish: directChildText(element, "ActualFinish"),
-    work: directChildText(element, "Work"),
-    actualWork: directChildText(element, "ActualWork"),
-    remainingWork: directChildText(element, "RemainingWork"),
-    timephasedData: parseTimephasedData(element)
-  }));
-
-  const taskByUid = new Map(tasks.filter((task) => task.uid != null).map((task) => [String(task.uid), task]));
-  const assignmentsByTaskUid = new Map();
-  for (const assignment of assignments) {
-    const key = String(assignment.taskUid ?? "");
-    const existing = assignmentsByTaskUid.get(key) ?? [];
-    existing.push(assignment);
-    assignmentsByTaskUid.set(key, existing);
-  }
-
-  return {
-    document,
-    project: {
-      name: directChildText(root, "Name") || directChildText(root, "Title") || "Unnamed Project",
-      title: directChildText(root, "Title"),
-      uid: directChildText(root, "UID"),
-      guid: directChildText(root, "GUID"),
-      startDate: directChildText(root, "StartDate"),
-      finishDate: directChildText(root, "FinishDate"),
-      currentDate: directChildText(root, "CurrentDate"),
-      statusDate: directChildText(root, "StatusDate"),
-      minutesPerDay: directChildText(root, "MinutesPerDay"),
-      durationFormat: directChildText(root, "DurationFormat")
-    },
-    tasks,
-    taskByUid,
-    assignments,
-    assignmentsByTaskUid,
-    leafTasks: tasks.filter((task) => !task.summary && task.active),
-    summaryTasks: tasks.filter((task) => task.summary)
-  };
-}
-
-function escapeXmlText(value) {
-  return String(value)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
-function prefixPattern(prefix) {
-  return prefix ? `${prefix.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:` : "";
+  return enrichParsedProject(parseProjectXmlCore(xmlText));
 }
 
 function readScalarFromBlock(block, field) {
@@ -255,123 +104,55 @@ function readScalarFromBlock(block, field) {
   return match ? match[1].replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&amp;/g, "&").trim() : null;
 }
 
-function detectTaskPrefix(block) {
-  const match = /<((?:[A-Za-z_][\w.-]*:)?UID)\b/.exec(block);
-  if (!match || !match[1].includes(":")) {
-    return "";
+function assertUniqueTargetTasks(sourceXml, patchEntries) {
+  const targets = new Set(
+    patchEntries
+      .filter((entry) => entry?.taskUid != null && entry?.fields && Object.keys(entry.fields).length > 0)
+      .map((entry) => String(entry.taskUid))
+  );
+  if (targets.size === 0) {
+    return;
   }
-  return match[1].slice(0, match[1].indexOf(":"));
-}
 
-function detectChildIndent(block) {
-  const match = /\n([ \t]+)<(?:[A-Za-z_][\w.-]*:)?UID\b/.exec(block);
-  if (match) {
-    return match[1];
-  }
-  const closing = /\n([ \t]*)<\/(?:[A-Za-z_][\w.-]*:)?Task>/.exec(block);
-  return `${closing?.[1] ?? ""}  `;
-}
-
-function replaceExistingScalar(block, prefix, field, value) {
-  const qualified = `${prefixPattern(prefix)}${field}`;
-  const expression = new RegExp(`(<${qualified}\\b[^>]*>)[\\s\\S]*?(<\\/${qualified}>)`);
-  if (!expression.test(block)) {
-    return null;
-  }
-  return block.replace(expression, `$1${escapeXmlText(value)}$2`);
-}
-
-function insertScalar(block, prefix, field, value) {
-  const indent = detectChildIndent(block);
-  const qualifiedField = prefix ? `${prefix}:${field}` : field;
-  const line = `${indent}<${qualifiedField}>${escapeXmlText(value)}</${qualifiedField}>`;
-
-  for (const anchor of TASK_FIELD_INSERT_ANCHORS[field] ?? []) {
-    const qualifiedAnchor = prefix ? `${prefix}:${anchor}` : anchor;
-    const expression = new RegExp(`(^|\\n)([ \\t]*)<${qualifiedAnchor}\\b`, "m");
-    const match = expression.exec(block);
-    if (match) {
-      const insertionPoint = match.index + (match[1] ? 1 : 0);
-      return `${block.slice(0, insertionPoint)}${line}\n${block.slice(insertionPoint)}`;
+  const counts = new Map(Array.from(targets, (uid) => [uid, 0]));
+  const taskExpression = /<((?:[A-Za-z_][\w.-]*:)?Task)\b[^>]*>[\s\S]*?<\/\1>/g;
+  for (const match of sourceXml.matchAll(taskExpression)) {
+    const uid = readScalarFromBlock(match[0], "UID");
+    if (uid != null && targets.has(String(uid))) {
+      counts.set(String(uid), (counts.get(String(uid)) ?? 0) + 1);
     }
   }
 
-  const closingExpression = new RegExp(`\\n([ \\t]*)<\\/${prefix ? `${prefix}:` : ""}Task>\\s*$`);
-  const closingMatch = closingExpression.exec(block);
-  if (!closingMatch) {
-    throw new Error(`Could not locate the closing Task element while inserting ${field}.`);
-  }
-  return `${block.slice(0, closingMatch.index)}\n${line}${block.slice(closingMatch.index)}`;
-}
-
-function setScalar(block, field, value) {
-  const prefix = detectTaskPrefix(block);
-  return replaceExistingScalar(block, prefix, field, value) ?? insertScalar(block, prefix, field, value);
-}
-
-function assertTaskIdentity(block, entry) {
-  const actualUid = readScalarFromBlock(block, "UID");
-  if (String(actualUid) !== String(entry.taskUid)) {
-    throw new Error(`Task UID identity mismatch: expected ${entry.taskUid}, found ${actualUid ?? "missing"}.`);
-  }
-  if (readScalarFromBlock(block, "Summary") === "1") {
-    throw new Error(`Task UID ${entry.taskUid} is a summary task and cannot be patched.`);
-  }
-
-  const expectations = entry.expected ?? {};
-  for (const [field, expectedValue] of Object.entries({
-    ID: expectations.id,
-    Name: expectations.name,
-    WBS: expectations.wbs
-  })) {
-    if (expectedValue == null || expectedValue === "") {
-      continue;
+  for (const [uid, count] of counts) {
+    if (count === 0) {
+      throw new Error(`Candidate generation could not find task UID ${uid}.`);
     }
-    const actualValue = readScalarFromBlock(block, field);
-    if (String(actualValue) !== String(expectedValue)) {
-      throw new Error(
-        `Task UID ${entry.taskUid} ${field} identity mismatch: expected ${expectedValue}, found ${actualValue ?? "missing"}.`
-      );
+    if (count > 1) {
+      throw new Error(`Duplicate task UID ${uid} in source XML.`);
     }
   }
 }
 
 export function applyTaskScalarDiagnostic(sourceXml, patchEntries) {
-  const entriesByUid = new Map(
-    patchEntries
-      .filter((entry) => entry && entry.taskUid && entry.fields && Object.keys(entry.fields).length > 0)
-      .map((entry) => [String(entry.taskUid), entry])
-  );
+  assertUniqueTargetTasks(sourceXml, patchEntries);
+  return applyTaskScalarDiagnosticCore(sourceXml, patchEntries);
+}
 
-  if (entriesByUid.size === 0) {
-    return sourceXml;
+function checksumText(value) {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
   }
+  return (hash >>> 0).toString(16).padStart(8, "0");
+}
 
-  const found = new Set();
-  const taskExpression = /<((?:[A-Za-z_][\w.-]*:)?Task)\b[^>]*>[\s\S]*?<\/\1>/g;
-  const candidate = sourceXml.replace(taskExpression, (block) => {
-    const uid = readScalarFromBlock(block, "UID");
-    const entry = uid == null ? null : entriesByUid.get(String(uid));
-    if (!entry) {
-      return block;
-    }
-
-    assertTaskIdentity(block, entry);
-    found.add(String(uid));
-    let updated = block;
-    for (const field of ["PercentComplete", "ActualStart", "ActualFinish"]) {
-      if (entry.fields[field] != null) {
-        updated = setScalar(updated, field, entry.fields[field]);
-      }
-    }
-    return updated;
-  });
-
-  const missing = Array.from(entriesByUid.keys()).filter((uid) => !found.has(uid));
-  if (missing.length > 0) {
-    throw new Error(`Candidate generation could not find task UID(s): ${missing.join(", ")}.`);
-  }
-  return candidate;
+function timephasedDigest(rows) {
+  const canonical = rows
+    .map((row) => [row.uid, row.type, row.start, row.finish, row.unit, row.value].map((value) => value ?? "").join("|"))
+    .sort()
+    .join("\n");
+  return `${rows.length} rows · ${checksumText(canonical)}`;
 }
 
 function assignmentSummary(project, taskUid) {
@@ -381,18 +162,26 @@ function assignmentSummary(project, taskUid) {
   }
 
   return assignments
-    .map((assignment) => {
-      const facts = [
+    .slice()
+    .sort((left, right) => String(left.uid ?? "").localeCompare(String(right.uid ?? ""), undefined, { numeric: true }))
+    .map((assignment) =>
+      [
         `UID ${assignment.uid ?? "—"}`,
         `%Work ${assignment.percentWorkComplete ?? "—"}`,
+        `Work ${assignment.work ?? "—"}`,
         `ActualWork ${assignment.actualWork ?? "—"}`,
         `RemainingWork ${assignment.remainingWork ?? "—"}`,
+        `Start ${assignment.start ?? "—"}`,
+        `Finish ${assignment.finish ?? "—"}`,
         `ActualStart ${assignment.actualStart ?? "—"}`,
         `ActualFinish ${assignment.actualFinish ?? "—"}`,
-        `Timephased ${assignment.timephasedData.length}`
-      ];
-      return facts.join(" · ");
-    })
+        `Stop ${assignment.stop ?? "—"}`,
+        `Resume ${assignment.resume ?? "—"}`,
+        `ActualOT ${assignment.actualOvertimeWork ?? "—"}`,
+        `RemainingOT ${assignment.remainingOvertimeWork ?? "—"}`,
+        `Timephased ${timephasedDigest(assignment.timephasedData)}`
+      ].join(" · ")
+    )
     .join(" | ");
 }
 
@@ -400,14 +189,50 @@ function displayValue(value) {
   return value == null || value === "" ? "—" : String(value);
 }
 
-export function buildComparisonRows({ source, candidate, result, taskUids }) {
+function valuesDiffer(values) {
+  return new Set(values).size > 1;
+}
+
+function unionTaskUids(...projects) {
+  const result = new Set();
+  for (const project of projects) {
+    for (const uid of project?.taskByUid?.keys?.() ?? []) {
+      result.add(String(uid));
+    }
+  }
+  return result;
+}
+
+function taskHasComparisonDifference(source, candidate, result, taskUid) {
+  const tasks = [source, candidate, result].map((project) => project?.taskByUid?.get(String(taskUid)));
+  if (COMPARISON_TASK_FIELDS.some(([, property]) => valuesDiffer(tasks.map((task) => displayValue(task?.[property]))))) {
+    return true;
+  }
+  return valuesDiffer([source, candidate, result].map((project) => assignmentSummary(project, taskUid)));
+}
+
+export function buildComparisonRows({ source, candidate, result, taskUids = [] }) {
   const rows = [
+    {
+      key: "project-start",
+      label: "Project · Start date",
+      source: displayValue(source?.project?.startDate),
+      candidate: displayValue(candidate?.project?.startDate),
+      result: displayValue(result?.project?.startDate)
+    },
     {
       key: "project-finish",
       label: "Project · Finish date",
       source: displayValue(source?.project?.finishDate),
       candidate: displayValue(candidate?.project?.finishDate),
       result: displayValue(result?.project?.finishDate)
+    },
+    {
+      key: "project-current-date",
+      label: "Project · Current date",
+      source: displayValue(source?.project?.currentDate),
+      candidate: displayValue(candidate?.project?.currentDate),
+      result: displayValue(result?.project?.currentDate)
     },
     {
       key: "project-status-date",
@@ -418,35 +243,57 @@ export function buildComparisonRows({ source, candidate, result, taskUids }) {
     }
   ];
 
-  for (const taskUid of taskUids) {
-    const sourceTask = source?.taskByUid?.get(String(taskUid));
-    const candidateTask = candidate?.taskByUid?.get(String(taskUid));
-    const resultTask = result?.taskByUid?.get(String(taskUid));
+  const explicitTaskUids = new Set(taskUids.map(String));
+  const selected = new Set(explicitTaskUids);
+  for (const uid of unionTaskUids(source, candidate, result)) {
+    if (taskHasComparisonDifference(source, candidate, result, uid)) {
+      selected.add(uid);
+    }
+  }
+
+  const orderedTaskUids = Array.from(selected).sort((left, right) => {
+    const leftTask = source?.taskByUid?.get(left) ?? candidate?.taskByUid?.get(left) ?? result?.taskByUid?.get(left);
+    const rightTask = source?.taskByUid?.get(right) ?? candidate?.taskByUid?.get(right) ?? result?.taskByUid?.get(right);
+    const leftId = Number(leftTask?.id);
+    const rightId = Number(rightTask?.id);
+    if (Number.isFinite(leftId) && Number.isFinite(rightId) && leftId !== rightId) {
+      return leftId - rightId;
+    }
+    return left.localeCompare(right, undefined, { numeric: true });
+  });
+
+  for (const taskUid of orderedTaskUids) {
+    const sourceTask = source?.taskByUid?.get(taskUid);
+    const candidateTask = candidate?.taskByUid?.get(taskUid);
+    const resultTask = result?.taskByUid?.get(taskUid);
     const taskName = sourceTask?.name ?? candidateTask?.name ?? resultTask?.name ?? `Task UID ${taskUid}`;
+    const context = sourceTask?.summary || candidateTask?.summary || resultTask?.summary ? "summary" : "leaf";
 
     for (const [label, property] of COMPARISON_TASK_FIELDS) {
+      const values = [sourceTask?.[property], candidateTask?.[property], resultTask?.[property]].map(displayValue);
+      if (!explicitTaskUids.has(taskUid) && !valuesDiffer(values)) {
+        continue;
+      }
       rows.push({
         key: `${taskUid}-${property}`,
-        label: `${taskName} · ${label}`,
-        source: displayValue(sourceTask?.[property]),
-        candidate: displayValue(candidateTask?.[property]),
-        result: displayValue(resultTask?.[property])
+        label: `${taskName} · ${context} · ${label}`,
+        source: values[0],
+        candidate: values[1],
+        result: values[2]
       });
     }
 
-    rows.push({
-      key: `${taskUid}-assignments`,
-      label: `${taskName} · Assignment progress`,
-      source: assignmentSummary(source, taskUid),
-      candidate: assignmentSummary(candidate, taskUid),
-      result: assignmentSummary(result, taskUid)
-    });
+    const assignmentValues = [source, candidate, result].map((project) => assignmentSummary(project, taskUid));
+    if (explicitTaskUids.has(taskUid) || valuesDiffer(assignmentValues)) {
+      rows.push({
+        key: `${taskUid}-assignments`,
+        label: `${taskName} · ${context} · Assignment progress`,
+        source: assignmentValues[0],
+        candidate: assignmentValues[1],
+        result: assignmentValues[2]
+      });
+    }
   }
 
   return rows;
-}
-
-export function candidateFilename(originalFilename, profileId) {
-  const base = String(originalFilename || "project.xml").replace(/\.mspdi\.xml$/i, "").replace(/\.xml$/i, "");
-  return `${base}.shutdown-tracker-lab.${profileId}.xml`;
 }

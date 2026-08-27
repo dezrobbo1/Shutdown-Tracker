@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applyTaskScalarDiagnostic,
+  buildComparisonRows,
   decodeXmlBytes,
   encodeXmlText,
   sha256Hex
@@ -97,4 +98,92 @@ test("UTF-16LE source encoding and BOM can be retained", () => {
 test("SHA-256 hashing is deterministic", async () => {
   const bytes = new TextEncoder().encode("shutdown-tracker");
   assert.equal(await sha256Hex(bytes), await sha256Hex(bytes));
+});
+
+test("duplicate targeted task UIDs fail closed", () => {
+  const duplicated = source.replace("  </Tasks>", `    <Task>
+      <UID>43</UID>
+      <ID>99</ID>
+      <Name>Duplicate</Name>
+      <WBS>9.9</WBS>
+      <Summary>0</Summary>
+    </Task>
+  </Tasks>`);
+
+  assert.throws(
+    () =>
+      applyTaskScalarDiagnostic(duplicated, [
+        {
+          taskUid: "43",
+          expected: {},
+          fields: { PercentComplete: "50" }
+        }
+      ]),
+    /Duplicate task UID 43/
+  );
+});
+
+test("comparison includes unrelated summary changes and timephased assignment changes", () => {
+  const task = (uid, id, name, values = {}) => ({
+    uid,
+    id,
+    name,
+    wbs: String(id),
+    outlineNumber: String(id),
+    summary: Boolean(values.summary),
+    start: values.start ?? "2026-01-05T08:00:00",
+    finish: values.finish ?? "2026-01-05T16:00:00",
+    duration: values.duration ?? "PT8H0M0S",
+    percentComplete: values.percentComplete ?? "0",
+    percentWorkComplete: values.percentWorkComplete ?? "0",
+    actualStart: values.actualStart ?? null,
+    actualFinish: values.actualFinish ?? null,
+    actualDuration: values.actualDuration ?? "PT0H0M0S",
+    remainingDuration: values.remainingDuration ?? "PT8H0M0S",
+    work: values.work ?? "PT8H0M0S",
+    actualWork: values.actualWork ?? "PT0H0M0S",
+    remainingWork: values.remainingWork ?? "PT8H0M0S",
+    critical: values.critical ?? "0",
+    totalSlack: values.totalSlack ?? "0",
+    freeSlack: values.freeSlack ?? "0"
+  });
+  const assignment = (value) => ({
+    uid: "91",
+    percentWorkComplete: value === "PT8H0M0S" ? "0" : "50",
+    start: "2026-01-05T08:00:00",
+    finish: "2026-01-05T16:00:00",
+    actualStart: null,
+    actualFinish: null,
+    stop: null,
+    resume: null,
+    work: "PT8H0M0S",
+    actualWork: value === "PT8H0M0S" ? "PT0H0M0S" : "PT4H0M0S",
+    remainingWork: value,
+    actualOvertimeWork: null,
+    remainingOvertimeWork: null,
+    timephasedData: [{ uid: "1", type: "1", start: null, finish: null, unit: null, value }]
+  });
+  const project = (summaryFinish, assignmentValue) => ({
+    project: { startDate: "2026-01-05T08:00:00", finishDate: summaryFinish, currentDate: null, statusDate: null },
+    taskByUid: new Map([
+      ["1", task("1", "1", "Summary", { summary: true, finish: summaryFinish })],
+      ["2", task("2", "2", "Tracked leaf")]
+    ]),
+    assignmentsByTaskUid: new Map([["2", [assignment(assignmentValue)]]])
+  });
+
+  const sourceProject = project("2026-01-05T16:00:00", "PT8H0M0S");
+  const candidateProject = project("2026-01-05T16:00:00", "PT8H0M0S");
+  const resultProject = project("2026-01-06T16:00:00", "PT4H0M0S");
+  const rows = buildComparisonRows({
+    source: sourceProject,
+    candidate: candidateProject,
+    result: resultProject,
+    taskUids: ["2"]
+  });
+
+  assert.ok(rows.some((row) => row.label.includes("Summary · summary · Finish")));
+  const assignmentRow = rows.find((row) => row.label.includes("Tracked leaf · leaf · Assignment progress"));
+  assert.ok(assignmentRow);
+  assert.notEqual(assignmentRow.source, assignmentRow.result);
 });
