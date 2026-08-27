@@ -1,74 +1,8 @@
-# Node / Vite
-node_modules/
 dist/
-build/
-.vite/
-.turbo/
-.cache/
-coverage/
-*.tsbuildinfo
-
-# Java / Kotlin / Gradle
-.gradle/
-**/build/
-out/
-target/
-*.class
-*.jar
-*.war
-*.ear
-
-# IDE and editor files
-.idea/
-.vscode/
-*.iml
-*.swp
-*.swo
+node_modules/
 .DS_Store
-Thumbs.db
-
-# Environment and secrets
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.jks
-
-# Logs
-logs/
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Local data and generated artifacts
-*.db
-*.sqlite
-*.sqlite3
-local-data/
-uploads/
-exports/
-simulation-runs/
-.shutdown-tracker/
-tmp/
-temp/
-
-# Binary project/source artifacts should not be committed by default
-*.mpp
-*.pdf
-*.doc
-*.docx
-*.zip
-fixtures/project-files/**/*.mpp
-fixtures/project-files/**/*.xml
-fixtures/project-files/**/*.xer
-fixtures/project-files/**/*.zip
-fixtures/project-files/_local/
-fixtures/import-export/_local/
-node_modules/
-dist/
-coverage/
-*.tsbuildinfo
+_local/
+trial-output/
+*.shutdown-tracker-lab.*.xml
+*.execution-log.json

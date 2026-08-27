@@ -1,8 +1,0 @@
-package com.shutdowntracker.api.exportpreview.handoff;
-
-import com.shutdowntracker.projectexport.contract.ProjectExportArtifactGenerationRequest;
-import com.shutdowntracker.projectexport.contract.ProjectExportArtifactGenerationResponse;
-
-public interface ProjectExportArtifactJobClient {
-    ProjectExportArtifactGenerationResponse generateArtifact(ProjectExportArtifactGenerationRequest request);
-}

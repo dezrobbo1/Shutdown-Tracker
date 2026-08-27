@@ -1,62 +1,20 @@
-name: CI
+name: XML round-trip lab CI
 
 on:
   pull_request:
-    branches:
-      - main
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
-  backend-maven-test:
-    name: Backend Maven test
+  validate:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Java 21
-        uses: actions/setup-java@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          distribution: temurin
-          java-version: "21"
-          cache: maven
-
-      - name: Run Maven tests
-        run: mvn test
-
-  frontend-test-build:
-    name: Frontend test and build
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node 22
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
+          node-version: 22
           cache: npm
-
-      - name: Install frontend dependencies
-        run: npm ci
-
-      - name: Run frontend tests
-        run: npm test
-
-      - name: Build frontend apps
-        run: npm run build
-
-  migration-validation:
-    name: Migration validation
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Validate SQL migrations
-        run: bash scripts/db/validate-migrations.sh
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run build
