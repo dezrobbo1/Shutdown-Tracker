@@ -3,15 +3,22 @@ import { spawnSync } from "node:child_process";
 import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
-const directories = [resolve(root, "src"), resolve(root, "scripts"), resolve(root, "tests")];
+const scanRoots = ["src", "scripts", "tests", "apps/console/scripts", "apps/mobile-pwa/scripts"];
 const files = [];
 
-for (const directory of directories) {
+async function collect(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
-    if (entry.isFile() && /\.(?:js|mjs)$/.test(entry.name)) {
-      files.push(resolve(directory, entry.name));
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) {
+      await collect(path);
+    } else if (/\.(?:js|mjs)$/.test(entry.name)) {
+      files.push(path);
     }
   }
+}
+
+for (const relativePath of scanRoots) {
+  await collect(resolve(root, relativePath));
 }
 
 for (const file of files) {
