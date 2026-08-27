@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Project xmlns="http://schemas.microsoft.com/project">
   <UID>LAB-1</UID>
+  <GUID>SOURCE-GUID</GUID>
   <Name>Browser Assigned Task Lab</Name>
   <StartDate>2026-01-05T08:00:00</StartDate>
   <FinishDate>2026-01-05T16:00:00</FinishDate>
