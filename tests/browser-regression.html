@@ -24,26 +24,52 @@ try {
   if (parsed.assignmentsByTaskUid.get("43")?.[0]?.timephasedData?.length !== 1) throw new Error("assignment timephased parsing failed");
   if (projectResult.taskByUid.get("43")?.timephasedData?.[0]?.type !== "11") throw new Error("task Type 11 parsing failed");
 
-  const effective = new Date(2026, 0, 5, 8, 0);
-  const events = [
-    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.START, timestamp: effective, sequence: 1, recordedAt: new Date("2026-01-05T00:00:01Z") }),
-    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.FINISH, timestamp: effective, sequence: 2, recordedAt: new Date("2026-01-05T00:00:02Z") })
+  const sameTime = new Date(2026, 0, 5, 8, 0);
+  const sameTimeEvents = [
+    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.START, timestamp: sameTime, sequence: 1, recordedAt: new Date("2026-01-05T00:00:01Z") }),
+    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.FINISH, timestamp: sameTime, sequence: 2, recordedAt: new Date("2026-01-05T00:00:02Z") })
   ];
-  if (deriveExecutionState(events, "43") !== "Completed") throw new Error("same-time ordering failed");
+  if (deriveExecutionState(sameTimeEvents, "43") !== "Completed") throw new Error("same-time ordering failed");
 
-  const generated = generateCandidateText({ sourceXml, project: parsed, events, profileId: "task-scalar-diagnostic" });
-  if (!generated.candidateText.includes("<PercentComplete>100</PercentComplete>")) throw new Error("candidate generation failed");
+  const events = [
+    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.START, timestamp: new Date(2026, 0, 5, 8, 0), sequence: 1, recordedAt: new Date("2026-01-05T00:00:01Z") }),
+    createExecutionEvent({ taskUid: "43", type: EXECUTION_EVENT_TYPES.SKIP_TO_PLANNED_FINISH, timestamp: new Date(2026, 0, 5, 16, 0), sequence: 2, recordedAt: new Date("2026-01-05T00:00:02Z") })
+  ];
+
+  const generated = generateCandidateText({
+    sourceXml,
+    project: parsed,
+    events,
+    profileId: "assigned-completion-native-v0"
+  });
   const candidate = parseProjectXml(generated.candidateText);
+  const candidateTask = candidate.taskByUid.get("43");
+  const candidateAssignment = candidate.assignmentsByTaskUid.get("43")?.[0];
 
-  const strict = classifyProjectResultCompatibility({ candidate, result: projectResult, touchedTaskUids: ["43"] });
+  if (generated.changedTaskUids.join(",") !== "43") throw new Error("changed task identity failed");
+  if (generated.changedAssignmentUids.join(",") !== "91") throw new Error("changed assignment identity failed");
+  if (candidateTask?.percentComplete !== "100") throw new Error("candidate task completion failed");
+  if (candidateTask?.actualDuration !== "PT8H0M0S" || candidateTask?.remainingDuration !== "PT0H0M0S") throw new Error("candidate task duration closure failed");
+  if (candidateTask?.timephasedData?.[0]?.type !== "11") throw new Error("candidate task Type 11 failed");
+  if (candidateAssignment?.uid !== "91" || candidateAssignment?.resourceUid !== "5") throw new Error("candidate source assignment identity failed");
+  if (candidateAssignment?.actualWork !== "PT16H0M0S" || candidateAssignment?.remainingWork !== "PT0H0M0S") throw new Error("candidate assignment work closure failed");
+  if (candidateAssignment?.timephasedData?.[0]?.type !== "2") throw new Error("candidate assignment Type 2 failed");
+
+  const strict = classifyProjectResultCompatibility({
+    candidate,
+    result: projectResult,
+    touchedTaskUids: ["43"]
+  });
   if (strict.classification !== "strict-result") throw new Error("strict result classification failed");
   if (!strict.warnings.some((warning) => warning.includes("Project GUID changed"))) throw new Error("Project GUID warning failed");
 
   const rows = buildComparisonRows({ source: parsed, candidate, result: projectResult, taskUids: ["43"] });
   const taskTimephased = rows.find((row) => row.key === "43-task-timephased");
+  const assignmentRow = rows.find((row) => row.key === "43-assignments");
   const allTimephased = rows.find((row) => row.key === "project-timephased-all");
-  if (!taskTimephased?.result.includes("11=1")) throw new Error("task timephased comparison failed");
-  if (!allTimephased || allTimephased.candidate === allTimephased.result) throw new Error("broad timephased comparison failed");
+  if (!taskTimephased?.candidate.includes("11=1")) throw new Error("candidate task timephased comparison failed");
+  if (!assignmentRow?.candidate.includes("Timephased 1 rows") || !assignmentRow.candidate.includes("2=1")) throw new Error("candidate assignment comparison failed");
+  if (!allTimephased || allTimephased.source === allTimephased.candidate) throw new Error("candidate global timephased comparison failed");
 
   const referenceXml = projectResultXml.replace(
     "  </Tasks>",
