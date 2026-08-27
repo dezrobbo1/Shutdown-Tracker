@@ -40,9 +40,13 @@ try {
   if (!strict.warnings.some((warning) => warning.includes("Project GUID changed"))) throw new Error("Project GUID warning failed");
 
   const rows = buildComparisonRows({ source: parsed, candidate, result: projectResult, taskUids: ["43"] });
+  const taskGuid = rows.find((row) => row.key === "43-guid");
   const taskTimephased = rows.find((row) => row.key === "43-task-timephased");
+  const assignment = rows.find((row) => row.key === "43-assignments");
   const allTimephased = rows.find((row) => row.key === "project-timephased-all");
+  if (taskGuid?.candidate !== "SOURCE-TASK-GUID" || taskGuid?.result !== "RESULT-TASK-GUID") throw new Error("task GUID comparison failed");
   if (!taskTimephased?.result.includes("11=1")) throw new Error("task timephased comparison failed");
+  if (!assignment?.source.includes("ResourceUID 5") || !assignment?.result.includes("ResourceUID 36")) throw new Error("assignment resource comparison failed");
   if (!allTimephased || allTimephased.candidate === allTimephased.result) throw new Error("broad timephased comparison failed");
 
   const referenceXml = projectResultXml.replace(
