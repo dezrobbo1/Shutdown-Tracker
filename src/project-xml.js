@@ -12,6 +12,7 @@ export { MSPDI_NAMESPACE, candidateFilename, decodeXmlBytes, encodeXmlText, sha2
 
 const COMPARISON_TASK_FIELDS = Object.freeze([
   ["Task ID", "id"],
+  ["Task GUID", "guid"],
   ["Task name", "name"],
   ["WBS", "wbs"],
   ["Outline number", "outlineNumber"],
@@ -347,7 +348,7 @@ export function classifyProjectResultCompatibility({ candidate, result, touchedT
 
   return {
     classification: strict ? "strict-result" : "reference",
-    label: strict ? "Strict candidate result" : "Reference schedule",
+    label: strict ? "Strict candidate result (task identity)" : "Reference schedule",
     identityMethod: strict
       ? "complete task UID/ID/name/WBS/summary fingerprint"
       : touched.length > 0
@@ -474,6 +475,7 @@ function assignmentSummary(project, taskUid) {
     .map((assignment) =>
       [
         `UID ${assignment.uid ?? "—"}`,
+        `ResourceUID ${assignment.resourceUid ?? "—"}`,
         `%Work ${assignment.percentWorkComplete ?? "—"}`,
         `Work ${assignment.work ?? "—"}`,
         `ActualWork ${assignment.actualWork ?? "—"}`,
@@ -519,6 +521,9 @@ function taskHasComparisonDifference(source, candidate, result, taskUid) {
       valuesDiffer(tasks.map((task) => displayValue(task?.[property])))
     )
   ) {
+    return true;
+  }
+  if (valuesDiffer(tasks.map(taskTimephasedSummary))) {
     return true;
   }
   return valuesDiffer([source, candidate, result].map((project) => assignmentSummary(project, taskUid)));
