@@ -21,6 +21,7 @@
     <Task>
       <UID>43</UID>
       <ID>7</ID>
+      <GUID>RESULT-TASK-GUID</GUID>
       <Name>Assigned leaf</Name>
       <WBS>1.1</WBS>
       <OutlineNumber>1.1</OutlineNumber>
@@ -70,7 +71,7 @@
     <Assignment>
       <UID>91</UID>
       <TaskUID>43</TaskUID>
-      <ResourceUID>5</ResourceUID>
+      <ResourceUID>36</ResourceUID>
       <PercentWorkComplete>100</PercentWorkComplete>
       <Start>2026-01-05T08:00:00</Start>
       <Finish>2026-01-05T16:00:00</Finish>
