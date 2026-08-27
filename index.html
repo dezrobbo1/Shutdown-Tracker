@@ -176,27 +176,31 @@
         <section class="panel" aria-labelledby="result-heading">
           <div class="section-heading">
             <div>
-              <h2 id="result-heading">6. Import Microsoft Project result</h2>
-              <p>After opening, recalculating and saving the candidate in Microsoft Project, import that saved XML here.</p>
+              <h2 id="result-heading">6. Import Project result or reference</h2>
+              <p>
+                Import the XML saved after Microsoft Project opens and recalculates the candidate, or import a
+                Project-authored reference schedule to study how a native operation is written.
+              </p>
             </div>
             <label class="file-button">
-              Choose Project-saved XML
+              Choose result/reference XML
               <input id="result-file" type="file" accept=".xml,.mspdi.xml,text/xml,application/xml" />
             </label>
           </div>
           <div id="result-status" class="status-message" role="status">No Project result loaded.</div>
           <div id="comparison" hidden>
             <p class="callout info">
-              Differences shown here are evidence for review. The lab does not classify them as authorised, calculated or erroneous automatically.
+              The lab identifies a strict task-identity result or a broader reference schedule. Individual differences
+              remain evidence for review and are not automatically classified as authorised, calculated or erroneous.
             </p>
-            <div class="table-scroll">
+            <div class="table-scroll comparison-scroll">
               <table>
                 <thead>
                   <tr>
                     <th scope="col">Task / fact</th>
                     <th scope="col">Source</th>
                     <th scope="col">Candidate</th>
-                    <th scope="col">Project result</th>
+                    <th scope="col">Project result/reference</th>
                   </tr>
                 </thead>
                 <tbody id="comparison-rows"></tbody>
