@@ -1,4 +1,7 @@
-import { generateAssignedCompletionNativeV0 as generateCore } from "./native-completion-v0.js";
+import {
+  applyAssignedCompletionNativeV0,
+  buildAssignedCompletionNativeV0Transaction
+} from "./native-completion-v0.js";
 
 function requireCondition(condition, message) {
   if (!condition) {
@@ -71,7 +74,10 @@ function assertMutationBoundary(sourceXml, candidateText, transaction) {
 }
 
 function assertEvidenceProfileIdentity(transaction) {
-  requireCondition(transaction.taskId != null && transaction.taskId !== "", `Task UID ${transaction.taskUid} requires an ID.`);
+  requireCondition(
+    transaction.taskId != null && transaction.taskId !== "",
+    `Task UID ${transaction.taskUid} requires an ID.`
+  );
   requireCondition(transaction.taskName, `Task UID ${transaction.taskUid} requires a Name.`);
   requireCondition(transaction.taskWbs, `Task UID ${transaction.taskUid} requires a WBS value.`);
   requireCondition(
@@ -85,8 +91,15 @@ function assertEvidenceProfileIdentity(transaction) {
 }
 
 export function generateAssignedCompletionNativeV0(options) {
-  const result = generateCore(options);
-  assertEvidenceProfileIdentity(result.transaction);
-  assertMutationBoundary(options.sourceXml, result.candidateText, result.transaction);
-  return result;
+  const transaction = buildAssignedCompletionNativeV0Transaction(options.project, options.events);
+  assertEvidenceProfileIdentity(transaction);
+  const candidateText = applyAssignedCompletionNativeV0(options.sourceXml, transaction);
+  assertMutationBoundary(options.sourceXml, candidateText, transaction);
+  return {
+    candidateText,
+    transaction,
+    patchEntries: [],
+    changedTaskUids: [transaction.taskUid],
+    changedAssignmentUids: [transaction.assignmentUid]
+  };
 }
