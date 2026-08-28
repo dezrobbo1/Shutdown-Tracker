@@ -42,6 +42,23 @@ function evidenceEventsForTask(task) {
   ];
 }
 
+function assertEvidenceProfileIdentity(transaction) {
+  requireCondition(
+    transaction.taskId != null && transaction.taskId !== "",
+    `Task UID ${transaction.taskUid} requires an ID.`
+  );
+  requireCondition(transaction.taskName, `Task UID ${transaction.taskUid} requires a Name.`);
+  requireCondition(transaction.taskWbs, `Task UID ${transaction.taskUid} requires a WBS value.`);
+  requireCondition(
+    String(transaction.resourceUid) !== "0",
+    `Assignment UID ${transaction.assignmentUid} uses Resource UID 0 and is outside the proven assigned-task shape.`
+  );
+  requireCondition(
+    String(transaction.assignmentTimephased.unit) === "1",
+    `Assignment UID ${transaction.assignmentUid} timephased Unit must be 1 for the proven completion shape.`
+  );
+}
+
 function eligibilityCategory(message) {
   const text = String(message ?? "");
   if (/requires positive Duration/.test(text)) return "Non-positive duration / milestone";
@@ -85,6 +102,7 @@ export function analyzePlannedCompletionCut({ project, cutoff, existingEvents = 
 
     try {
       const transaction = buildAssignedCompletionNativeV0Transaction(project, evidenceEventsForTask(task));
+      assertEvidenceProfileIdentity(transaction);
       eligible.push({
         taskUid: String(task.uid),
         taskName: task.name,
@@ -187,6 +205,7 @@ export function generateBulkAssignedCompletionNativeV0({ sourceXml, analysis }) 
 
   let candidateText = sourceXml;
   for (const transaction of transactions) {
+    assertEvidenceProfileIdentity(transaction);
     candidateText = applyAssignedCompletionNativeV0(candidateText, transaction);
   }
 
