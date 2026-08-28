@@ -229,12 +229,6 @@ function replaceRequiredScalar(block, prefix, field, value) {
   return block.replace(expression, `$1${escapeXmlText(value)}$2`);
 }
 
-function lineIndentBefore(block, prefix, field) {
-  const name = qualified(prefix, field);
-  const match = new RegExp(`(?:^|\\n)([ \\t]*)<${escapeRegExp(name)}\\b`, "m").exec(block);
-  return match?.[1] ?? null;
-}
-
 function insertScalarBefore(block, prefix, field, value, anchor) {
   const name = qualified(prefix, field);
   const anchorName = qualified(prefix, anchor);
@@ -245,34 +239,6 @@ function insertScalarBefore(block, prefix, field, value, anchor) {
   const insertionPoint = match.index + (match[1] ? 1 : 0);
   const line = `${match[2]}<${name}>${escapeXmlText(value)}</${name}>`;
   return `${block.slice(0, insertionPoint)}${line}\n${block.slice(insertionPoint)}`;
-}
-
-function appendTaskTimephased(block, prefix, transaction) {
-  requireCondition(!/<(?:[A-Za-z_][\w.-]*:)?TimephasedData\b/.test(block), "Task already contains TimephasedData.");
-  const closingName = qualified(prefix, "Task");
-  const closingMatch = new RegExp(`\\n([ \\t]*)<\\/${escapeRegExp(closingName)}>\\s*$`).exec(block);
-  requireCondition(closingMatch, "Could not locate the closing Task element.");
-
-  const childIndent = lineIndentBefore(block, prefix, "UID");
-  requireCondition(childIndent != null, "Could not determine Task child indentation.");
-  const closingIndent = closingMatch[1];
-  const indentUnit = childIndent.startsWith(closingIndent)
-    ? childIndent.slice(closingIndent.length) || "\t"
-    : "\t";
-  const nestedIndent = `${childIndent}${indentUnit}`;
-  const q = (field) => qualified(prefix, field);
-  const lines = [
-    `${childIndent}<${q("TimephasedData")}>`,
-    `${nestedIndent}<${q("Type")}>11</${q("Type")}>`,
-    `${nestedIndent}<${q("UID")}>${escapeXmlText(transaction.taskUid)}</${q("UID")}>`,
-    `${nestedIndent}<${q("Start")}>${escapeXmlText(transaction.actualStart)}</${q("Start")}>`,
-    `${nestedIndent}<${q("Finish")}>${escapeXmlText(transaction.actualFinish)}</${q("Finish")}>`,
-    `${nestedIndent}<${q("Unit")}>2</${q("Unit")}>`,
-    `${nestedIndent}<${q("Value")}>100</${q("Value")}>`,
-    `${childIndent}</${q("TimephasedData")}>`
-  ].join("\n");
-
-  return `${block.slice(0, closingMatch.index)}\n${lines}${block.slice(closingMatch.index)}`;
 }
 
 function patchTaskBlock(block, transaction) {
@@ -294,7 +260,7 @@ function patchTaskBlock(block, transaction) {
   updated = replaceRequiredScalar(updated, prefix, "ActualWork", transaction.work);
   updated = replaceRequiredScalar(updated, prefix, "RemainingDuration", ZERO_DURATION);
   updated = replaceRequiredScalar(updated, prefix, "RemainingWork", ZERO_DURATION);
-  return appendTaskTimephased(updated, prefix, transaction);
+  return updated;
 }
 
 function patchAssignmentTimephased(block, prefix, transaction) {
