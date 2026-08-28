@@ -21,6 +21,8 @@ const elements = Object.fromEntries(
     "completion-cutoff",
     "analyze-completion",
     "generate-candidate",
+    "download-candidate-xml",
+    "download-candidate-intent",
     "completion-status",
     "completion-summary",
     "unsupported-wrap",
@@ -109,6 +111,11 @@ function renderUnsupported(analysis) {
   }
 }
 
+function resetSundayDownloads() {
+  elements["download-candidate-xml"].disabled = true;
+  elements["download-candidate-intent"].disabled = true;
+}
+
 async function loadSource(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const decoded = decodeXmlBytes(bytes);
@@ -121,6 +128,7 @@ async function loadSource(file) {
   state.result = null;
   elements.trial.hidden = false;
   elements["generate-candidate"].disabled = true;
+  resetSundayDownloads();
   elements["download-partial-plan"].disabled = true;
   elements["candidate-summary"].hidden = true;
   elements["result-summary"].hidden = true;
@@ -156,6 +164,7 @@ function analyseCompletion() {
   elements["result-file"].value = "";
   elements["candidate-summary"].hidden = true;
   elements["result-summary"].hidden = true;
+  resetSundayDownloads();
   elements["generate-candidate"].disabled = analysis.eligible.length === 0;
   summaryCards(elements["completion-summary"], [
     ["Planned finished by cut", analysis.plannedFinishedCount],
@@ -191,6 +200,8 @@ async function generateCandidate() {
   state.candidate = { ...generated, bytes, hash, parsed, fileName, executionIntent };
   state.result = null;
   elements["result-file"].value = "";
+  elements["download-candidate-xml"].disabled = false;
+  elements["download-candidate-intent"].disabled = false;
   summaryCards(elements["candidate-summary"], [
     ["Candidate file", fileName],
     ["Candidate SHA-256", hash],
@@ -200,22 +211,37 @@ async function generateCandidate() {
   ]);
   setStatus(
     elements["completion-status"],
-    `Candidate generated for ${generated.changedTaskUids.length} proven-shape completions. This multi-task composition still requires Microsoft Project verification.`,
+    `Candidate prepared for ${generated.changedTaskUids.length} proven-shape completions. Download the XML and intent JSON with the separate buttons below the cutoff. This multi-task composition still requires Microsoft Project verification.`,
     "success"
   );
-  setStatus(elements["result-status"], "Open/recalculate/save this candidate in Project, then import the Project-saved XML.");
-  downloadBytes(bytes, fileName, "application/xml");
+  setStatus(elements["result-status"], "Download the Sunday XML, open/recalculate/save it in Project, then import the Project-saved XML.");
+}
+
+function sundayIntentDocument() {
+  if (!state.source || !state.completionAnalysis || !state.candidate) {
+    throw new Error("Prepare the Sunday candidate first.");
+  }
+  return {
+    format: "shutdown-tracker-bulk-planned-completion/v0",
+    createdAt: new Date().toISOString(),
+    source: { fileName: state.source.fileName, sha256: state.source.hash },
+    candidate: { fileName: state.candidate.fileName, sha256: state.candidate.hash },
+    cutoff: cutoffValue(elements["completion-cutoff"]),
+    supportedTaskUids: state.candidate.changedTaskUids,
+    unsupported: state.completionAnalysis.unsupported,
+    executionIntent: state.candidate.executionIntent
+  };
+}
+
+function downloadSundayXml() {
+  if (!state.candidate) throw new Error("Prepare the Sunday candidate first.");
+  downloadBytes(state.candidate.bytes, state.candidate.fileName, "application/xml");
+}
+
+function downloadSundayIntent() {
+  if (!state.source || !state.candidate) throw new Error("Prepare the Sunday candidate first.");
   downloadJson(
-    {
-      format: "shutdown-tracker-bulk-planned-completion/v0",
-      createdAt: new Date().toISOString(),
-      source: { fileName: state.source.fileName, sha256: state.source.hash },
-      candidate: { fileName, sha256: hash },
-      cutoff: cutoffValue(elements["completion-cutoff"]),
-      supportedTaskUids: generated.changedTaskUids,
-      unsupported: state.completionAnalysis.unsupported,
-      executionIntent
-    },
+    sundayIntentDocument(),
     `${baseFilename(state.source.fileName)}.bulk-planned-completion-v0.intent.json`
   );
 }
@@ -347,13 +373,31 @@ elements["completion-cutoff"].addEventListener("change", () => {
   state.completionAnalysis = null;
   state.candidate = null;
   elements["generate-candidate"].disabled = true;
+  resetSundayDownloads();
   elements["candidate-summary"].hidden = true;
-  setStatus(elements["completion-status"], "Cutoff changed. Analyse the schedule again before generating a candidate.");
+  setStatus(elements["completion-status"], "Cutoff changed. Analyse the schedule again before preparing a candidate.");
 });
 
 elements["generate-candidate"].addEventListener("click", async () => {
   try {
     await generateCandidate();
+  } catch (error) {
+    resetSundayDownloads();
+    setStatus(elements["completion-status"], error instanceof Error ? error.message : String(error), "error");
+  }
+});
+
+elements["download-candidate-xml"].addEventListener("click", () => {
+  try {
+    downloadSundayXml();
+  } catch (error) {
+    setStatus(elements["completion-status"], error instanceof Error ? error.message : String(error), "error");
+  }
+});
+
+elements["download-candidate-intent"].addEventListener("click", () => {
+  try {
+    downloadSundayIntent();
   } catch (error) {
     setStatus(elements["completion-status"], error instanceof Error ? error.message : String(error), "error");
   }
