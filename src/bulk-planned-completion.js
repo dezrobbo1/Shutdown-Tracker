@@ -140,20 +140,36 @@ export function analyzePlannedCompletionCut({ project, cutoff, existingEvents = 
   };
 }
 
+function rawScalarFromBlock(block, field) {
+  const match = new RegExp(
+    `<(?:[A-Za-z_][\\w.-]*:)?${field}\\b[^>]*>\\s*([\\s\\S]*?)\\s*<\\/(?:[A-Za-z_][\\w.-]*:)?${field}>`
+  ).exec(block);
+  return match?.[1]?.trim() ?? null;
+}
+
+function rawTaskNameForUid(xml, taskUid) {
+  const expression = /<((?:[A-Za-z_][\w.-]*:)?Task)\b[^>]*>[\s\S]*?<\/\1>/g;
+  let rawName = null;
+  let count = 0;
+  for (const match of xml.matchAll(expression)) {
+    const block = match[0];
+    if (String(rawScalarFromBlock(block, "UID")) !== String(taskUid)) continue;
+    count += 1;
+    rawName = rawScalarFromBlock(block, "Name");
+  }
+  requireCondition(count === 1, `Task UID ${taskUid} matched ${count} source Task blocks while resolving XML identity.`);
+  requireCondition(rawName != null && rawName !== "", `Task UID ${taskUid} requires a source Name.`);
+  return rawName;
+}
+
 function replaceUniqueBlockWithMarker(xml, elementName, identityField, identityValue, marker) {
   const expression = new RegExp(
     `<((?:[A-Za-z_][\\w.-]*:)?${elementName})\\b[^>]*>[\\s\\S]*?<\\/\\1>`,
     "g"
   );
-  const scalar = (block, field) => {
-    const match = new RegExp(
-      `<(?:[A-Za-z_][\\w.-]*:)?${field}\\b[^>]*>\\s*([\\s\\S]*?)\\s*<\\/(?:[A-Za-z_][\\w.-]*:)?${field}>`
-    ).exec(block);
-    return match?.[1]?.trim() ?? null;
-  };
   let count = 0;
   const normalized = xml.replace(expression, (block) => {
-    if (String(scalar(block, identityField)) !== String(identityValue)) {
+    if (String(rawScalarFromBlock(block, identityField)) !== String(identityValue)) {
       return block;
     }
     count += 1;
@@ -206,7 +222,11 @@ export function generateBulkAssignedCompletionNativeV0({ sourceXml, analysis }) 
   let candidateText = sourceXml;
   for (const transaction of transactions) {
     assertEvidenceProfileIdentity(transaction);
-    candidateText = applyAssignedCompletionNativeV0(candidateText, transaction);
+    const sourceIdentityTransaction = {
+      ...transaction,
+      taskName: rawTaskNameForUid(sourceXml, transaction.taskUid)
+    };
+    candidateText = applyAssignedCompletionNativeV0(candidateText, sourceIdentityTransaction);
   }
 
   const normalizedSource = normalizeBulkTargets(sourceXml, transactions);
