@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Bulk browser regression</title></head>
+<body data-result="running">running
+<script type="module">
+import {
+  analyzePlannedCompletionCut,
+  generateBulkAssignedCompletionNativeV0,
+  planMondayFiftyPercentSample
+} from "../src/bulk-planned-completion.js";
+import { parseProjectXml } from "../src/project-xml.js";
+
+try {
+  const sourceXml = await fetch("./fixtures/assigned-task.xml").then((response) => response.text());
+  const project = parseProjectXml(sourceXml);
+  const analysis = analyzePlannedCompletionCut({
+    project,
+    cutoff: "2026-01-05T17:00:00"
+  });
+  if (analysis.plannedFinishedCount !== 2) throw new Error(`expected 2 planned-finished leaves, got ${analysis.plannedFinishedCount}`);
+  if (analysis.eligible.length !== 1 || analysis.eligible[0].taskUid !== "43") throw new Error("proven-shape eligibility failed");
+  if (analysis.unsupported.length !== 1) throw new Error("unsupported task reporting failed");
+
+  const generated = generateBulkAssignedCompletionNativeV0({ sourceXml, analysis });
+  if (generated.changedTaskUids.join(",") !== "43") throw new Error("changed task identity failed");
+  if (!generated.candidateText.includes("<PercentComplete>100</PercentComplete>")) throw new Error("task completion missing");
+  if (!generated.candidateText.includes("<Type>2</Type>")) throw new Error("assignment actual work Type 2 missing");
+  if (generated.candidateText.includes("<Type>11</Type>")) throw new Error("browser must not author task Type 11");
+
+  const partial = planMondayFiftyPercentSample({
+    project,
+    cutoff: "2026-01-05T10:00:00",
+    fraction: 0.5
+  });
+  if (partial.exportable !== false) throw new Error("partial plan must remain non-exportable");
+  if (partial.selected.length < 1) throw new Error("partial intent preview produced no sample");
+
+  document.body.dataset.result = "pass";
+  document.body.textContent = "pass";
+} catch (error) {
+  document.body.dataset.result = "fail";
+  document.body.textContent = error instanceof Error ? error.stack : String(error);
+}
+</script>
+</body>
+</html>
