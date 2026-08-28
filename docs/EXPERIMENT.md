@@ -2,17 +2,52 @@
 
 ## Objective
 
-Determine whether the evidence-derived Microsoft Project XML transaction can complete one real assigned task coherently.
+Confirm that the lightweight browser implementation reproduces the Microsoft Project-proven assigned-task completion transaction, then continue native evidence work for partial progress and other execution actions.
 
-The repository is an evidence laboratory. It imports source XML, records execution intent, generates explicitly labelled candidates, accepts Microsoft Project-saved results or Project-authored reference schedules, and compares task, assignment, timephased, summary, project, and wider changed-task facts.
+The current repository remains an evidence laboratory. It imports source XML, records execution intent, generates explicitly labelled candidates, accepts Microsoft Project-saved results or Project-authored reference schedules, and compares task, assignment, timephased, summary, project, and wider changed-task facts.
 
-Draft PR #75 implements one experimental writer:
+## What is now proven elsewhere
+
+The companion `Shutdown-Tracker-Claude` repository has a completed manual Microsoft Project round trip for BOILER task UID `43` using Project desktop build `16.0.20228.20188`.
+
+For the evidenced single-assignment, single-timephased-block shape, the accepted candidate authors:
+
+- task Percent Complete / Percent Work Complete = 100;
+- task Actual Start / Actual Finish;
+- task Actual Duration / Actual Work = planned values;
+- task Remaining Duration / Remaining Work = zero;
+- task Stop / Resume = Actual Finish;
+- assignment Percent Work Complete = 100;
+- assignment Actual Start / Actual Finish;
+- assignment Actual Work = planned assignment Work;
+- assignment Remaining Work = zero;
+- assignment Stop / Resume = Actual Finish;
+- assignment TimephasedData Type 1 → Type 2 over the same source interval, Unit and Value.
+
+The proven candidate does **not** directly add task Type 11 timephasing. Project-authored/reference files may contain Type 11 after recalculation/save, so that row is treated as Project result state rather than required Tracker-authored input.
+
+## Browser confirmation trial
+
+Draft PR #75 implements the separate browser generator:
 
 ```text
 assigned-completion-native-v0
 ```
 
-It is not approved as a native-semantic transaction. The deployed `main` registry does not expose it while the native trial is pending.
+It remains draft because this JavaScript implementation still needs one Microsoft Project confirmation.
+
+1. Import the untouched BOILER source in PR #75.
+2. Select task UID `43`.
+3. Record Start at the imported planned Start.
+4. Skip to the imported planned Finish.
+5. Generate `assigned-completion-native-v0`.
+6. Open the candidate in Microsoft Project build `16.0.20228.20188`.
+7. Recalculate and Save As a separate XML file.
+8. Close and reopen the saved file.
+9. Import the Project-saved result into the lab.
+10. Compare source, browser candidate and Project result.
+
+This is an implementation-confirmation test, not a discovery experiment.
 
 ## Result classifications
 
@@ -25,7 +60,7 @@ A file is a strict result when:
 - each common task retains the same ID, name, WBS, and summary/leaf status; and
 - every touched task retains that exact identity fingerprint.
 
-Project UID, GUID, and name changes are reported as evidence and warnings. A Project GUID change alone is not a rejection condition because the supplied failed Project resave changed Project GUID while preserving the complete task identity set.
+Project UID, GUID, and name changes are reported as evidence and warnings. A Project GUID change alone is not a rejection condition.
 
 ### Reference schedule
 
@@ -44,12 +79,14 @@ A file is rejected when a touched task is missing or its UID/ID/name/WBS/summary
 | Approved input | The execution fact entered or selected by the user |
 | Required semantic companion | Dependent state needed to express that input coherently in XML |
 | Project-calculated consequence | State changed by Microsoft Project after opening/recalculation |
-| Serialization normalization | Formatting, ordering, identity, or volatile output written by Project |
+| Serialization normalization | Formatting, ordering, identity, save metadata, or value representation written by Project |
 | Unexpected difference | A difference requiring further investigation |
+
+Known Project-result semantics from the proven UID `43` round trip are codified in `src/project-result-semantics.js`, including save metadata normalization, numeric signed-zero equivalence, summary/resource roll-ups, and task slack/late-date/Critical recalculation.
 
 ## Implemented v0 boundary
 
-The writer fails closed unless:
+The browser writer fails closed unless:
 
 - exactly one task is touched;
 - the task is active, non-null, non-summary, and unstarted;
@@ -67,76 +104,20 @@ The writer changes only the selected Task and Assignment blocks and verifies tha
 
 Pause, Resume, observed percentage, Mark on Track, shift-end progress, off-plan dates, split tasks, multiple assignments, partial progress, and already-progressed tasks are outside v0.
 
-## Evidence-derived completion shape
+## Next native evidence after completion confirmation
 
-For the task:
-
-- `PercentComplete = 100`;
-- `PercentWorkComplete = 100`;
-- Actual Start and Actual Finish equal the planned window;
-- Actual Duration equals Duration;
-- Remaining Duration equals zero;
-- Actual Work equals Work;
-- Remaining Work equals zero;
-- Stop and Resume equal Actual Finish;
-- one direct task Type 11 timephased row with Unit 2 and Value 100.
-
-For the existing source assignment:
-
-- `PercentWorkComplete = 100`;
-- Actual Start and Actual Finish equal the task actual dates;
-- Actual Work equals assignment Work;
-- Remaining Work equals zero;
-- Stop and Resume equal Actual Finish;
-- the existing Type 1 assignment timephased row becomes Type 2 while preserving source assignment UID, Resource UID, interval, Unit, and Value.
-
-The writer does not independently alter Project GUID, task GUID, assignment UID, Resource UID, summary progress, slack, criticality, early/late dates, successor dates, project finish, tasks, resources, calendars, dependencies, or baselines.
-
-## First native completion trial
-
-Trial only BOILER task UID `43`:
-
-```text
-source XML
-→ assigned-completion-native-v0 candidate
-→ open in Microsoft Project build 16.0.20228.20188
-→ recalculate
-→ Save As XML
-→ close and reopen the saved result
-→ import the result into the lab
-```
-
-Exact user steps are in `ASSIGNED-COMPLETION-NATIVE-V0-TRIAL.md`.
-
-Pass conditions:
-
-- task displays 100% complete;
-- Actual Start is `2026-08-17T07:30:00`;
-- Actual Finish is `2026-08-17T15:30:00`;
-- Actual Duration equals `PT8H0M0S`;
-- Remaining Duration equals zero;
-- assignment Actual Work equals `PT16H0M0S`;
-- assignment Remaining Work equals zero;
-- task Type 11 and assignment Type 2 evidence survive or are coherently normalized by Project;
-- no contradictory remaining work or duration remains;
-- source task, assignment, and resource identities remain attributable;
-- the source file remains unchanged; and
-- the Project-saved result reopens stably.
-
-Only after UID `43` passes should the same profile be tried on UIDs `318` and `319`.
-
-## Later native cases
-
-After the completion case is proven, separately investigate:
+Run each new case separately before implementing general support:
 
 - Actual Start only;
 - Mark on Track through a controlled status date/time;
 - partial progress at 50% or 75%;
+- expected progress at shift end;
 - off-plan completion;
-- pause/resume;
-- multiple assignments; and
-- unassigned tasks.
+- multiple assignments;
+- multiple timephased blocks.
+
+Partial assigned-task progress remains blocked until a native sample shows how Project divides actual versus remaining timephased work and how Stop / Resume behave.
 
 ## Stop condition
 
-Do not merge PR #75, expand the writer, or rebuild backend, approvals, roles, Mobile, reporting, messaging, or production persistence until task UID `43` passes the Microsoft Project open, recalculate, save, close, reopen, and result-import trial.
+Do not rebuild backend, approvals, roles, Mobile, reporting, messaging, or production persistence in this lightweight repository while the interoperability evidence is still being established. Use the Claude repository as a donor/reference source rather than importing its large platform architecture wholesale.
