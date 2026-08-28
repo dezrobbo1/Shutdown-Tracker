@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { EXECUTION_EVENT_TYPES } from "../src/execution.js";
 import {
   analyzePlannedCompletionCut,
   buildBulkCompletionExecutionIntent,
