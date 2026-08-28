@@ -33,19 +33,19 @@ The main single-task lab remains available separately.
    - a JSON execution-intent record containing the cutoff, supported UIDs and unsupported reasons.
 7. Open the candidate in Microsoft Project desktop build `16.0.20228.20188`.
 8. Recalculate.
-9. Inspect the schedule and save as a separate XML/Mpp candidate.
+9. Inspect the schedule and save as a separate XML/MPP candidate.
 10. Close and reopen the MPP to verify stability.
 11. Import the Project-saved XML back into the trial page.
 
 ### Source preflight examples
 
-The untouched BOILER schedule currently produces these counts under the strict v0 eligibility rules. These are examples only; use the actual shift cutoff for the trial.
+The untouched BOILER schedule currently produces these counts under the exact strict v0 eligibility rules used by the bulk planner. These are examples only; use the actual shift cutoff for the trial.
 
 | Reporting cut | Planned-finished leaf tasks | Supported v0 completions | Left unchanged |
 |---|---:|---:|---:|
-| 13 Sep 2026 23:59 | 63 | 49 | 14 |
-| 14 Sep 2026 07:00 | 66 | 52 | 14 |
-| 14 Sep 2026 18:00 | 161 | 137 | 24 |
+| 13 Sep 2026 23:59 | 62 | 48 | 14 |
+| 14 Sep 2026 07:00 | 65 | 51 | 14 |
+| 14 Sep 2026 18:00 | 159 | 136 | 23 |
 
 Unsupported tasks remain byte-for-byte unchanged. Typical reasons in the real schedule include milestones/non-positive duration, multiple assignment timephased rows, multiple assignments and other shapes outside the existing proof.
 
