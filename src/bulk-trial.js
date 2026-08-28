@@ -240,7 +240,7 @@ function analysePartial() {
   const fragment = document.createDocumentFragment();
   for (const item of plan.selected) {
     const line = document.createElement("div");
-    line.innerHTML = `<code>UID ${item.taskUid}</code> · ${item.taskName} · planned ${item.start.replace("T", " ")} → ${item.finish.replace("T", " ")} · report 50%`;
+    line.textContent = `UID ${item.taskUid} · ${item.taskName} · planned ${item.start.replace("T", " ")} → ${item.finish.replace("T", " ")} · report 50%`;
     fragment.append(line);
   }
   elements["partial-list"].append(fragment);
