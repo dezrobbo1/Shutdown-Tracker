@@ -19,10 +19,10 @@ export const EXPORT_PROFILES = Object.freeze([
   },
   {
     id: "assigned-completion-native-v0",
-    label: "Assigned completion at planned window — native-evidence v0",
+    label: "Assigned completion at planned window — Project-proven shape, browser confirmation pending",
     classification: "native-evidence-derived",
     warning:
-      "Experimental and not yet Microsoft Project-verified. It supports exactly one active, unstarted leaf task with one non-zero Resource UID assignment and one matching Unit 1, Type 1 assignment timephased row. Start and completion must equal the imported planned Start and Finish. Open, recalculate, save and reopen the candidate in Microsoft Project before treating the result as evidence."
+      "The underlying completion transaction has passed a Microsoft Project 16.0.20228.20188 round trip in Shutdown-Tracker-Claude for BOILER task UID 43. This browser implementation has not yet been independently confirmed in Project. It supports exactly one active, unstarted leaf task with one non-zero Resource UID assignment and one matching Unit 1, Type 1 assignment timephased row. Start and completion must equal the imported planned Start and Finish."
   }
 ]);
 
