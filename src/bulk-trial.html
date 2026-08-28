@@ -49,7 +49,9 @@
       <div class="form-row">
         <label>Sunday reporting cutoff<input id="completion-cutoff" type="datetime-local" step="60" /></label>
         <button id="analyze-completion" type="button">Analyse schedule</button>
-        <button id="generate-candidate" type="button" disabled>Generate Sunday candidate</button>
+        <button id="generate-candidate" type="button" disabled>Prepare Sunday candidate</button>
+        <button id="download-candidate-xml" type="button" disabled>Download Sunday XML</button>
+        <button id="download-candidate-intent" type="button" class="secondary" disabled>Download Sunday intent JSON</button>
       </div>
       <div id="completion-status" class="status-message">Set the exact end-of-shift reporting cutoff, then analyse.</div>
       <div id="completion-summary" class="bulk-grid" hidden></div>
