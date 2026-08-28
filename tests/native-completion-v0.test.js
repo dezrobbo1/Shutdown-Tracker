@@ -114,7 +114,7 @@ function blockFor(xml, elementName, identityField, identityValue) {
   return block;
 }
 
-test("native-evidence v0 writes one complete task and assignment transaction", () => {
+test("native-evidence v0 writes the Project-proven complete task and assignment transaction", () => {
   const result = generateAssignedCompletionNativeV0({
     sourceXml,
     project: project(),
@@ -139,7 +139,7 @@ test("native-evidence v0 writes one complete task and assignment transaction", (
   assert.match(taskBlock, /<ActualWork>PT16H0M0S<\/ActualWork>/);
   assert.match(taskBlock, /<RemainingDuration>PT0H0M0S<\/RemainingDuration>/);
   assert.match(taskBlock, /<RemainingWork>PT0H0M0S<\/RemainingWork>/);
-  assert.match(taskBlock, /<TimephasedData>[\s\S]*?<Type>11<\/Type>[\s\S]*?<UID>43<\/UID>[\s\S]*?<Unit>2<\/Unit>[\s\S]*?<Value>100<\/Value>[\s\S]*?<\/TimephasedData>/);
+  assert.doesNotMatch(taskBlock, /<TimephasedData>/);
 
   assert.ok(taskBlock.indexOf("<Stop>") < taskBlock.indexOf("<Resume>"));
   assert.ok(taskBlock.indexOf("<Resume>") < taskBlock.indexOf("<ResumeValid>"));
