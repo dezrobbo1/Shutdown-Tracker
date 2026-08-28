@@ -73,8 +73,15 @@ function project(tasks, assignmentMap) {
   };
 }
 
+function xmlText(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
 function taskXml(taskValue) {
-  return `    <Task>\n      <UID>${taskValue.uid}</UID>\n      <ID>${taskValue.id}</ID>\n      <Name>${taskValue.name}</Name>\n      <Active>1</Active>\n      <WBS>${taskValue.wbs}</WBS>\n      <Start>${taskValue.start}</Start>\n      <Finish>${taskValue.finish}</Finish>\n      <Duration>${taskValue.duration}</Duration>\n      <Work>${taskValue.work}</Work>\n      <ResumeValid>0</ResumeValid>\n      <Summary>0</Summary>\n      <PercentComplete>0</PercentComplete>\n      <PercentWorkComplete>0</PercentWorkComplete>\n      <ActualDuration>PT0H0M0S</ActualDuration>\n      <ActualCost>0</ActualCost>\n      <ActualOvertimeCost>0</ActualOvertimeCost>\n      <ActualWork>PT0H0M0S</ActualWork>\n      <RemainingDuration>${taskValue.duration}</RemainingDuration>\n      <RemainingWork>${taskValue.work}</RemainingWork>\n    </Task>`;
+  return `    <Task>\n      <UID>${taskValue.uid}</UID>\n      <ID>${taskValue.id}</ID>\n      <Name>${xmlText(taskValue.name)}</Name>\n      <Active>1</Active>\n      <WBS>${taskValue.wbs}</WBS>\n      <Start>${taskValue.start}</Start>\n      <Finish>${taskValue.finish}</Finish>\n      <Duration>${taskValue.duration}</Duration>\n      <Work>${taskValue.work}</Work>\n      <ResumeValid>0</ResumeValid>\n      <Summary>0</Summary>\n      <PercentComplete>0</PercentComplete>\n      <PercentWorkComplete>0</PercentWorkComplete>\n      <ActualDuration>PT0H0M0S</ActualDuration>\n      <ActualCost>0</ActualCost>\n      <ActualOvertimeCost>0</ActualOvertimeCost>\n      <ActualWork>PT0H0M0S</ActualWork>\n      <RemainingDuration>${taskValue.duration}</RemainingDuration>\n      <RemainingWork>${taskValue.work}</RemainingWork>\n    </Task>`;
 }
 
 function assignmentXml(assignmentValue) {
@@ -122,6 +129,21 @@ test("bulk generator composes the proven transaction across multiple eligible ta
   assert.equal((generated.candidateText.match(/<Type>2<\/Type>/g) ?? []).length, 2);
   assert.match(generated.candidateText, /<ExtendedAttributes><Sentinel>unchanged<\/Sentinel><\/ExtendedAttributes>/);
   assert.doesNotMatch(generated.candidateText, /<Type>11<\/Type>/);
+});
+
+test("bulk generator accepts decoded task identity when source Name contains XML entities", () => {
+  const t1 = task(319, 5, "2026-08-18T11:30:00", "2026-08-19T11:30:00", 8, 16);
+  t1.name = "Scaffold access to Feedwater isolating valve and NRV, 4-way pipe support (1.4 & 1.5)";
+  const a1 = assignment(91, t1);
+  const parsed = project([t1], new Map([["319", [a1]]]));
+  const xml = sourceXml([t1], [a1]);
+  const analysis = analyzePlannedCompletionCut({ project: parsed, cutoff: "2026-08-20T00:00:00" });
+
+  const generated = generateBulkAssignedCompletionNativeV0({ sourceXml: xml, analysis });
+
+  assert.deepEqual(generated.changedTaskUids, ["319"]);
+  assert.match(generated.candidateText, /<Name>Scaffold access to Feedwater isolating valve and NRV, 4-way pipe support \(1\.4 &amp; 1\.5\)<\/Name>/);
+  assert.match(generated.candidateText, /<PercentComplete>100<\/PercentComplete>/);
 });
 
 test("unsupported tasks are reported rather than patched", () => {
