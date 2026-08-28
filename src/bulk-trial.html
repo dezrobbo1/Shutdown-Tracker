@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Shutdown Tracker Reporting-Cut Trial</title>
+  <link rel="stylesheet" href="./styles.css" />
+  <style>
+    .bulk-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:.75rem;margin-top:1rem}
+    .bulk-grid>div{border-top:1px solid #d8dde1;padding-top:.55rem}
+    .bulk-grid strong{display:block;font-size:1.25rem}
+    .reason-list{margin:.75rem 0 0;padding-left:1.2rem}
+    .sample-list{max-height:20rem;overflow:auto;border:1px solid #d1d6da;padding:.65rem;margin-top:.75rem;background:#fafbfc}
+    .sample-list code{font-size:.82rem}
+    .action-row{display:flex;flex-wrap:wrap;gap:.65rem;margin-top:.9rem}
+    .small-note{color:#5a6570;font-size:.88rem}
+    .status-pass{border-left-color:#2f7a45;background:#eff8f1}
+  </style>
+</head>
+<body>
+<header class="app-header">
+  <div>
+    <p class="eyebrow">Native-evidence reporting cycle experiment</p>
+    <h1>Sunday completion → Monday partial-report trial</h1>
+  </div>
+  <p class="memory-warning">Browser memory only · no backend · source is never overwritten</p>
+</header>
+<main>
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <h2>1. Import original Project XML</h2>
+        <p>Use the untouched schedule. The Sunday candidate is always downloaded as a separate XML file.</p>
+      </div>
+      <label class="file-button">Choose source XML<input id="source-file" type="file" accept=".xml,text/xml,application/xml" /></label>
+    </div>
+    <div id="source-status" class="status-message">No source loaded.</div>
+    <dl id="source-summary" class="summary-grid" hidden></dl>
+  </section>
+
+  <section id="trial" hidden>
+    <section class="panel">
+      <div class="section-heading compact">
+        <div>
+          <h2>2. Complete tasks as planned through Sunday reporting cut</h2>
+          <p>Only tasks matching the already Project-verified v0 shape are eligible. Everything else remains untouched and is reported by reason.</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Sunday reporting cutoff<input id="completion-cutoff" type="datetime-local" step="60" /></label>
+        <button id="analyze-completion" type="button">Analyse schedule</button>
+        <button id="generate-candidate" type="button" disabled>Generate Sunday candidate</button>
+      </div>
+      <div id="completion-status" class="status-message">Set the exact end-of-shift reporting cutoff, then analyse.</div>
+      <div id="completion-summary" class="bulk-grid" hidden></div>
+      <div id="unsupported-wrap" hidden>
+        <h3>Unsupported planned-finished tasks</h3>
+        <ul id="unsupported-reasons" class="reason-list"></ul>
+        <p class="small-note">Unsupported tasks are not patched. This trial does not generalise the proven completion transaction.</p>
+      </div>
+      <dl id="candidate-summary" class="summary-grid" hidden></dl>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading compact">
+        <div>
+          <h2>3. Monday 50% reporting preview</h2>
+          <p>This prepares the next realistic reporting scenario but does not write partial progress into XML.</p>
+        </div>
+      </div>
+      <div class="form-row">
+        <label>Monday reporting cutoff<input id="partial-cutoff" type="datetime-local" step="60" /></label>
+        <button id="analyze-partial" type="button">Preview half reported at 50%</button>
+        <button id="download-partial-plan" type="button" class="secondary" disabled>Download intent plan JSON</button>
+      </div>
+      <div id="partial-status" class="status-message">Partial assigned-task progress remains unproven. This section creates intent evidence only.</div>
+      <div id="partial-summary" class="bulk-grid" hidden></div>
+      <div id="partial-list" class="sample-list" hidden></div>
+      <p class="callout warning">No partial-progress XML is generated here. One native 50% Project sample is still required before the Monday half-report scenario can be exported safely.</p>
+    </section>
+
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <h2>4. Import Microsoft Project result for the Sunday candidate</h2>
+          <p>Open/recalculate/save the Sunday candidate in Project, then bring the Project-saved XML back here.</p>
+        </div>
+        <label class="file-button">Choose Project-saved XML<input id="result-file" type="file" accept=".xml,text/xml,application/xml" /></label>
+      </div>
+      <div id="result-status" class="status-message">No Project result loaded.</div>
+      <div id="result-summary" class="bulk-grid" hidden></div>
+    </section>
+  </section>
+</main>
+<footer><p>Evidence-first: bulk 100% completion is a new composition trial; Monday partial progress remains intent-only until native evidence exists.</p></footer>
+<script type="module" src="./bulk-trial.js"></script>
+</body>
+</html>
