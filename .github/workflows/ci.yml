@@ -34,4 +34,13 @@ jobs:
             http://127.0.0.1:4173/tests/browser-regression.html > /tmp/browser-regression.html
           cat /tmp/browser-regression.html
           grep -q 'data-result="pass"' /tmp/browser-regression.html
+          "${{ steps.setup-chrome.outputs.chrome-path }}" \
+            --headless=new \
+            --disable-gpu \
+            --no-sandbox \
+            --virtual-time-budget=5000 \
+            --dump-dom \
+            http://127.0.0.1:4173/tests/bulk-browser-regression.html > /tmp/bulk-browser-regression.html
+          cat /tmp/bulk-browser-regression.html
+          grep -q 'data-result="pass"' /tmp/bulk-browser-regression.html
       - run: npm run build
