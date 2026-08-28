@@ -20,27 +20,37 @@
     </Task>
     <Task>
       <UID>43</UID>
+      <GUID>SOURCE-TASK-GUID</GUID>
       <ID>7</ID>
       <Name>Assigned leaf</Name>
+      <Active>1</Active>
       <WBS>1.1</WBS>
       <OutlineNumber>1.1</OutlineNumber>
       <OutlineLevel>2</OutlineLevel>
-      <Summary>0</Summary>
       <Start>2026-01-05T08:00:00</Start>
       <Finish>2026-01-05T16:00:00</Finish>
       <Duration>PT8H0M0S</Duration>
       <Work>PT16H0M0S</Work>
+      <ResumeValid>0</ResumeValid>
+      <Summary>0</Summary>
       <PercentComplete>0</PercentComplete>
       <PercentWorkComplete>0</PercentWorkComplete>
+      <Cost>0</Cost>
+      <OvertimeCost>0</OvertimeCost>
+      <OvertimeWork>PT0H0M0S</OvertimeWork>
       <ActualDuration>PT0H0M0S</ActualDuration>
-      <RemainingDuration>PT8H0M0S</RemainingDuration>
+      <ActualCost>0</ActualCost>
+      <ActualOvertimeCost>0</ActualOvertimeCost>
       <ActualWork>PT0H0M0S</ActualWork>
+      <ActualOvertimeWork>PT0H0M0S</ActualOvertimeWork>
+      <RemainingDuration>PT8H0M0S</RemainingDuration>
       <RemainingWork>PT16H0M0S</RemainingWork>
     </Task>
     <Task>
       <UID>44</UID>
       <ID>8</ID>
       <Name>Unrelated leaf</Name>
+      <Active>1</Active>
       <WBS>1.2</WBS>
       <OutlineNumber>1.2</OutlineNumber>
       <OutlineLevel>2</OutlineLevel>
@@ -57,20 +67,26 @@
   <Assignments>
     <Assignment>
       <UID>91</UID>
+      <GUID>SOURCE-ASSIGNMENT-GUID</GUID>
       <TaskUID>43</TaskUID>
       <ResourceUID>5</ResourceUID>
       <PercentWorkComplete>0</PercentWorkComplete>
-      <Start>2026-01-05T08:00:00</Start>
-      <Finish>2026-01-05T16:00:00</Finish>
-      <Work>PT16H0M0S</Work>
+      <ActualCost>0</ActualCost>
+      <ActualOvertimeCost>0</ActualOvertimeCost>
+      <ActualOvertimeWork>PT0H0M0S</ActualOvertimeWork>
       <ActualWork>PT0H0M0S</ActualWork>
+      <Finish>2026-01-05T16:00:00</Finish>
       <RemainingWork>PT16H0M0S</RemainingWork>
+      <ResponsePending>0</ResponsePending>
+      <Start>2026-01-05T08:00:00</Start>
+      <StartVariance>0</StartVariance>
+      <Work>PT16H0M0S</Work>
       <TimephasedData>
-        <UID>1</UID>
         <Type>1</Type>
+        <UID>91</UID>
         <Start>2026-01-05T08:00:00</Start>
         <Finish>2026-01-05T16:00:00</Finish>
-        <Unit>2</Unit>
+        <Unit>1</Unit>
         <Value>PT16H0M0S</Value>
       </TimephasedData>
     </Assignment>

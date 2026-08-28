@@ -20,6 +20,7 @@
     </Task>
     <Task>
       <UID>43</UID>
+      <GUID>SOURCE-TASK-GUID</GUID>
       <ID>7</ID>
       <Name>Assigned leaf</Name>
       <WBS>1.1</WBS>
@@ -30,6 +31,8 @@
       <Finish>2026-01-05T16:00:00</Finish>
       <Duration>PT8H0M0S</Duration>
       <Work>PT16H0M0S</Work>
+      <Stop>2026-01-05T16:00:00</Stop>
+      <Resume>2026-01-05T16:00:00</Resume>
       <PercentComplete>100</PercentComplete>
       <PercentWorkComplete>100</PercentWorkComplete>
       <ActualStart>2026-01-05T08:00:00</ActualStart>
@@ -38,8 +41,6 @@
       <RemainingDuration>PT0H0M0S</RemainingDuration>
       <ActualWork>PT16H0M0S</ActualWork>
       <RemainingWork>PT0H0M0S</RemainingWork>
-      <Stop>2026-01-05T16:00:00</Stop>
-      <Resume>2026-01-05T16:00:00</Resume>
       <TimephasedData>
         <Type>11</Type>
         <UID>43</UID>
@@ -69,24 +70,25 @@
   <Assignments>
     <Assignment>
       <UID>91</UID>
+      <GUID>SOURCE-ASSIGNMENT-GUID</GUID>
       <TaskUID>43</TaskUID>
       <ResourceUID>5</ResourceUID>
       <PercentWorkComplete>100</PercentWorkComplete>
-      <Start>2026-01-05T08:00:00</Start>
-      <Finish>2026-01-05T16:00:00</Finish>
-      <ActualStart>2026-01-05T08:00:00</ActualStart>
       <ActualFinish>2026-01-05T16:00:00</ActualFinish>
+      <ActualStart>2026-01-05T08:00:00</ActualStart>
+      <ActualWork>PT16H0M0S</ActualWork>
+      <Finish>2026-01-05T16:00:00</Finish>
+      <RemainingWork>PT0H0M0S</RemainingWork>
+      <Start>2026-01-05T08:00:00</Start>
       <Stop>2026-01-05T16:00:00</Stop>
       <Resume>2026-01-05T16:00:00</Resume>
       <Work>PT16H0M0S</Work>
-      <ActualWork>PT16H0M0S</ActualWork>
-      <RemainingWork>PT0H0M0S</RemainingWork>
       <TimephasedData>
-        <UID>1</UID>
         <Type>2</Type>
+        <UID>91</UID>
         <Start>2026-01-05T08:00:00</Start>
         <Finish>2026-01-05T16:00:00</Finish>
-        <Unit>2</Unit>
+        <Unit>1</Unit>
         <Value>PT16H0M0S</Value>
       </TimephasedData>
     </Assignment>
