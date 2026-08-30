@@ -5,6 +5,7 @@ import {
   analyzePlannedCompletionCut,
   buildBulkCompletionExecutionIntent,
   buildBulkCompletionIntentDocument,
+  buildBulkCompletionResultEvidenceDocument,
   buildPartialProgressIntentDocument,
   generateBulkAssignedCompletionNativeV0,
   planMondayFiftyPercentSample
@@ -198,6 +199,80 @@ test("partial intent serializes the cutoff stored in the plan", () => {
 
   assert.equal(document.cutoff, "2026-01-05T12:00:00");
   assert.equal(document.exportable, false);
+});
+
+test("Monday sample excludes tasks with hidden imported progress", () => {
+  const clean = task(43, 7);
+  const percentWork = task(44, 8);
+  percentWork.percentWorkComplete = "75";
+  const actualWork = task(45, 9);
+  actualWork.actualStart = actualWork.start;
+  actualWork.actualWork = "PT8H0M0S";
+  actualWork.remainingWork = "PT8H0M0S";
+  const stopped = task(46, 10);
+  stopped.stop = "2026-01-05T12:00:00";
+
+  const parsed = {
+    leafTasks: [clean, percentWork, actualWork, stopped],
+    taskByUid: new Map(
+      [clean, percentWork, actualWork, stopped].map((entry) => [String(entry.uid), entry])
+    )
+  };
+  const plan = planMondayFiftyPercentSample({
+    project: parsed,
+    cutoff: "2026-01-05T12:00:00",
+    fraction: 1
+  });
+
+  assert.equal(plan.activePoolCount, 1);
+  assert.deepEqual(plan.selected.map((entry) => entry.taskUid), ["43"]);
+});
+
+test("result evidence binds source, candidate, Project result and validation", () => {
+  const document = buildBulkCompletionResultEvidenceDocument({
+    source: {
+      fileName: "source.xml",
+      sha256: "source-hash",
+      project: { startDate: "2026-01-05T08:00:00" }
+    },
+    candidate: {
+      fileName: "candidate.xml",
+      sha256: "candidate-hash",
+      changedTaskUids: ["43"],
+      changedAssignmentUids: ["91"],
+      project: { startDate: "2026-01-05T08:00:00" }
+    },
+    analysis: { cutoffProjectLocal: "2026-01-05T17:00:00" },
+    result: {
+      fileName: "project-result.xml",
+      sha256: "result-hash",
+      project: { startDate: "2026-01-05T08:00:00" },
+      compatibility: {
+        classification: "strict-result",
+        label: "Strict candidate result",
+        warnings: []
+      },
+      validation: {
+        pass: true,
+        strictResult: true,
+        projectInvariantsPreserved: true,
+        projectInvariantCount: 3,
+        coherentTaskCount: 1,
+        coherentAssignmentCount: 1,
+        touchedTaskCount: 1,
+        untouchedPreservedCount: 10,
+        untouchedTaskCount: 10,
+        failures: []
+      }
+    },
+    createdAt: new Date("2026-01-01T00:00:00Z")
+  });
+
+  assert.equal(document.format, "shutdown-tracker-bulk-result-evidence/v0");
+  assert.equal(document.candidate.sha256, "candidate-hash");
+  assert.equal(document.result.sha256, "result-hash");
+  assert.equal(document.result.compatibility.classification, "strict-result");
+  assert.equal(document.result.validation.pass, true);
 });
 
 test("bulk generated result exposes explicit profile provenance", () => {
