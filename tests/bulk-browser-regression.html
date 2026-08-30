@@ -5,13 +5,38 @@
 <script type="module">
 import {
   analyzePlannedCompletionCut,
+  buildBulkCompletionExecutionIntent,
   buildBulkCompletionIntentDocument,
+  buildBulkCompletionResultEvidenceDocument,
   buildPartialProgressIntentDocument,
   generateBulkAssignedCompletionNativeV0,
   planMondayFiftyPercentSample
 } from "../src/bulk-planned-completion.js";
 import { validateBulkCompletionResult } from "../src/bulk-result-validation.js";
 import { classifyProjectResultCompatibility, parseProjectXml } from "../src/project-xml.js";
+
+function schedulingStructure(calendar = "calendar-v1") {
+  return {
+    calendarUid: "1",
+    predecessorLinks: ["43|1|1|0|0|7"],
+    calendars: [calendar]
+  };
+}
+
+function removeTouchedTypeEleven(xmlText, taskUid) {
+  const document = new DOMParser().parseFromString(xmlText, "application/xml");
+  const namespace = document.documentElement.namespaceURI;
+  const taskElement = Array.from(document.getElementsByTagNameNS(namespace, "Task")).find((element) =>
+    Array.from(element.children).some(
+      (child) => child.localName === "UID" && child.textContent?.trim() === String(taskUid)
+    )
+  );
+  if (!taskElement) throw new Error(`task ${taskUid} missing while removing Type 11`);
+  for (const child of Array.from(taskElement.children)) {
+    if (child.localName === "TimephasedData") child.remove();
+  }
+  return new XMLSerializer().serializeToString(document);
+}
 
 try {
   const [sourceXml, projectResultXml] = await Promise.all([
@@ -34,8 +59,18 @@ try {
   if (!generated.candidateText.includes("<Type>2</Type>")) throw new Error("assignment actual work Type 2 missing");
   if (generated.candidateText.includes("<Type>11</Type>")) throw new Error("browser must not author task Type 11");
 
+  const executionIntent = buildBulkCompletionExecutionIntent({
+    analysis,
+    recordedAt: new Date("2026-01-01T00:00:00Z")
+  });
+  if (!Object.isFrozen(executionIntent) || !Object.isFrozen(executionIntent[0])) {
+    throw new Error("execution intent was not frozen");
+  }
+
   const candidate = parseProjectXml(generated.candidateText);
   const result = parseProjectXml(projectResultXml);
+  candidate.schedulingStructure = schedulingStructure();
+  result.schedulingStructure = schedulingStructure();
   const compatibility = classifyProjectResultCompatibility({
     candidate,
     result,
@@ -45,16 +80,46 @@ try {
     candidate,
     result,
     transactions: generated.transactions,
-    unsupported: analysis.unsupported,
     compatibility
   });
   if (!validation.pass) throw new Error(`strict bulk result validation failed: ${validation.failures.join(" ")}`);
+  if (validation.typeElevenTaskCount !== 1) throw new Error("Type 11 completion was not validated");
+  if (!validation.schedulingStructurePreserved) throw new Error("scheduling structure was not preserved");
+
+  const noTypeEleven = parseProjectXml(removeTouchedTypeEleven(projectResultXml, "43"));
+  noTypeEleven.schedulingStructure = schedulingStructure();
+  const noTypeElevenValidation = validateBulkCompletionResult({
+    candidate,
+    result: noTypeEleven,
+    transactions: generated.transactions,
+    compatibility: classifyProjectResultCompatibility({
+      candidate,
+      result: noTypeEleven,
+      touchedTaskUids: generated.changedTaskUids
+    })
+  });
+  if (noTypeElevenValidation.pass) throw new Error("missing Type 11 received a strict success state");
+
+  const changedStructureResult = parseProjectXml(projectResultXml);
+  changedStructureResult.schedulingStructure = schedulingStructure("calendar-changed");
+  const changedStructureValidation = validateBulkCompletionResult({
+    candidate,
+    result: changedStructureResult,
+    transactions: generated.transactions,
+    compatibility: classifyProjectResultCompatibility({
+      candidate,
+      result: changedStructureResult,
+      touchedTaskUids: generated.changedTaskUids
+    })
+  });
+  if (changedStructureValidation.pass) throw new Error("changed calendar semantics received a strict success state");
 
   const referenceXml = projectResultXml.replace(
     "  </Tasks>",
     "    <Task><UID>45</UID><ID>9</ID><Name>Added task</Name><WBS>1.3</WBS><OutlineNumber>1.3</OutlineNumber><OutlineLevel>2</OutlineLevel><Summary>0</Summary></Task>\n  </Tasks>"
   );
   const referenceResult = parseProjectXml(referenceXml);
+  referenceResult.schedulingStructure = schedulingStructure();
   const referenceCompatibility = classifyProjectResultCompatibility({
     candidate,
     result: referenceResult,
@@ -64,7 +129,6 @@ try {
     candidate,
     result: referenceResult,
     transactions: generated.transactions,
-    unsupported: analysis.unsupported,
     compatibility: referenceCompatibility
   });
   if (referenceValidation.pass) throw new Error("reference schedule received a strict success state");
@@ -75,12 +139,36 @@ try {
       fileName: "candidate.xml",
       sha256: "candidate",
       changedTaskUids: generated.changedTaskUids,
-      executionIntent: []
+      executionIntent
     },
     analysis,
     createdAt: new Date("2026-01-01T00:00:00Z")
   });
   if (intent.profile.classification !== "native-evidence-derived") throw new Error("intent profile classification missing");
+
+  const resultEvidence = buildBulkCompletionResultEvidenceDocument({
+    source: { fileName: "source.xml", sha256: "source", project: candidate.project },
+    candidate: {
+      fileName: "candidate.xml",
+      sha256: "candidate",
+      changedTaskUids: generated.changedTaskUids,
+      changedAssignmentUids: generated.changedAssignmentUids,
+      project: candidate.project
+    },
+    analysis,
+    result: {
+      fileName: "result.xml",
+      sha256: "result",
+      project: result.project,
+      compatibility,
+      validation
+    },
+    createdAt: new Date("2026-01-01T00:00:00Z")
+  });
+  if (resultEvidence.candidate.executionIntent.length !== 2) throw new Error("result evidence omitted execution intent");
+  if (resultEvidence.candidate.executionIntent[0].recordedAtUtc !== "2026-01-01T00:00:00.000Z") {
+    throw new Error("result evidence changed execution intent provenance");
+  }
 
   const partial = planMondayFiftyPercentSample({
     project,
