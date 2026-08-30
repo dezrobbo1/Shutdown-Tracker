@@ -2,6 +2,7 @@ import {
   analyzePlannedCompletionCut,
   buildBulkCompletionExecutionIntent,
   buildBulkCompletionIntentDocument,
+  buildBulkCompletionResultEvidenceDocument,
   buildPartialProgressIntentDocument,
   generateBulkAssignedCompletionNativeV0,
   planMondayFiftyPercentSample
@@ -39,7 +40,8 @@ const elements = Object.fromEntries(
     "partial-list",
     "result-file",
     "result-status",
-    "result-summary"
+    "result-summary",
+    "download-result-evidence"
   ].map((id) => [id, document.getElementById(id)])
 );
 
@@ -119,6 +121,14 @@ function resetSundayDownloads() {
   elements["download-candidate-intent"].disabled = true;
 }
 
+function resetResultState(message = "No Project result loaded.") {
+  state.result = null;
+  elements["result-file"].value = "";
+  elements["result-summary"].hidden = true;
+  elements["download-result-evidence"].disabled = true;
+  setStatus(elements["result-status"], message);
+}
+
 function resetPartialPlan(message = "Partial assigned-task progress remains unproven. This section creates intent evidence only.") {
   state.partialPlan = null;
   elements["download-partial-plan"].disabled = true;
@@ -136,14 +146,12 @@ async function loadSource(file) {
   state.source = { fileName: file.name, ...decoded, parsed, hash };
   state.completionAnalysis = null;
   state.candidate = null;
-  state.result = null;
   elements.trial.hidden = false;
   elements["generate-candidate"].disabled = true;
   resetSundayDownloads();
+  resetResultState();
   resetPartialPlan();
   elements["candidate-summary"].hidden = true;
-  elements["result-summary"].hidden = true;
-  setStatus(elements["result-status"], "No Project result loaded.");
   summaryCards(elements["source-summary"], [
     ["Project", parsed.project.name],
     ["Source SHA-256", hash],
@@ -163,6 +171,7 @@ async function loadSource(file) {
 
 function analyseCompletion() {
   if (!state.source) throw new Error("Import a source XML first.");
+  resetResultState("Reporting-cut analysis changed. No Project result is bound to the current experiment.");
   const cutoff = cutoffValue(elements["completion-cutoff"]);
   const analysis = analyzePlannedCompletionCut({
     project: state.source.parsed,
@@ -171,10 +180,7 @@ function analyseCompletion() {
   });
   state.completionAnalysis = analysis;
   state.candidate = null;
-  state.result = null;
-  elements["result-file"].value = "";
   elements["candidate-summary"].hidden = true;
-  elements["result-summary"].hidden = true;
   resetSundayDownloads();
   elements["generate-candidate"].disabled = analysis.eligible.length === 0;
   summaryCards(elements["completion-summary"], [
@@ -193,6 +199,7 @@ function analyseCompletion() {
 
 async function generateCandidate() {
   if (!state.source || !state.completionAnalysis) throw new Error("Analyse the Sunday reporting cutoff first.");
+  resetResultState("Preparing a new candidate. No Project result is bound to it yet.");
   const generated = generateBulkAssignedCompletionNativeV0({
     sourceXml: state.source.text,
     analysis: state.completionAnalysis
@@ -209,8 +216,6 @@ async function generateCandidate() {
   const executionIntent = buildBulkCompletionExecutionIntent({ analysis: state.completionAnalysis });
 
   state.candidate = { ...generated, bytes, hash, parsed, fileName, executionIntent };
-  state.result = null;
-  elements["result-file"].value = "";
   elements["download-candidate-xml"].disabled = false;
   elements["download-candidate-intent"].disabled = false;
   summaryCards(elements["candidate-summary"], [
@@ -235,10 +240,15 @@ function sundayIntentDocument() {
     throw new Error("Prepare the Sunday candidate first.");
   }
   return buildBulkCompletionIntentDocument({
-    source: { fileName: state.source.fileName, sha256: state.source.hash },
+    source: {
+      fileName: state.source.fileName,
+      sha256: state.source.hash,
+      project: state.source.parsed.project
+    },
     candidate: {
       fileName: state.candidate.fileName,
       sha256: state.candidate.hash,
+      project: state.candidate.parsed.project,
       changedTaskUids: state.candidate.changedTaskUids,
       executionIntent: state.candidate.executionIntent
     },
@@ -270,7 +280,7 @@ function analysePartial() {
   state.partialPlan = plan;
   elements["download-partial-plan"].disabled = plan.selected.length === 0;
   summaryCards(elements["partial-summary"], [
-    ["Planned active at cut", plan.activePoolCount],
+    ["Unstarted planned active at cut", plan.activePoolCount],
     ["Selected for 50% report", plan.selected.length],
     ["XML writes", 0],
     ["Status", "intent only"]
@@ -286,7 +296,7 @@ function analysePartial() {
   elements["partial-list"].hidden = false;
   setStatus(
     elements["partial-status"],
-    `${plan.selected.length} of ${plan.activePoolCount} planned-active work tasks selected deterministically for a 50% Monday report. No XML is generated because partial-progress semantics remain unproven.`,
+    `${plan.selected.length} of ${plan.activePoolCount} unstarted planned-active work tasks selected deterministically for a 50% Monday report. No XML is generated because partial-progress semantics remain unproven.`,
     "warning"
   );
 }
@@ -299,6 +309,42 @@ function downloadPartialPlan() {
       plan: state.partialPlan
     }),
     `${baseFilename(state.source.fileName)}.monday-50-percent-intent.json`
+  );
+}
+
+function resultEvidenceDocument() {
+  if (!state.source || !state.candidate || !state.completionAnalysis || !state.result) {
+    throw new Error("Import and validate a Project result first.");
+  }
+  return buildBulkCompletionResultEvidenceDocument({
+    source: {
+      fileName: state.source.fileName,
+      sha256: state.source.hash,
+      project: state.source.parsed.project
+    },
+    candidate: {
+      fileName: state.candidate.fileName,
+      sha256: state.candidate.hash,
+      changedTaskUids: state.candidate.changedTaskUids,
+      changedAssignmentUids: state.candidate.changedAssignmentUids,
+      project: state.candidate.parsed.project
+    },
+    analysis: state.completionAnalysis,
+    result: {
+      fileName: state.result.fileName,
+      sha256: state.result.hash,
+      project: state.result.parsed.project,
+      compatibility: state.result.compatibility,
+      validation: state.result.validation
+    }
+  });
+}
+
+function downloadResultEvidence() {
+  if (!state.source || !state.result) throw new Error("Import and validate a Project result first.");
+  downloadJson(
+    resultEvidenceDocument(),
+    `${baseFilename(state.source.fileName)}.bulk-planned-completion-v0.result-evidence.json`
   );
 }
 
@@ -319,17 +365,18 @@ async function loadResult(file) {
     candidate: state.candidate.parsed,
     result: parsed,
     transactions: state.candidate.transactions,
-    unsupported: state.completionAnalysis.unsupported,
     compatibility
   });
 
   state.result = { fileName: file.name, ...decoded, parsed, hash, compatibility, validation };
+  elements["download-result-evidence"].disabled = false;
   summaryCards(elements["result-summary"], [
     ["Result SHA-256", hash],
     ["Identity classification", compatibility.label],
+    ["Project scheduling invariants", validation.projectInvariantsPreserved ? "preserved" : "changed"],
     ["Exact touched task transactions", `${validation.coherentTaskCount}/${validation.touchedTaskCount}`],
     ["Exact touched assignment transactions", `${validation.coherentAssignmentCount}/${validation.touchedTaskCount}`],
-    ["Unsupported tasks preserved", `${validation.unsupportedPreservedCount}/${validation.unsupportedTaskCount}`],
+    ["Untouched task progress preserved", `${validation.untouchedPreservedCount}/${validation.untouchedTaskCount}`],
     ["Overall result", validation.pass ? "strict pass" : "review required"],
     ["Project Start", `${state.source.parsed.project.startDate} → ${parsed.project.startDate}`],
     ["Status Date", `${state.source.parsed.project.statusDate ?? "—"} → ${parsed.project.statusDate ?? "—"}`],
@@ -342,7 +389,7 @@ async function loadResult(file) {
   setStatus(
     elements["result-status"],
     validation.pass
-      ? `${file.name} loaded as a strict candidate result. All ${validation.touchedTaskCount} touched task and assignment transactions match the bounded profile, and all ${validation.unsupportedTaskCount} unsupported tasks retained their candidate progress state.`
+      ? `${file.name} loaded as a strict candidate result. All ${validation.touchedTaskCount} touched task and assignment transactions match the bounded profile, Project Start/Finish/Status Date are preserved, and all ${validation.untouchedTaskCount} untouched non-summary tasks retained their candidate progress state.`
       : `${file.name} requires review. ${messages.slice(0, 6).join(" ")}${messages.length > 6 ? ` ${messages.length - 6} additional finding(s).` : ""}`,
     validation.pass ? "success" : "warning"
   );
@@ -372,11 +419,10 @@ elements["analyze-completion"].addEventListener("click", () => {
 elements["completion-cutoff"].addEventListener("change", () => {
   state.completionAnalysis = null;
   state.candidate = null;
-  state.result = null;
   elements["generate-candidate"].disabled = true;
   resetSundayDownloads();
+  resetResultState("Sunday cutoff changed. Analyse and prepare a new candidate before importing a Project result.");
   elements["candidate-summary"].hidden = true;
-  elements["result-summary"].hidden = true;
   setStatus(elements["completion-status"], "Cutoff changed. Analyse the schedule again before preparing a candidate.");
 });
 
@@ -385,6 +431,7 @@ elements["generate-candidate"].addEventListener("click", async () => {
     await generateCandidate();
   } catch (error) {
     resetSundayDownloads();
+    resetResultState("Candidate preparation failed. No Project result is bound to the current experiment.");
     setStatus(elements["completion-status"], error instanceof Error ? error.message : String(error), "error");
   }
 });
@@ -426,15 +473,25 @@ elements["download-partial-plan"].addEventListener("click", () => {
   }
 });
 
+elements["download-result-evidence"].addEventListener("click", () => {
+  try {
+    downloadResultEvidence();
+  } catch (error) {
+    setStatus(elements["result-status"], error instanceof Error ? error.message : String(error), "error");
+  }
+});
+
 elements["result-file"].addEventListener("change", async (event) => {
   const file = event.target.files?.[0];
   if (!file) return;
   try {
+    elements["download-result-evidence"].disabled = true;
     setStatus(elements["result-status"], `Reading ${file.name}…`);
     await loadResult(file);
   } catch (error) {
     state.result = null;
     elements["result-summary"].hidden = true;
+    elements["download-result-evidence"].disabled = true;
     setStatus(elements["result-status"], error instanceof Error ? error.message : String(error), "error");
   }
 });
