@@ -1,3 +1,9 @@
+const PROJECT_INVARIANT_FIELDS = Object.freeze([
+  ["Project Start", "startDate"],
+  ["Project Finish", "finishDate"],
+  ["Status Date", "statusDate"]
+]);
+
 const TASK_PROGRESS_FIELDS = Object.freeze([
   ["Percent Complete", "percentComplete", "percent"],
   ["Percent Work Complete", "percentWorkComplete", "percent"],
@@ -69,6 +75,47 @@ function requireField(failures, scope, label, actual, expected, kind = "text") {
   if (!valuesEqual(actual, expected, kind)) {
     addMismatch(failures, scope, label, actual, expected);
   }
+}
+
+function canonicalTimephasedRows(rows = []) {
+  return rows
+    .map((row) => {
+      const durationValue = durationSeconds(row?.value);
+      const value = durationValue == null ? `text:${normalizedText(row?.value)}` : `duration:${durationValue}`;
+      return [
+        normalizedText(row?.type),
+        normalizedText(row?.uid),
+        normalizedText(row?.start),
+        normalizedText(row?.finish),
+        normalizedText(row?.unit),
+        value
+      ].join("|");
+    })
+    .sort();
+}
+
+function compareTimephasedRows(failures, scope, candidateRows, resultRows, label = "timephased data") {
+  const candidateCanonical = canonicalTimephasedRows(candidateRows);
+  const resultCanonical = canonicalTimephasedRows(resultRows);
+  if (candidateCanonical.join("\n") !== resultCanonical.join("\n")) {
+    failures.push(
+      `${scope} ${label} mismatch: result [${resultCanonical.join(", ")}], expected [${candidateCanonical.join(", ")}].`
+    );
+  }
+}
+
+function validateProjectInvariants(candidate, result) {
+  const failures = [];
+  for (const [label, property] of PROJECT_INVARIANT_FIELDS) {
+    requireField(
+      failures,
+      "Project",
+      label,
+      result?.project?.[property],
+      candidate?.project?.[property]
+    );
+  }
+  return { pass: failures.length === 0, failures };
 }
 
 function validateExactTask(resultTask, transaction) {
@@ -181,9 +228,13 @@ function sortedAssignments(project, taskUid) {
     );
 }
 
-function validateUnsupportedTask(candidate, result, taskUid) {
+function taskTypeElevenRows(task) {
+  return (task?.timephasedData ?? []).filter((row) => String(row?.type) === "11");
+}
+
+function validatePreservedTask(candidate, result, taskUid) {
   const failures = [];
-  const scope = `Unsupported task UID ${taskUid}`;
+  const scope = `Untouched task UID ${taskUid}`;
   const candidateTask = candidate?.taskByUid?.get(String(taskUid));
   const resultTask = result?.taskByUid?.get(String(taskUid));
   if (!candidateTask || !resultTask) {
@@ -192,6 +243,13 @@ function validateUnsupportedTask(candidate, result, taskUid) {
   }
 
   compareProgressFields(failures, scope, candidateTask, resultTask, TASK_PROGRESS_FIELDS);
+  compareTimephasedRows(
+    failures,
+    scope,
+    taskTypeElevenRows(candidateTask),
+    taskTypeElevenRows(resultTask),
+    "Type 11 task progress"
+  );
 
   const candidateAssignments = sortedAssignments(candidate, taskUid);
   const resultAssignments = sortedAssignments(result, taskUid);
@@ -223,16 +281,31 @@ function validateUnsupportedTask(candidate, result, taskUid) {
       resultAssignment,
       ASSIGNMENT_PROGRESS_FIELDS
     );
+    compareTimephasedRows(
+      failures,
+      assignmentScope,
+      candidateAssignment.timephasedData ?? [],
+      resultAssignment.timephasedData ?? [],
+      "assignment timephased progress"
+    );
   }
 
   return { pass: failures.length === 0, failures };
+}
+
+function preservedTaskUids(candidate, touchedTaskUids) {
+  const touched = new Set(touchedTaskUids.map(String));
+  return Array.from(candidate?.taskByUid?.values?.() ?? [])
+    .filter((task) => task?.uid != null && !touched.has(String(task.uid)))
+    .filter((task) => !task.summary && !task.isNull)
+    .map((task) => String(task.uid))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
 }
 
 export function validateBulkCompletionResult({
   candidate,
   result,
   transactions = [],
-  unsupported = [],
   compatibility
 }) {
   const failures = [];
@@ -242,6 +315,9 @@ export function validateBulkCompletionResult({
       `Result provenance is ${compatibility?.classification ?? "unknown"}; strict-result is required for a successful candidate round trip.`
     );
   }
+
+  const projectCheck = validateProjectInvariants(candidate, result);
+  failures.push(...projectCheck.failures);
 
   let coherentTaskCount = 0;
   let coherentAssignmentCount = 0;
@@ -261,22 +337,27 @@ export function validateBulkCompletionResult({
     failures.push(...assignmentCheck.failures);
   }
 
-  const unsupportedTaskUids = [...new Set(unsupported.map((item) => String(item.taskUid ?? item)))];
-  let unsupportedPreservedCount = 0;
-  for (const taskUid of unsupportedTaskUids) {
-    const check = validateUnsupportedTask(candidate, result, taskUid);
-    if (check.pass) unsupportedPreservedCount += 1;
+  const untouchedTaskUids = preservedTaskUids(
+    candidate,
+    transactions.map((transaction) => transaction.taskUid)
+  );
+  let untouchedPreservedCount = 0;
+  for (const taskUid of untouchedTaskUids) {
+    const check = validatePreservedTask(candidate, result, taskUid);
+    if (check.pass) untouchedPreservedCount += 1;
     failures.push(...check.failures);
   }
 
   return {
     pass: failures.length === 0,
     strictResult,
+    projectInvariantsPreserved: projectCheck.pass,
+    projectInvariantCount: PROJECT_INVARIANT_FIELDS.length,
     coherentTaskCount,
     coherentAssignmentCount,
-    unsupportedPreservedCount,
+    untouchedPreservedCount,
     touchedTaskCount: transactions.length,
-    unsupportedTaskCount: unsupportedTaskUids.length,
+    untouchedTaskCount: untouchedTaskUids.length,
     failures
   };
 }
