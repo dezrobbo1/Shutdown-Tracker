@@ -5,13 +5,19 @@
 <script type="module">
 import {
   analyzePlannedCompletionCut,
+  buildBulkCompletionIntentDocument,
+  buildPartialProgressIntentDocument,
   generateBulkAssignedCompletionNativeV0,
   planMondayFiftyPercentSample
 } from "../src/bulk-planned-completion.js";
-import { parseProjectXml } from "../src/project-xml.js";
+import { validateBulkCompletionResult } from "../src/bulk-result-validation.js";
+import { classifyProjectResultCompatibility, parseProjectXml } from "../src/project-xml.js";
 
 try {
-  const sourceXml = await fetch("./fixtures/assigned-task.xml").then((response) => response.text());
+  const [sourceXml, projectResultXml] = await Promise.all([
+    fetch("./fixtures/assigned-task.xml").then((response) => response.text()),
+    fetch("./fixtures/project-authored-result.xml").then((response) => response.text())
+  ]);
   const project = parseProjectXml(sourceXml);
   const analysis = analyzePlannedCompletionCut({
     project,
@@ -23,9 +29,58 @@ try {
 
   const generated = generateBulkAssignedCompletionNativeV0({ sourceXml, analysis });
   if (generated.changedTaskUids.join(",") !== "43") throw new Error("changed task identity failed");
+  if (generated.profile.classification !== "native-evidence-derived") throw new Error("profile provenance missing");
   if (!generated.candidateText.includes("<PercentComplete>100</PercentComplete>")) throw new Error("task completion missing");
   if (!generated.candidateText.includes("<Type>2</Type>")) throw new Error("assignment actual work Type 2 missing");
   if (generated.candidateText.includes("<Type>11</Type>")) throw new Error("browser must not author task Type 11");
+
+  const candidate = parseProjectXml(generated.candidateText);
+  const result = parseProjectXml(projectResultXml);
+  const compatibility = classifyProjectResultCompatibility({
+    candidate,
+    result,
+    touchedTaskUids: generated.changedTaskUids
+  });
+  const validation = validateBulkCompletionResult({
+    candidate,
+    result,
+    transactions: generated.transactions,
+    unsupported: analysis.unsupported,
+    compatibility
+  });
+  if (!validation.pass) throw new Error(`strict bulk result validation failed: ${validation.failures.join(" ")}`);
+
+  const referenceXml = projectResultXml.replace(
+    "  </Tasks>",
+    "    <Task><UID>45</UID><ID>9</ID><Name>Added task</Name><WBS>1.3</WBS><OutlineNumber>1.3</OutlineNumber><OutlineLevel>2</OutlineLevel><Summary>0</Summary></Task>\n  </Tasks>"
+  );
+  const referenceResult = parseProjectXml(referenceXml);
+  const referenceCompatibility = classifyProjectResultCompatibility({
+    candidate,
+    result: referenceResult,
+    touchedTaskUids: generated.changedTaskUids
+  });
+  const referenceValidation = validateBulkCompletionResult({
+    candidate,
+    result: referenceResult,
+    transactions: generated.transactions,
+    unsupported: analysis.unsupported,
+    compatibility: referenceCompatibility
+  });
+  if (referenceValidation.pass) throw new Error("reference schedule received a strict success state");
+
+  const intent = buildBulkCompletionIntentDocument({
+    source: { fileName: "source.xml", sha256: "source" },
+    candidate: {
+      fileName: "candidate.xml",
+      sha256: "candidate",
+      changedTaskUids: generated.changedTaskUids,
+      executionIntent: []
+    },
+    analysis,
+    createdAt: new Date("2026-01-01T00:00:00Z")
+  });
+  if (intent.profile.classification !== "native-evidence-derived") throw new Error("intent profile classification missing");
 
   const partial = planMondayFiftyPercentSample({
     project,
@@ -34,6 +89,12 @@ try {
   });
   if (partial.exportable !== false) throw new Error("partial plan must remain non-exportable");
   if (partial.selected.length < 1) throw new Error("partial intent preview produced no sample");
+  const partialIntent = buildPartialProgressIntentDocument({
+    source: { fileName: "source.xml", sha256: "source" },
+    plan: partial,
+    createdAt: new Date("2026-01-01T00:00:00Z")
+  });
+  if (partialIntent.cutoff !== "2026-01-05T10:00:00") throw new Error("partial cutoff provenance failed");
 
   document.body.dataset.result = "pass";
   document.body.textContent = "pass";
