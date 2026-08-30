@@ -2,6 +2,105 @@
 
 Real schedules and generated trial artifacts remain outside Git. Record hashes and sanitized structural findings only.
 
+## 2026-08-30 browser-generated bulk planned completion — 13 tasks
+
+### Result
+
+**PASS for composition of the bounded assigned-completion v0 transaction across the 13 tested BOILER tasks.**
+
+Microsoft Project build `16.0.20228.20186` accepted the browser candidate, recalculated it, exported it, persisted it to MPP, closed/reopened the MPP, and retained all 13 intended completions.
+
+A separate untouched-source XML → MPP → close/reopen → XML control reproduced the unrelated task/assignment schedule normalization seen in the progressed result. That normalization is therefore baseline Microsoft Project behaviour rather than a Tracker-authored or Tracker-triggered semantic change.
+
+### Evidence hashes
+
+| Evidence role | SHA-256 |
+|---|---|
+| Untouched BOILER source | `e6a3739976580e2144352011f818c0099c0dc0c278fb37a976c5b6a55fbc3420` |
+| Browser bulk candidate | `6255ee46948e893784f75fb408339d863e014905f82f1b6947ea48b3d25cd22f` |
+| First Project XML result | `0f325baae72126d668a1506ba14cdabd9d2fafc44aff19ef8ea7bab494537080` |
+| Post-MPP-reopen Project XML result | `f6ed41e06262cf3933eee234214edc9c5d5c5a92171fda36c1bf070f3259d871` |
+| Untouched-source MPP control result | `844c5673bd99fac803821aeecb64ecb41bc8882d887b204be65cbd1bfbe008bd` |
+
+### Touched tasks
+
+```text
+43, 318, 319, 321, 324, 323, 29, 26, 338, 337, 336, 335, 320
+```
+
+After MPP reopen, all 13 retained:
+
+- `PercentComplete = 100`;
+- `PercentWorkComplete = 100`;
+- planned-window Actual Start / Actual Finish;
+- Actual Duration / Work equal to planned values;
+- Remaining Duration / Work equal to zero;
+- coherent single-assignment completion;
+- assignment Type 2 actual-work timephasing.
+
+The five deliberately unsupported planned-finished tasks remained at zero progress.
+
+### Scheduling foundations
+
+The progressed post-MPP result retained:
+
+- 555 tasks;
+- 472 assignments;
+- 32 resources;
+- 45 calendars;
+- Project Start `2026-09-13T19:00:00`;
+- Project Finish `2026-09-24T21:00:00`;
+- Status Date `2025-05-09T17:00:00`;
+- Project Calendar UID `1`;
+- all 600 predecessor-link semantics;
+- semantic calendar definitions, excluding regenerated GUID identity.
+
+### Untouched-source MPP control
+
+The post-MPP progressed result moved the Start later and shortened Duration for ten unrelated multi-assignment task UIDs:
+
+```text
+100, 106, 116, 117, 164, 181, 207, 217, 264, 284
+```
+
+The untouched-source MPP control reproduced the **same ten tasks**, the **same final Start/Finish/Duration/Work values**, and the same movement of the Resource UID `11` / `WC-OPER` assignments.
+
+The untouched control and progressed post-MPP result have:
+
+- identical task Start, Finish, Duration and Work across all 555 tasks;
+- identical assignment Start, Finish and Work across all 472 assignments;
+- identical `LateStart`, `LateFinish`, `TotalSlack`, `StartSlack` and `FinishSlack` across all tasks.
+
+The difference between those two persisted schedules is therefore the intended progress transaction and its progress-dependent consequences, not the ten schedule-normalization movements.
+
+### Timephased normalization
+
+The untouched source contained 2,202 timephased rows:
+
+- 889 task Type 9;
+- 851 resource Type 7;
+- 462 assignment Type 1.
+
+The untouched MPP control persisted as 462 assignment Type 1 rows with every task still at zero progress.
+
+The progressed post-MPP result contained 510 rows:
+
+- 449 assignment Type 1;
+- 13 assignment Type 2;
+- 48 Project-generated task Type 11.
+
+This confirms that the broad removal of source task Type 9/resource Type 7 rows is normal Project persistence serialization, while Type 2 and Type 11 are the progress-related result.
+
+### Type 11 conclusion
+
+The browser still does not author task Type 11. Microsoft Project generated the result itself, including multi-row hourly Type 11 representations for some overnight/non-working-window tasks. Tracker must continue treating Type 11 as Project-owned result serialization.
+
+### Decision
+
+Bulk composition of `assigned-completion-native-v0` is Project-verified for the 13 tested tasks and may merge with the existing fail-closed per-task eligibility boundary.
+
+This does **not** prove partial progress, Mark on Track, Pause/Resume, off-plan actuals, multiple assignments, multiple timephased blocks or other unsupported shapes. The Monday 50% workflow remains intent-only pending a separate native partial-progress experiment.
+
 ## 2026-08-28 browser-generated assigned completion — UID 43
 
 ### Result
