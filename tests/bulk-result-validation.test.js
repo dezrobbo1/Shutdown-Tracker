@@ -8,6 +8,25 @@ const PROJECT = Object.freeze({
   statusDate: "2026-01-04T17:00:00"
 });
 
+const SCHEDULING_STRUCTURE = Object.freeze({
+  calendarUid: "1",
+  predecessorLinks: ["43|5|1|0|-403200|8"],
+  calendars: ["1|Standard|base|-1|weekday-definition"]
+});
+
+function wholeWindowTypeEleven(uid = "43") {
+  return [
+    {
+      uid,
+      type: "11",
+      start: "2026-01-05T08:00:00",
+      finish: "2026-01-05T16:00:00",
+      unit: "2",
+      value: "100"
+    }
+  ];
+}
+
 function task(overrides = {}) {
   return {
     uid: "43",
@@ -33,6 +52,10 @@ function task(overrides = {}) {
     timephasedData: [],
     ...overrides
   };
+}
+
+function resultTask(overrides = {}) {
+  return task({ timephasedData: wholeWindowTypeEleven(), ...overrides });
 }
 
 function assignment(overrides = {}) {
@@ -110,9 +133,15 @@ function unprogressedAssignment(taskUid = "44", uid = "92", overrides = {}) {
   });
 }
 
-function project(tasks, assignmentsByTaskUid, projectOverrides = {}) {
+function project(tasks, assignmentsByTaskUid, projectOverrides = {}, schedulingOverrides = {}) {
   return {
     project: { ...PROJECT, ...projectOverrides },
+    schedulingStructure: {
+      calendarUid: SCHEDULING_STRUCTURE.calendarUid,
+      predecessorLinks: [...SCHEDULING_STRUCTURE.predecessorLinks],
+      calendars: [...SCHEDULING_STRUCTURE.calendars],
+      ...schedulingOverrides
+    },
     taskByUid: new Map(tasks.map((entry) => [String(entry.uid), entry])),
     assignmentsByTaskUid: new Map(
       Object.entries(assignmentsByTaskUid).map(([uid, assignments]) => [String(uid), assignments])
@@ -149,7 +178,7 @@ function validFixture() {
     { "43": [assignment()], "44": [untouchedAssignment] }
   );
   const result = project(
-    [task(), { ...untouchedTask }],
+    [resultTask(), { ...untouchedTask }],
     { "43": [assignment()], "44": [{ ...untouchedAssignment }] }
   );
   return { candidate, result };
@@ -170,8 +199,10 @@ test("strict exact bulk result passes and preserves every untouched leaf", () =>
 
   assert.equal(validation.pass, true);
   assert.equal(validation.projectInvariantsPreserved, true);
+  assert.equal(validation.schedulingStructurePreserved, true);
   assert.equal(validation.coherentTaskCount, 1);
   assert.equal(validation.coherentAssignmentCount, 1);
+  assert.equal(validation.typeElevenTaskCount, 1);
   assert.equal(validation.untouchedPreservedCount, 1);
   assert.equal(validation.untouchedTaskCount, 1);
   assert.deepEqual(validation.failures, []);
@@ -183,6 +214,55 @@ test("reference schedule cannot receive a successful result state", () => {
 
   assert.equal(validation.pass, false);
   assert.match(validation.failures[0], /strict-result is required/);
+});
+
+test("touched task requires Project-generated Type 11 completion", () => {
+  const { candidate, result } = validFixture();
+  result.taskByUid.set("43", resultTask({ timephasedData: [] }));
+
+  const validation = validate(candidate, result);
+
+  assert.equal(validation.pass, false);
+  assert.equal(validation.typeElevenTaskCount, 0);
+  assert.ok(validation.failures.some((failure) => failure.includes("Type 11 progress is missing")));
+});
+
+test("contiguous Unit 1 Type 11 rows with sentinel intervals and 100 total progress pass", () => {
+  const { candidate, result } = validFixture();
+  result.taskByUid.set(
+    "43",
+    resultTask({
+      timephasedData: [
+        { uid: "43", type: "11", start: "2026-01-05T08:00:00", finish: "2026-01-05T10:00:00", unit: "1", value: "25" },
+        { uid: "43", type: "11", start: "2026-01-05T10:00:00", finish: "2026-01-05T14:00:00", unit: "1", value: "32768" },
+        { uid: "43", type: "11", start: "2026-01-05T14:00:00", finish: "2026-01-05T16:00:00", unit: "1", value: "75" }
+      ]
+    })
+  );
+
+  const validation = validate(candidate, result);
+
+  assert.equal(validation.pass, true);
+  assert.equal(validation.typeElevenTaskCount, 1);
+});
+
+test("gapped or incomplete Type 11 coverage prevents success", () => {
+  const { candidate, result } = validFixture();
+  result.taskByUid.set(
+    "43",
+    resultTask({
+      timephasedData: [
+        { uid: "43", type: "11", start: "2026-01-05T08:00:00", finish: "2026-01-05T10:00:00", unit: "1", value: "25" },
+        { uid: "43", type: "11", start: "2026-01-05T11:00:00", finish: "2026-01-05T16:00:00", unit: "1", value: "50" }
+      ]
+    })
+  );
+
+  const validation = validate(candidate, result);
+
+  assert.equal(validation.pass, false);
+  assert.ok(validation.failures.some((failure) => failure.includes("gap or overlap")));
+  assert.ok(validation.failures.some((failure) => failure.includes("percentages total 75")));
 });
 
 test("exact assignment validation rejects replacement or incomplete transaction", () => {
@@ -287,16 +367,7 @@ test("new Type 11 task progress on an untouched task prevents success", () => {
   result.taskByUid.set(
     "44",
     unprogressedTask("44", {
-      timephasedData: [
-        {
-          uid: "44",
-          type: "11",
-          start: "2026-01-05T08:00:00",
-          finish: "2026-01-05T16:00:00",
-          unit: "2",
-          value: "100"
-        }
-      ]
+      timephasedData: wholeWindowTypeEleven("44")
     })
   );
 
@@ -322,4 +393,21 @@ test("Project Start, Finish and Status Date are strict pass invariants", () => {
   assert.ok(validation.failures.some((failure) => failure.includes("Project Project Start mismatch")));
   assert.ok(validation.failures.some((failure) => failure.includes("Project Project Finish mismatch")));
   assert.ok(validation.failures.some((failure) => failure.includes("Project Status Date mismatch")));
+});
+
+test("Project Calendar UID, predecessor links and calendar semantics are strict pass invariants", () => {
+  const { candidate, result } = validFixture();
+  result.schedulingStructure = {
+    calendarUid: "20",
+    predecessorLinks: ["43|999|1|0|0|7"],
+    calendars: ["1|Standard|changed"]
+  };
+
+  const validation = validate(candidate, result);
+
+  assert.equal(validation.pass, false);
+  assert.equal(validation.schedulingStructurePreserved, false);
+  assert.ok(validation.failures.some((failure) => failure.includes("Calendar UID mismatch")));
+  assert.ok(validation.failures.some((failure) => failure.includes("predecessor-link semantics mismatch")));
+  assert.ok(validation.failures.some((failure) => failure.includes("calendar semantics mismatch")));
 });
