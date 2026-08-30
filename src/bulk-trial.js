@@ -1,9 +1,12 @@
 import {
   analyzePlannedCompletionCut,
   buildBulkCompletionExecutionIntent,
+  buildBulkCompletionIntentDocument,
+  buildPartialProgressIntentDocument,
   generateBulkAssignedCompletionNativeV0,
   planMondayFiftyPercentSample
 } from "./bulk-planned-completion.js";
+import { validateBulkCompletionResult } from "./bulk-result-validation.js";
 import {
   classifyProjectResultCompatibility,
   decodeXmlBytes,
@@ -116,6 +119,15 @@ function resetSundayDownloads() {
   elements["download-candidate-intent"].disabled = true;
 }
 
+function resetPartialPlan(message = "Partial assigned-task progress remains unproven. This section creates intent evidence only.") {
+  state.partialPlan = null;
+  elements["download-partial-plan"].disabled = true;
+  elements["partial-summary"].hidden = true;
+  elements["partial-list"].hidden = true;
+  clear(elements["partial-list"]);
+  setStatus(elements["partial-status"], message);
+}
+
 async function loadSource(file) {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const decoded = decodeXmlBytes(bytes);
@@ -124,12 +136,11 @@ async function loadSource(file) {
   state.source = { fileName: file.name, ...decoded, parsed, hash };
   state.completionAnalysis = null;
   state.candidate = null;
-  state.partialPlan = null;
   state.result = null;
   elements.trial.hidden = false;
   elements["generate-candidate"].disabled = true;
   resetSundayDownloads();
-  elements["download-partial-plan"].disabled = true;
+  resetPartialPlan();
   elements["candidate-summary"].hidden = true;
   elements["result-summary"].hidden = true;
   setStatus(elements["result-status"], "No Project result loaded.");
@@ -193,7 +204,7 @@ async function generateCandidate() {
   );
   const hash = await sha256Hex(bytes);
   const parsed = parseProjectXml(generated.candidateText);
-  const cutoffStamp = cutoffValue(elements["completion-cutoff"]).replaceAll(":", "-");
+  const cutoffStamp = state.completionAnalysis.cutoffProjectLocal.replaceAll(":", "-");
   const fileName = `${baseFilename(state.source.fileName)}.bulk-planned-completion-v0.${cutoffStamp}.xml`;
   const executionIntent = buildBulkCompletionExecutionIntent({ analysis: state.completionAnalysis });
 
@@ -205,13 +216,15 @@ async function generateCandidate() {
   summaryCards(elements["candidate-summary"], [
     ["Candidate file", fileName],
     ["Candidate SHA-256", hash],
+    ["Profile", generated.profile.label],
+    ["Profile classification", generated.profile.classification],
     ["Changed task blocks", generated.changedTaskUids.length],
     ["Changed assignment blocks", generated.changedAssignmentUids.length],
     ["Unsupported tasks left untouched", state.completionAnalysis.unsupported.length]
   ]);
   setStatus(
     elements["completion-status"],
-    `Candidate prepared for ${generated.changedTaskUids.length} proven-shape completions. Download the XML and intent JSON with the separate buttons below the cutoff. This multi-task composition still requires Microsoft Project verification.`,
+    `Candidate prepared for ${generated.changedTaskUids.length} proven-shape completions. Download the XML and intent JSON with the separate buttons below the cutoff.`,
     "success"
   );
   setStatus(elements["result-status"], "Download the Sunday XML, open/recalculate/save it in Project, then import the Project-saved XML.");
@@ -221,16 +234,16 @@ function sundayIntentDocument() {
   if (!state.source || !state.completionAnalysis || !state.candidate) {
     throw new Error("Prepare the Sunday candidate first.");
   }
-  return {
-    format: "shutdown-tracker-bulk-planned-completion/v0",
-    createdAt: new Date().toISOString(),
+  return buildBulkCompletionIntentDocument({
     source: { fileName: state.source.fileName, sha256: state.source.hash },
-    candidate: { fileName: state.candidate.fileName, sha256: state.candidate.hash },
-    cutoff: cutoffValue(elements["completion-cutoff"]),
-    supportedTaskUids: state.candidate.changedTaskUids,
-    unsupported: state.completionAnalysis.unsupported,
-    executionIntent: state.candidate.executionIntent
-  };
+    candidate: {
+      fileName: state.candidate.fileName,
+      sha256: state.candidate.hash,
+      changedTaskUids: state.candidate.changedTaskUids,
+      executionIntent: state.candidate.executionIntent
+    },
+    analysis: state.completionAnalysis
+  });
 }
 
 function downloadSundayXml() {
@@ -281,27 +294,16 @@ function analysePartial() {
 function downloadPartialPlan() {
   if (!state.source || !state.partialPlan) throw new Error("Preview the Monday partial-report plan first.");
   downloadJson(
-    {
-      format: "shutdown-tracker-partial-progress-intent/v0",
-      createdAt: new Date().toISOString(),
+    buildPartialProgressIntentDocument({
       source: { fileName: state.source.fileName, sha256: state.source.hash },
-      cutoff: cutoffValue(elements["partial-cutoff"]),
-      fraction: state.partialPlan.fraction,
-      reportedPercent: 50,
-      selected: state.partialPlan.selected,
-      exportable: false,
-      note: state.partialPlan.note
-    },
+      plan: state.partialPlan
+    }),
     `${baseFilename(state.source.fileName)}.monday-50-percent-intent.json`
   );
 }
 
-function zeroDuration(value) {
-  return value === "PT0H0M0S" || value === "PT0S";
-}
-
 async function loadResult(file) {
-  if (!state.source || !state.candidate) {
+  if (!state.source || !state.candidate || !state.completionAnalysis) {
     throw new Error("Generate the Sunday candidate before importing its Project result.");
   }
   const bytes = new Uint8Array(await file.arrayBuffer());
@@ -313,26 +315,22 @@ async function loadResult(file) {
     result: parsed,
     touchedTaskUids: state.candidate.changedTaskUids
   });
+  const validation = validateBulkCompletionResult({
+    candidate: state.candidate.parsed,
+    result: parsed,
+    transactions: state.candidate.transactions,
+    unsupported: state.completionAnalysis.unsupported,
+    compatibility
+  });
 
-  let coherentTaskCount = 0;
-  let coherentAssignmentCount = 0;
-  for (const uid of state.candidate.changedTaskUids) {
-    const task = parsed.taskByUid.get(String(uid));
-    if (task?.percentComplete === "100" && zeroDuration(task.remainingDuration) && zeroDuration(task.remainingWork)) {
-      coherentTaskCount += 1;
-    }
-    const assignments = parsed.assignmentsByTaskUid.get(String(uid)) ?? [];
-    if (assignments.some((assignment) => assignment.percentWorkComplete === "100" && zeroDuration(assignment.remainingWork))) {
-      coherentAssignmentCount += 1;
-    }
-  }
-
-  state.result = { fileName: file.name, ...decoded, parsed, hash, compatibility };
+  state.result = { fileName: file.name, ...decoded, parsed, hash, compatibility, validation };
   summaryCards(elements["result-summary"], [
     ["Result SHA-256", hash],
     ["Identity classification", compatibility.label],
-    ["Touched tasks coherent", `${coherentTaskCount}/${state.candidate.changedTaskUids.length}`],
-    ["Touched assignments coherent", `${coherentAssignmentCount}/${state.candidate.changedTaskUids.length}`],
+    ["Exact touched task transactions", `${validation.coherentTaskCount}/${validation.touchedTaskCount}`],
+    ["Exact touched assignment transactions", `${validation.coherentAssignmentCount}/${validation.touchedTaskCount}`],
+    ["Unsupported tasks preserved", `${validation.unsupportedPreservedCount}/${validation.unsupportedTaskCount}`],
+    ["Overall result", validation.pass ? "strict pass" : "review required"],
     ["Project Start", `${state.source.parsed.project.startDate} → ${parsed.project.startDate}`],
     ["Status Date", `${state.source.parsed.project.statusDate ?? "—"} → ${parsed.project.statusDate ?? "—"}`],
     ["Project Finish", `${state.source.parsed.project.finishDate} → ${parsed.project.finishDate}`],
@@ -340,11 +338,13 @@ async function loadResult(file) {
     ["Assignment count", `${state.source.parsed.assignments.length} → ${parsed.assignments.length}`]
   ]);
 
-  const allCoherent = coherentTaskCount === state.candidate.changedTaskUids.length && coherentAssignmentCount === state.candidate.changedTaskUids.length;
+  const messages = [...validation.failures, ...(compatibility.warnings ?? [])];
   setStatus(
     elements["result-status"],
-    `${file.name} loaded. ${coherentTaskCount}/${state.candidate.changedTaskUids.length} touched tasks and ${coherentAssignmentCount}/${state.candidate.changedTaskUids.length} touched assignment sets remain coherently complete. ${compatibility.warnings.join(" ")}`,
-    allCoherent ? "success" : "warning"
+    validation.pass
+      ? `${file.name} loaded as a strict candidate result. All ${validation.touchedTaskCount} touched task and assignment transactions match the bounded profile, and all ${validation.unsupportedTaskCount} unsupported tasks retained their candidate progress state.`
+      : `${file.name} requires review. ${messages.slice(0, 6).join(" ")}${messages.length > 6 ? ` ${messages.length - 6} additional finding(s).` : ""}`,
+    validation.pass ? "success" : "warning"
   );
 }
 
@@ -372,9 +372,11 @@ elements["analyze-completion"].addEventListener("click", () => {
 elements["completion-cutoff"].addEventListener("change", () => {
   state.completionAnalysis = null;
   state.candidate = null;
+  state.result = null;
   elements["generate-candidate"].disabled = true;
   resetSundayDownloads();
   elements["candidate-summary"].hidden = true;
+  elements["result-summary"].hidden = true;
   setStatus(elements["completion-status"], "Cutoff changed. Analyse the schedule again before preparing a candidate.");
 });
 
@@ -403,10 +405,15 @@ elements["download-candidate-intent"].addEventListener("click", () => {
   }
 });
 
+elements["partial-cutoff"].addEventListener("change", () => {
+  resetPartialPlan("Monday cutoff changed. Preview the 50% intent plan again before downloading it.");
+});
+
 elements["analyze-partial"].addEventListener("click", () => {
   try {
     analysePartial();
   } catch (error) {
+    resetPartialPlan();
     setStatus(elements["partial-status"], error instanceof Error ? error.message : String(error), "error");
   }
 });
