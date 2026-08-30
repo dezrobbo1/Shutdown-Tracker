@@ -27,6 +27,9 @@ const ASSIGNMENT_PROGRESS_FIELDS = Object.freeze([
   ["Resume", "resume", "text"]
 ]);
 
+const TYPE_ELEVEN_SENTINEL = 32768;
+const PERCENT_TOLERANCE = 0.05;
+
 function durationSeconds(value) {
   const match = /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i.exec(
     String(value ?? "")
@@ -104,6 +107,110 @@ function compareTimephasedRows(failures, scope, candidateRows, resultRows, label
   }
 }
 
+function directChildText(element, localName) {
+  for (const child of element?.children ?? []) {
+    if (child.localName === localName) return child.textContent?.trim() ?? "";
+  }
+  return null;
+}
+
+function canonicalElement(element, excludedNames = new Set(["GUID"])) {
+  if (!element || excludedNames.has(element.localName)) return null;
+  const attributes = Array.from(element.attributes ?? [])
+    .map((attribute) => `${attribute.namespaceURI ?? ""}|${attribute.localName}=${attribute.value}`)
+    .sort();
+  const children = Array.from(element.children ?? [])
+    .map((child) => canonicalElement(child, excludedNames))
+    .filter(Boolean)
+    .sort();
+  const text = children.length === 0 ? element.textContent?.trim() ?? "" : "";
+  return `${element.namespaceURI ?? ""}|${element.localName}[${attributes.join(";")}](${text}){${children.join("|")}}`;
+}
+
+function structureFromDocument(project) {
+  const document = project?.document;
+  const root = document?.documentElement;
+  if (!root) return null;
+  const namespace = root.namespaceURI;
+  const taskElements = Array.from(document.getElementsByTagNameNS(namespace, "Task"));
+  const predecessorLinks = [];
+  for (const taskElement of taskElements) {
+    const taskUid = directChildText(taskElement, "UID");
+    for (const child of taskElement.children) {
+      if (child.localName !== "PredecessorLink") continue;
+      predecessorLinks.push(`${taskUid ?? ""}|${canonicalElement(child, new Set())}`);
+    }
+  }
+
+  const calendars = Array.from(document.getElementsByTagNameNS(namespace, "Calendar"))
+    .map((calendar) => `${directChildText(calendar, "UID") ?? ""}|${canonicalElement(calendar)}`)
+    .sort();
+
+  return {
+    calendarUid: directChildText(root, "CalendarUID"),
+    predecessorLinks: predecessorLinks.sort(),
+    calendars
+  };
+}
+
+function normalizedSchedulingStructure(project) {
+  const explicit = project?.schedulingStructure;
+  if (explicit) {
+    return {
+      calendarUid: normalizedText(explicit.calendarUid),
+      predecessorLinks: [...(explicit.predecessorLinks ?? [])].map(String).sort(),
+      calendars: [...(explicit.calendars ?? [])].map(String).sort()
+    };
+  }
+  return structureFromDocument(project);
+}
+
+function compareCanonicalSets(failures, label, candidateValues, resultValues) {
+  const candidateText = [...candidateValues].sort().join("\n");
+  const resultText = [...resultValues].sort().join("\n");
+  if (candidateText !== resultText) {
+    const candidateSet = new Set(candidateValues);
+    const resultSet = new Set(resultValues);
+    const missing = candidateValues.filter((value) => !resultSet.has(value));
+    const added = resultValues.filter((value) => !candidateSet.has(value));
+    failures.push(`${label} mismatch: ${missing.length} missing and ${added.length} added/changed item(s).`);
+  }
+}
+
+function validateSchedulingStructure(candidate, result) {
+  const failures = [];
+  const candidateStructure = normalizedSchedulingStructure(candidate);
+  const resultStructure = normalizedSchedulingStructure(result);
+  if (!candidateStructure && !resultStructure) {
+    return { pass: true, invariantCount: 0, failures };
+  }
+  if (!candidateStructure || !resultStructure) {
+    failures.push("Project scheduling structure is unavailable in either the candidate or result.");
+    return { pass: false, invariantCount: 3, failures };
+  }
+
+  requireField(
+    failures,
+    "Project",
+    "Calendar UID",
+    resultStructure.calendarUid,
+    candidateStructure.calendarUid
+  );
+  compareCanonicalSets(
+    failures,
+    "Project predecessor-link semantics",
+    candidateStructure.predecessorLinks,
+    resultStructure.predecessorLinks
+  );
+  compareCanonicalSets(
+    failures,
+    "Project calendar semantics",
+    candidateStructure.calendars,
+    resultStructure.calendars
+  );
+  return { pass: failures.length === 0, invariantCount: 3, failures };
+}
+
 function validateProjectInvariants(candidate, result) {
   const failures = [];
   for (const [label, property] of PROJECT_INVARIANT_FIELDS) {
@@ -115,6 +222,90 @@ function validateProjectInvariants(candidate, result) {
       candidate?.project?.[property]
     );
   }
+  const scheduling = validateSchedulingStructure(candidate, result);
+  failures.push(...scheduling.failures);
+  return {
+    pass: failures.length === 0,
+    invariantCount: PROJECT_INVARIANT_FIELDS.length + scheduling.invariantCount,
+    schedulingStructurePreserved: scheduling.pass,
+    failures
+  };
+}
+
+function typeElevenRows(task) {
+  return (task?.timephasedData ?? []).filter((row) => String(row?.type) === "11");
+}
+
+function validateTypeElevenCoverage(resultTask, transaction) {
+  const failures = [];
+  const scope = `Task UID ${transaction.taskUid} Type 11 progress`;
+  const allRows = resultTask?.timephasedData ?? [];
+  const rows = typeElevenRows(resultTask).slice().sort((left, right) =>
+    normalizedText(left.start).localeCompare(normalizedText(right.start))
+  );
+
+  if (rows.length === 0) {
+    return { pass: false, failures: [`${scope} is missing.`] };
+  }
+  if (rows.length !== allRows.length) {
+    failures.push(`${scope} contains non-Type 11 direct task timephasing.`);
+  }
+
+  for (const row of rows) {
+    requireField(failures, scope, "row Type", row.type, "11");
+    requireField(failures, scope, "row UID", row.uid, transaction.taskUid);
+    if (!row.start || !row.finish || normalizedText(row.start) >= normalizedText(row.finish)) {
+      failures.push(`${scope} contains an invalid interval ${row.start ?? "—"} → ${row.finish ?? "—"}.`);
+    }
+    if (
+      normalizedText(row.start) < normalizedText(transaction.actualStart) ||
+      normalizedText(row.finish) > normalizedText(transaction.actualFinish)
+    ) {
+      failures.push(`${scope} interval ${row.start} → ${row.finish} falls outside the Actual Start/Finish window.`);
+    }
+  }
+
+  requireField(failures, scope, "coverage Start", rows[0]?.start, transaction.actualStart);
+  requireField(failures, scope, "coverage Finish", rows.at(-1)?.finish, transaction.actualFinish);
+  for (let index = 1; index < rows.length; index += 1) {
+    if (normalizedText(rows[index - 1].finish) !== normalizedText(rows[index].start)) {
+      failures.push(
+        `${scope} has a gap or overlap between ${rows[index - 1].finish ?? "—"} and ${rows[index].start ?? "—"}.`
+      );
+    }
+  }
+
+  const units = new Set(rows.map((row) => normalizedText(row.unit)));
+  if (units.size !== 1) {
+    failures.push(`${scope} mixes Unit values: ${[...units].join(", ")}.`);
+  } else if (units.has("2")) {
+    if (rows.length !== 1 || Math.abs(Number(rows[0].value) - 100) > PERCENT_TOLERANCE) {
+      failures.push(`${scope} Unit 2 form must be one whole-window Value 100 row.`);
+    }
+  } else if (units.has("1")) {
+    let progressTotal = 0;
+    let progressRows = 0;
+    for (const row of rows) {
+      const value = Number(row.value);
+      if (!Number.isFinite(value)) {
+        failures.push(`${scope} contains non-numeric Value ${row.value ?? "—"}.`);
+        continue;
+      }
+      if (value === TYPE_ELEVEN_SENTINEL) continue;
+      if (value < 0 || value > 100) {
+        failures.push(`${scope} contains unsupported percentage Value ${row.value}.`);
+        continue;
+      }
+      progressTotal += value;
+      progressRows += 1;
+    }
+    if (progressRows === 0 || Math.abs(progressTotal - 100) > PERCENT_TOLERANCE) {
+      failures.push(`${scope} Unit 1 percentages total ${progressTotal}, expected 100.`);
+    }
+  } else {
+    failures.push(`${scope} uses unsupported Unit ${[...units][0] || "—"}; expected 1 or 2.`);
+  }
+
   return { pass: failures.length === 0, failures };
 }
 
@@ -143,7 +334,10 @@ function validateExactTask(resultTask, transaction) {
   }
   requireField(failures, scope, "Stop", resultTask.stop, transaction.actualFinish);
   requireField(failures, scope, "Resume", resultTask.resume, transaction.actualFinish);
-  return { pass: failures.length === 0, failures };
+
+  const typeEleven = validateTypeElevenCoverage(resultTask, transaction);
+  failures.push(...typeEleven.failures);
+  return { pass: failures.length === 0, typeElevenPass: typeEleven.pass, failures };
 }
 
 function validateExactAssignment(resultAssignments, transaction) {
@@ -178,27 +372,9 @@ function validateExactAssignment(resultAssignments, transaction) {
     const row = rows[0];
     requireField(failures, scope, "timephased Type", row.type, "2");
     requireField(failures, scope, "timephased UID", row.uid, transaction.assignmentUid);
-    requireField(
-      failures,
-      scope,
-      "timephased Start",
-      row.start,
-      transaction.assignmentTimephased.start
-    );
-    requireField(
-      failures,
-      scope,
-      "timephased Finish",
-      row.finish,
-      transaction.assignmentTimephased.finish
-    );
-    requireField(
-      failures,
-      scope,
-      "timephased Unit",
-      row.unit,
-      transaction.assignmentTimephased.unit
-    );
+    requireField(failures, scope, "timephased Start", row.start, transaction.assignmentTimephased.start);
+    requireField(failures, scope, "timephased Finish", row.finish, transaction.assignmentTimephased.finish);
+    requireField(failures, scope, "timephased Unit", row.unit, transaction.assignmentTimephased.unit);
     requireField(
       failures,
       scope,
@@ -267,13 +443,7 @@ function validatePreservedTask(candidate, result, taskUid) {
     const resultAssignment = resultAssignments[index];
     const assignmentScope = `${scope} assignment UID ${candidateAssignment.uid}`;
     requireField(failures, assignmentScope, "Task UID", resultAssignment.taskUid, candidateAssignment.taskUid);
-    requireField(
-      failures,
-      assignmentScope,
-      "Resource UID",
-      resultAssignment.resourceUid,
-      candidateAssignment.resourceUid
-    );
+    requireField(failures, assignmentScope, "Resource UID", resultAssignment.resourceUid, candidateAssignment.resourceUid);
     compareProgressFields(
       failures,
       assignmentScope,
@@ -321,18 +491,14 @@ export function validateBulkCompletionResult({
 
   let coherentTaskCount = 0;
   let coherentAssignmentCount = 0;
+  let typeElevenTaskCount = 0;
   for (const transaction of transactions) {
-    const taskCheck = validateExactTask(
-      result?.taskByUid?.get(String(transaction.taskUid)),
-      transaction
-    );
+    const taskCheck = validateExactTask(result?.taskByUid?.get(String(transaction.taskUid)), transaction);
     if (taskCheck.pass) coherentTaskCount += 1;
+    if (taskCheck.typeElevenPass) typeElevenTaskCount += 1;
     failures.push(...taskCheck.failures);
 
-    const assignmentCheck = validateExactAssignment(
-      sortedAssignments(result, transaction.taskUid),
-      transaction
-    );
+    const assignmentCheck = validateExactAssignment(sortedAssignments(result, transaction.taskUid), transaction);
     if (assignmentCheck.pass) coherentAssignmentCount += 1;
     failures.push(...assignmentCheck.failures);
   }
@@ -352,9 +518,11 @@ export function validateBulkCompletionResult({
     pass: failures.length === 0,
     strictResult,
     projectInvariantsPreserved: projectCheck.pass,
-    projectInvariantCount: PROJECT_INVARIANT_FIELDS.length,
+    schedulingStructurePreserved: projectCheck.schedulingStructurePreserved,
+    projectInvariantCount: projectCheck.invariantCount,
     coherentTaskCount,
     coherentAssignmentCount,
+    typeElevenTaskCount,
     untouchedPreservedCount,
     touchedTaskCount: transactions.length,
     untouchedTaskCount: untouchedTaskUids.length,
