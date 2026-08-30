@@ -228,7 +228,36 @@ test("Monday sample excludes tasks with hidden imported progress", () => {
   assert.deepEqual(plan.selected.map((entry) => entry.taskUid), ["43"]);
 });
 
-test("result evidence binds source, candidate, Project result and validation", () => {
+test("execution intent is frozen onto its reporting-cut analysis", () => {
+  const taskValue = task(43, 7);
+  const assignmentValue = assignment(taskValue);
+  const analysis = analyzePlannedCompletionCut({
+    project: project(taskValue, assignmentValue),
+    cutoff: "2026-01-06T00:00:00"
+  });
+  const intent = buildBulkCompletionExecutionIntent({
+    analysis,
+    recordedAt: new Date("2026-01-01T00:00:00Z")
+  });
+
+  assert.equal(analysis.executionIntent, intent);
+  assert.equal(Object.isFrozen(intent), true);
+  assert.ok(intent.every(Object.isFrozen));
+  assert.equal(intent[0].recordedAtUtc, "2026-01-01T00:00:00.000Z");
+});
+
+test("result evidence binds source, candidate, exact execution intent, Project result and validation", () => {
+  const executionIntent = Object.freeze([
+    Object.freeze({
+      id: "43-bulk-start-1",
+      sequence: 1,
+      taskUid: "43",
+      type: "start",
+      effectiveProjectLocalTime: "2026-01-05T08:00:00",
+      recordedAtUtc: "2026-01-01T00:00:00.000Z",
+      source: "bulk-planned-completion"
+    })
+  ]);
   const document = buildBulkCompletionResultEvidenceDocument({
     source: {
       fileName: "source.xml",
@@ -242,7 +271,10 @@ test("result evidence binds source, candidate, Project result and validation", (
       changedAssignmentUids: ["91"],
       project: { startDate: "2026-01-05T08:00:00" }
     },
-    analysis: { cutoffProjectLocal: "2026-01-05T17:00:00" },
+    analysis: {
+      cutoffProjectLocal: "2026-01-05T17:00:00",
+      executionIntent
+    },
     result: {
       fileName: "project-result.xml",
       sha256: "result-hash",
@@ -256,9 +288,11 @@ test("result evidence binds source, candidate, Project result and validation", (
         pass: true,
         strictResult: true,
         projectInvariantsPreserved: true,
-        projectInvariantCount: 3,
+        schedulingStructurePreserved: true,
+        projectInvariantCount: 6,
         coherentTaskCount: 1,
         coherentAssignmentCount: 1,
+        typeElevenTaskCount: 1,
         touchedTaskCount: 1,
         untouchedPreservedCount: 10,
         untouchedTaskCount: 10,
@@ -270,9 +304,32 @@ test("result evidence binds source, candidate, Project result and validation", (
 
   assert.equal(document.format, "shutdown-tracker-bulk-result-evidence/v0");
   assert.equal(document.candidate.sha256, "candidate-hash");
+  assert.deepEqual(document.candidate.executionIntent, executionIntent);
+  assert.notEqual(document.candidate.executionIntent, executionIntent);
+  assert.equal(document.candidate.executionIntent[0].recordedAtUtc, "2026-01-01T00:00:00.000Z");
   assert.equal(document.result.sha256, "result-hash");
   assert.equal(document.result.compatibility.classification, "strict-result");
   assert.equal(document.result.validation.pass, true);
+  assert.equal(document.result.validation.schedulingStructurePreserved, true);
+  assert.equal(document.result.validation.typeElevenTaskCount, 1);
+});
+
+test("result evidence refuses to detach from the exact execution intent", () => {
+  assert.throws(
+    () =>
+      buildBulkCompletionResultEvidenceDocument({
+        source: { fileName: "source.xml", sha256: "source-hash" },
+        candidate: { fileName: "candidate.xml", sha256: "candidate-hash" },
+        analysis: { cutoffProjectLocal: "2026-01-05T17:00:00" },
+        result: {
+          fileName: "project-result.xml",
+          sha256: "result-hash",
+          compatibility: {},
+          validation: {}
+        }
+      }),
+    /exact candidate execution intent is required/
+  );
 });
 
 test("bulk generated result exposes explicit profile provenance", () => {
