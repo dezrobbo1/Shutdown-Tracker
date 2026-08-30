@@ -324,7 +324,15 @@ export function buildBulkCompletionExecutionIntent({ analysis, recordedAt = new 
       source: "bulk-planned-completion"
     });
   }
-  return events;
+  const immutableEvents = Object.freeze(events.map((event) => Object.freeze({ ...event })));
+  if (analysis && typeof analysis === "object") {
+    Object.defineProperty(analysis, "executionIntent", {
+      value: immutableEvents,
+      enumerable: true,
+      configurable: true
+    });
+  }
+  return immutableEvents;
 }
 
 function projectSnapshot(project = {}) {
@@ -394,9 +402,11 @@ function validationSnapshot(validation = {}) {
     pass: Boolean(validation.pass),
     strictResult: Boolean(validation.strictResult),
     projectInvariantsPreserved: Boolean(validation.projectInvariantsPreserved),
+    schedulingStructurePreserved: Boolean(validation.schedulingStructurePreserved),
     projectInvariantCount: validation.projectInvariantCount ?? 0,
     coherentTaskCount: validation.coherentTaskCount ?? 0,
     coherentAssignmentCount: validation.coherentAssignmentCount ?? 0,
+    typeElevenTaskCount: validation.typeElevenTaskCount ?? 0,
     touchedTaskCount: validation.touchedTaskCount ?? 0,
     untouchedPreservedCount: validation.untouchedPreservedCount ?? 0,
     untouchedTaskCount: validation.untouchedTaskCount ?? 0,
@@ -416,6 +426,10 @@ export function buildBulkCompletionResultEvidenceDocument({
   requireCondition(result?.fileName && result?.sha256, "Project result provenance is required.");
   requireCondition(result.compatibility && result.validation, "Project result review is required.");
   requireCondition(analysis?.cutoffProjectLocal, "Reporting-cut analysis provenance is required.");
+  requireCondition(
+    Array.isArray(analysis.executionIntent) && analysis.executionIntent.length > 0,
+    "The exact candidate execution intent is required for result evidence."
+  );
 
   return {
     format: "shutdown-tracker-bulk-result-evidence/v0",
@@ -433,7 +447,8 @@ export function buildBulkCompletionResultEvidenceDocument({
       profileId: BULK_PLANNED_COMPLETION_PROFILE.id,
       changedTaskUids: [...(candidate.changedTaskUids ?? [])],
       changedAssignmentUids: [...(candidate.changedAssignmentUids ?? [])],
-      project: projectSnapshot(candidate.project)
+      project: projectSnapshot(candidate.project),
+      executionIntent: analysis.executionIntent.map((event) => ({ ...event }))
     },
     result: {
       fileName: result.fileName,
