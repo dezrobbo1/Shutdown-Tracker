@@ -327,6 +327,18 @@ export function buildBulkCompletionExecutionIntent({ analysis, recordedAt = new 
   return events;
 }
 
+function projectSnapshot(project = {}) {
+  return {
+    name: project.name ?? null,
+    uid: project.uid ?? null,
+    guid: project.guid ?? null,
+    startDate: project.startDate ?? null,
+    finishDate: project.finishDate ?? null,
+    statusDate: project.statusDate ?? null,
+    currentDate: project.currentDate ?? null
+  };
+}
+
 export function buildBulkCompletionIntentDocument({
   source,
   candidate,
@@ -340,11 +352,16 @@ export function buildBulkCompletionIntentDocument({
     format: "shutdown-tracker-bulk-planned-completion/v0",
     createdAt: createdAt.toISOString(),
     profile: BULK_PLANNED_COMPLETION_PROFILE,
-    source: { fileName: source.fileName, sha256: source.sha256 },
+    source: {
+      fileName: source.fileName,
+      sha256: source.sha256,
+      project: projectSnapshot(source.project)
+    },
     candidate: {
       fileName: candidate.fileName,
       sha256: candidate.sha256,
-      profileId: BULK_PLANNED_COMPLETION_PROFILE.id
+      profileId: BULK_PLANNED_COMPLETION_PROFILE.id,
+      project: projectSnapshot(candidate.project)
     },
     cutoff: analysis.cutoffProjectLocal,
     supportedTaskUids: candidate.changedTaskUids,
@@ -353,12 +370,133 @@ export function buildBulkCompletionIntentDocument({
   };
 }
 
-function positiveNumber(value) {
-  if (value == null || value === "") return false;
-  const match = /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i.exec(String(value));
-  if (!match) return false;
-  const seconds = Number(match[1] ?? 0) * 86400 + Number(match[2] ?? 0) * 3600 + Number(match[3] ?? 0) * 60 + Number(match[4] ?? 0);
-  return seconds > 0;
+function compatibilitySnapshot(compatibility = {}) {
+  return {
+    classification: compatibility.classification ?? null,
+    label: compatibility.label ?? null,
+    identityMethod: compatibility.identityMethod ?? null,
+    warnings: [...(compatibility.warnings ?? [])],
+    projectIdentifiers: compatibility.projectIdentifiers ?? null,
+    taskSet: compatibility.taskSet
+      ? {
+          candidateCount: compatibility.taskSet.candidateCount,
+          resultCount: compatibility.taskSet.resultCount,
+          missingFromResult: [...(compatibility.taskSet.missingFromResult ?? [])],
+          addedInResult: [...(compatibility.taskSet.addedInResult ?? [])],
+          identityMismatchCount: compatibility.taskSet.identityMismatches?.length ?? 0
+        }
+      : null
+  };
+}
+
+function validationSnapshot(validation = {}) {
+  return {
+    pass: Boolean(validation.pass),
+    strictResult: Boolean(validation.strictResult),
+    projectInvariantsPreserved: Boolean(validation.projectInvariantsPreserved),
+    projectInvariantCount: validation.projectInvariantCount ?? 0,
+    coherentTaskCount: validation.coherentTaskCount ?? 0,
+    coherentAssignmentCount: validation.coherentAssignmentCount ?? 0,
+    touchedTaskCount: validation.touchedTaskCount ?? 0,
+    untouchedPreservedCount: validation.untouchedPreservedCount ?? 0,
+    untouchedTaskCount: validation.untouchedTaskCount ?? 0,
+    failures: [...(validation.failures ?? [])]
+  };
+}
+
+export function buildBulkCompletionResultEvidenceDocument({
+  source,
+  candidate,
+  analysis,
+  result,
+  createdAt = new Date()
+}) {
+  requireCondition(source?.fileName && source?.sha256, "Source provenance is required.");
+  requireCondition(candidate?.fileName && candidate?.sha256, "Candidate provenance is required.");
+  requireCondition(result?.fileName && result?.sha256, "Project result provenance is required.");
+  requireCondition(result.compatibility && result.validation, "Project result review is required.");
+  requireCondition(analysis?.cutoffProjectLocal, "Reporting-cut analysis provenance is required.");
+
+  return {
+    format: "shutdown-tracker-bulk-result-evidence/v0",
+    createdAt: createdAt.toISOString(),
+    profile: BULK_PLANNED_COMPLETION_PROFILE,
+    cutoff: analysis.cutoffProjectLocal,
+    source: {
+      fileName: source.fileName,
+      sha256: source.sha256,
+      project: projectSnapshot(source.project)
+    },
+    candidate: {
+      fileName: candidate.fileName,
+      sha256: candidate.sha256,
+      profileId: BULK_PLANNED_COMPLETION_PROFILE.id,
+      changedTaskUids: [...(candidate.changedTaskUids ?? [])],
+      changedAssignmentUids: [...(candidate.changedAssignmentUids ?? [])],
+      project: projectSnapshot(candidate.project)
+    },
+    result: {
+      fileName: result.fileName,
+      sha256: result.sha256,
+      project: projectSnapshot(result.project),
+      compatibility: compatibilitySnapshot(result.compatibility),
+      validation: validationSnapshot(result.validation)
+    }
+  };
+}
+
+function durationSeconds(value) {
+  const match = /^P(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/i.exec(
+    String(value ?? "")
+  );
+  if (!match) return null;
+  return (
+    Number(match[1] ?? 0) * 86400 +
+    Number(match[2] ?? 0) * 3600 +
+    Number(match[3] ?? 0) * 60 +
+    Number(match[4] ?? 0)
+  );
+}
+
+function positiveDuration(value) {
+  const seconds = durationSeconds(value);
+  return seconds != null && seconds > 0;
+}
+
+function zeroDurationOrAbsent(value) {
+  if (value == null || value === "") return true;
+  return durationSeconds(value) === 0;
+}
+
+function equalDuration(left, right) {
+  const leftSeconds = durationSeconds(left);
+  const rightSeconds = durationSeconds(right);
+  return leftSeconds != null && rightSeconds != null && leftSeconds === rightSeconds;
+}
+
+function zeroPercent(value) {
+  const number = Number(value ?? 0);
+  return Number.isFinite(number) && number === 0;
+}
+
+function hasTaskActualProgressTimephasing(task) {
+  return (task?.timephasedData ?? []).some((row) => String(row?.type) === "11");
+}
+
+function isUnstartedTaskForPartialIntent(task) {
+  return (
+    zeroPercent(task?.percentComplete) &&
+    zeroPercent(task?.percentWorkComplete) &&
+    !task?.actualStart &&
+    !task?.actualFinish &&
+    zeroDurationOrAbsent(task?.actualDuration) &&
+    zeroDurationOrAbsent(task?.actualWork) &&
+    equalDuration(task?.remainingDuration, task?.duration) &&
+    equalDuration(task?.remainingWork, task?.work) &&
+    !task?.stop &&
+    !task?.resume &&
+    !hasTaskActualProgressTimephasing(task)
+  );
 }
 
 function spansCutoff(task, cutoff) {
@@ -373,8 +511,8 @@ export function planMondayFiftyPercentSample({ project, cutoff, fraction = 0.5 }
   const boundedFraction = Math.min(1, Math.max(0, Number(fraction)));
   const pool = project.leafTasks
     .filter((task) => spansCutoff(task, cutoffDate))
-    .filter((task) => Number(task.percentComplete ?? 0) === 0)
-    .filter((task) => positiveNumber(task.duration) && positiveNumber(task.work))
+    .filter((task) => positiveDuration(task.duration) && positiveDuration(task.work))
+    .filter(isUnstartedTaskForPartialIntent)
     .sort((left, right) => {
       const leftId = Number(left.id);
       const rightId = Number(right.id);
