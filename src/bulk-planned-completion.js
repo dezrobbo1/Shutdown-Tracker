@@ -4,6 +4,15 @@ import {
   buildAssignedCompletionNativeV0Transaction
 } from "./native-completion-v0.js";
 
+export const BULK_PLANNED_COMPLETION_PROFILE = Object.freeze({
+  id: "bulk-planned-completion-native-v0",
+  label: "Bulk planned completion through reporting cutoff — Microsoft Project-verified bounded composition",
+  classification: "native-evidence-derived",
+  baseProfileId: "assigned-completion-native-v0",
+  proofBoundary:
+    "One active unstarted leaf task per transaction, one non-zero-resource assignment, one Unit 1 Type 1 assignment timephased row, and planned-window 100% completion."
+});
+
 function requireCondition(condition, message) {
   if (!condition) {
     throw new Error(message);
@@ -18,6 +27,22 @@ function asCutoffDate(value) {
   const parsed = parseProjectTimestamp(value);
   requireCondition(parsed, "Reporting cutoff is invalid.");
   return parsed;
+}
+
+function localTimestamp(date) {
+  const pad = (value) => String(value).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(
+    date.getHours()
+  )}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function cutoffProjectLocal(value, date) {
+  if (typeof value === "string") {
+    const text = value.trim();
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(text)) return `${text}:00`;
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/.test(text)) return text;
+  }
+  return localTimestamp(date);
 }
 
 function evidenceEventsForTask(task) {
@@ -131,6 +156,7 @@ export function analyzePlannedCompletionCut({ project, cutoff, existingEvents = 
 
   return {
     cutoff: cutoffDate,
+    cutoffProjectLocal: cutoffProjectLocal(cutoff, cutoffDate),
     plannedFinishedCount: plannedFinishedTasks.length,
     eligible,
     unsupported,
@@ -147,6 +173,26 @@ function rawScalarFromBlock(block, field) {
   return match?.[1]?.trim() ?? null;
 }
 
+function decodeXmlText(value) {
+  return String(value).replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi, (match, entity) => {
+    const normalized = entity.toLowerCase();
+    if (normalized === "amp") return "&";
+    if (normalized === "lt") return "<";
+    if (normalized === "gt") return ">";
+    if (normalized === "quot") return '"';
+    if (normalized === "apos") return "'";
+    if (normalized.startsWith("#x")) {
+      const codePoint = Number.parseInt(normalized.slice(2), 16);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    }
+    if (normalized.startsWith("#")) {
+      const codePoint = Number.parseInt(normalized.slice(1), 10);
+      return Number.isFinite(codePoint) ? String.fromCodePoint(codePoint) : match;
+    }
+    return match;
+  });
+}
+
 function rawTaskNameForUid(xml, taskUid) {
   const expression = /<((?:[A-Za-z_][\w.-]*:)?Task)\b[^>]*>[\s\S]*?<\/\1>/g;
   let rawName = null;
@@ -159,6 +205,16 @@ function rawTaskNameForUid(xml, taskUid) {
   }
   requireCondition(count === 1, `Task UID ${taskUid} matched ${count} source Task blocks while resolving XML identity.`);
   requireCondition(rawName != null && rawName !== "", `Task UID ${taskUid} requires a source Name.`);
+  return rawName;
+}
+
+function sourceTaskNameForTransaction(xml, transaction) {
+  const rawName = rawTaskNameForUid(xml, transaction.taskUid);
+  const decodedName = decodeXmlText(rawName);
+  requireCondition(
+    decodedName === String(transaction.taskName),
+    `Task UID ${transaction.taskUid} Name identity mismatch: source ${decodedName}, analysis ${transaction.taskName}.`
+  );
   return rawName;
 }
 
@@ -222,11 +278,9 @@ export function generateBulkAssignedCompletionNativeV0({ sourceXml, analysis }) 
   let candidateText = sourceXml;
   for (const transaction of transactions) {
     assertEvidenceProfileIdentity(transaction);
-    const sourceIdentityTransaction = {
-      ...transaction,
-      taskName: rawTaskNameForUid(sourceXml, transaction.taskUid)
-    };
-    candidateText = applyAssignedCompletionNativeV0(candidateText, sourceIdentityTransaction);
+    const rawSourceTaskName = sourceTaskNameForTransaction(sourceXml, transaction);
+    const patchTransaction = { ...transaction, taskName: rawSourceTaskName };
+    candidateText = applyAssignedCompletionNativeV0(candidateText, patchTransaction);
   }
 
   const normalizedSource = normalizeBulkTargets(sourceXml, transactions);
@@ -239,6 +293,7 @@ export function generateBulkAssignedCompletionNativeV0({ sourceXml, analysis }) 
   return {
     candidateText,
     transactions,
+    profile: BULK_PLANNED_COMPLETION_PROFILE,
     changedTaskUids: transactions.map((transaction) => String(transaction.taskUid)),
     changedAssignmentUids: transactions.map((transaction) => String(transaction.assignmentUid))
   };
@@ -270,6 +325,32 @@ export function buildBulkCompletionExecutionIntent({ analysis, recordedAt = new 
     });
   }
   return events;
+}
+
+export function buildBulkCompletionIntentDocument({
+  source,
+  candidate,
+  analysis,
+  createdAt = new Date()
+}) {
+  requireCondition(source?.fileName && source?.sha256, "Source provenance is required.");
+  requireCondition(candidate?.fileName && candidate?.sha256, "Candidate provenance is required.");
+  requireCondition(analysis?.cutoffProjectLocal, "Reporting-cut analysis provenance is required.");
+  return {
+    format: "shutdown-tracker-bulk-planned-completion/v0",
+    createdAt: createdAt.toISOString(),
+    profile: BULK_PLANNED_COMPLETION_PROFILE,
+    source: { fileName: source.fileName, sha256: source.sha256 },
+    candidate: {
+      fileName: candidate.fileName,
+      sha256: candidate.sha256,
+      profileId: BULK_PLANNED_COMPLETION_PROFILE.id
+    },
+    cutoff: analysis.cutoffProjectLocal,
+    supportedTaskUids: candidate.changedTaskUids,
+    unsupported: analysis.unsupported,
+    executionIntent: candidate.executionIntent
+  };
 }
 
 function positiveNumber(value) {
@@ -314,6 +395,7 @@ export function planMondayFiftyPercentSample({ project, cutoff, fraction = 0.5 }
 
   return {
     cutoff: cutoffDate,
+    cutoffProjectLocal: cutoffProjectLocal(cutoff, cutoffDate),
     fraction: boundedFraction,
     activePoolCount: pool.length,
     selected: selected.map((task) => ({
@@ -327,5 +409,21 @@ export function planMondayFiftyPercentSample({ project, cutoff, fraction = 0.5 }
     })),
     exportable: false,
     note: "Intent plan only. Assigned-task partial-progress XML is not yet Microsoft Project-proven and must not be generated."
+  };
+}
+
+export function buildPartialProgressIntentDocument({ source, plan, createdAt = new Date() }) {
+  requireCondition(source?.fileName && source?.sha256, "Source provenance is required.");
+  requireCondition(plan?.cutoffProjectLocal, "Partial-progress plan provenance is required.");
+  return {
+    format: "shutdown-tracker-partial-progress-intent/v0",
+    createdAt: createdAt.toISOString(),
+    source: { fileName: source.fileName, sha256: source.sha256 },
+    cutoff: plan.cutoffProjectLocal,
+    fraction: plan.fraction,
+    reportedPercent: 50,
+    selected: plan.selected,
+    exportable: false,
+    note: plan.note
   };
 }
