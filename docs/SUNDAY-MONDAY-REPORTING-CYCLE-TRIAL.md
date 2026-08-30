@@ -2,13 +2,13 @@
 
 ## Status
 
-Experimental multi-task composition trial.
+The Sunday bulk-completion experiment is **Microsoft Project-verified for the tested 13-task composition**.
 
-The underlying `assigned-completion-native-v0` transaction is Microsoft Project-verified for one BOILER task with one assignment and one timephased work block. This experiment asks a new question: can that already-proven transaction be composed safely across every eligible task planned to be complete by a reporting cutoff?
+The underlying `assigned-completion-native-v0` transaction was already proven for one BOILER task. This experiment has now shown that the same bounded transaction can be composed across 13 eligible tasks in one real BOILER candidate, survive Microsoft Project recalculation, survive MPP save/close/reopen, and retain the intended completions.
 
-The Sunday bulk transaction has now passed the **13-task completion persistence** portion of its native trial, including MPP save/close/reopen. A separate control is still required before merge because Microsoft Project changed ten unrelated multi-assignment task starts/durations during the XML → MPP → reopen cycle. The control must determine whether that is baseline Microsoft Project normalization or a consequence specific to the progressed candidate.
+A no-Tracker control also reproduced the unrelated schedule changes seen during XML → MPP persistence, so those changes are classified as baseline Microsoft Project normalization rather than consequences of the Tracker transaction.
 
-The Monday 50% portion is intentionally **intent-only**. No partial-progress XML is generated until a native 50% assigned-task reference has been collected and verified.
+The Monday 50% portion remains intentionally **intent-only**. No partial-progress XML is generated until a native 50% assigned-task reference has been collected and verified.
 
 ## Trial page
 
@@ -20,40 +20,25 @@ Use the dedicated browser-local page:
 
 The main single-task lab remains available separately.
 
-## Sunday planned-completion simulation
+## Sunday planned-completion behaviour
 
-1. Import the untouched BOILER XML source.
-2. Enter the exact end-of-shift Sunday reporting cutoff. Do not infer the shift boundary from the calendar date.
+1. Import the untouched Project XML source.
+2. Enter the exact reporting cutoff.
 3. Select **Analyse schedule**.
-4. Review:
-   - leaf tasks whose planned Finish is at or before the cutoff;
-   - tasks supported by the already-proven v0 shape;
-   - unsupported tasks and their reason categories.
+4. Review planned-finished leaf tasks, supported tasks and unsupported reason categories.
 5. Select **Prepare Sunday candidate**.
-6. Download separately:
-   - the complete-source Sunday XML candidate; and
-   - the JSON execution-intent record containing the cutoff, supported UIDs and unsupported reasons.
-7. Open the candidate in Microsoft Project desktop.
-8. Recalculate.
-9. Inspect the schedule and export/save a separate XML result.
-10. Save as MPP, close Microsoft Project, reopen the MPP, then export another XML result.
-11. Compare source, candidate, first Project XML result and post-MPP-reopen XML result.
+6. Download the XML candidate and intent JSON as separate explicit downloads.
+7. Open the XML in Microsoft Project.
+8. Recalculate and inspect.
+9. Export an XML result.
+10. Save as MPP, close Project, reopen the MPP and export another XML result.
+11. Compare source, candidate, first Project result and post-MPP-reopen result.
 
-### Source preflight examples
-
-The untouched BOILER schedule currently produces these counts under the exact strict v0 eligibility rules used by the bulk planner. These are examples only; use the actual shift cutoff for the trial.
-
-| Reporting cut | Planned-finished leaf tasks | Supported v0 completions | Left unchanged |
-|---|---:|---:|---:|
-| 13 Sep 2026 23:59 | 62 | 48 | 14 |
-| 14 Sep 2026 07:00 | 65 | 51 | 14 |
-| 14 Sep 2026 18:00 | 159 | 136 | 23 |
-
-Unsupported tasks remain byte-for-byte unchanged in the browser candidate. Typical reasons in the real schedule include milestones/non-positive duration, multiple assignment timephased rows, multiple assignments and other shapes outside the existing proof.
+Unsupported tasks remain byte-for-byte unchanged in the browser candidate.
 
 ## Bulk candidate rules
 
-For every supported task, the generator reuses the exact bounded transaction already proven in Microsoft Project:
+Every supported task reuses the exact bounded completion transaction already proven by the single-task experiment.
 
 ### Task
 
@@ -74,11 +59,11 @@ For every supported task, the generator reuses the exact bounded transaction alr
 - Actual Work = assignment Work
 - Remaining Work = zero
 - Stop / Resume = Actual Finish
-- existing Type 1 timephased block becomes Type 2 over the same UID, interval, Unit and Value
+- existing Type 1 assignment timephased work becomes Type 2 over the same UID, interval, Unit and Value
 
-The generator does not author task Type 11. Microsoft Project generated Type 11 itself in the successful single-task and bulk round trips.
+The generator does not author task Type 11. Microsoft Project owns that result-side serialization.
 
-The bulk generator verifies that XML outside all selected Task and Assignment blocks remains byte-for-byte identical to the imported source.
+The generator also verifies that XML outside every selected Task and Assignment block remains byte-for-byte identical to the imported source.
 
 ## 2026-08-30 native bulk result
 
@@ -90,27 +75,28 @@ Real schedule artifacts remain outside Git.
 |---|---|
 | Untouched BOILER source | `e6a3739976580e2144352011f818c0099c0dc0c278fb37a976c5b6a55fbc3420` |
 | Browser bulk candidate | `6255ee46948e893784f75fb408339d863e014905f82f1b6947ea48b3d25cd22f` |
-| Microsoft Project XML export before MPP reopen | `0f325baae72126d668a1506ba14cdabd9d2fafc44aff19ef8ea7bab494537080` |
-| Microsoft Project XML export after MPP save/close/reopen | `f6ed41e06262cf3933eee234214edc9c5d5c5a92171fda36c1bf070f3259d871` |
+| First Microsoft Project XML export | `0f325baae72126d668a1506ba14cdabd9d2fafc44aff19ef8ea7bab494537080` |
+| Post-MPP-save/close/reopen XML export | `f6ed41e06262cf3933eee234214edc9c5d5c5a92171fda36c1bf070f3259d871` |
+| Untouched-source XML → MPP → close/reopen → XML control | `844c5673bd99fac803821aeecb64ecb41bc8882d887b204be65cbd1bfbe008bd` |
 
-Microsoft Project build recorded in both result XML files: `16.0.20228.20186`.
+Microsoft Project build recorded in the result/control XML: `16.0.20228.20186`.
 
 ### Bulk completion persistence — PASS
 
-The candidate touched these 13 supported task UIDs:
+The browser candidate completed these 13 task UIDs:
 
 ```text
 43, 318, 319, 321, 324, 323, 29, 26, 338, 337, 336, 335, 320
 ```
 
-After Project import/recalculation/export and again after saving as MPP, closing, reopening and exporting:
+After Project import/recalculation/export and again after MPP save, close and reopen:
 
 - all 13 remained `100%` complete and `100%` work complete;
-- all 13 retained their planned Actual Start and Actual Finish;
-- Actual Duration/Work remained equal to planned Duration/Work;
-- Remaining Duration/Work remained zero;
-- their single assignments retained coherent 100% completion and Type 2 actual-work timephasing;
-- the five unsupported planned-finished tasks remained at zero progress;
+- Actual Start / Finish remained the planned window;
+- Actual Duration / Work remained equal to planned values;
+- Remaining Duration / Work remained zero;
+- their single assignments remained coherent and retained Type 2 actual-work timephasing;
+- the five deliberately unsupported planned-finished tasks remained at zero progress;
 - task count remained 555;
 - assignment count remained 472;
 - resource count remained 32;
@@ -119,18 +105,20 @@ After Project import/recalculation/export and again after saving as MPP, closing
 - Project Finish remained `2026-09-24T21:00:00`;
 - Status Date remained `2025-05-09T17:00:00`;
 - Project Calendar UID remained `1`;
-- all predecessor-link semantics remained unchanged;
-- common calendar definitions remained semantically unchanged, excluding Project-regenerated GUID identity.
+- all 600 predecessor-link semantics remained unchanged;
+- task UID/ID/Name/WBS identities remained traceable;
+- assignment UID/TaskUID/ResourceUID identities remained traceable;
+- calendar definitions remained semantically unchanged after excluding regenerated GUID identity.
 
-Project-generated task Type 11 serialization persisted. In the bulk result, some tasks use a simple single Type 11 row while overnight/non-working-window tasks are expanded into multiple hourly rows. Tracker must continue treating Type 11 as Project-owned result serialization rather than authoring a canonical form.
+Project generated task Type 11 progress itself. Some completed tasks use a single Type 11 row while overnight/non-working-window tasks are expanded into multiple hourly rows. Tracker must not attempt to author a canonical Type 11 representation.
 
-### MPP reopen control finding — unresolved
+## Untouched-source MPP control — PASS
 
-The MPP save/close/reopen step revealed a separate schedule-normalization effect outside the 13 touched tasks.
+### Why the control was required
 
-Compared with the first Project XML export, the post-MPP-reopen XML changed the Start and Duration of ten **untouched multi-assignment tasks** while retaining their Finish and Work:
+The progressed schedule's post-MPP-reopen result moved the Start later and shortened the Duration of ten unrelated multi-assignment tasks while keeping their Finish and Work fixed:
 
-| Task UID | Task | Start before MPP reopen | Start after MPP reopen | Duration before | Duration after |
+| Task UID | Task | Original Start | Post-MPP Start | Original Duration | Post-MPP Duration |
 |---:|---|---|---|---:|---:|
 | 100 | Vacuum blasting debris (FLT) | 14 Sep 02:00 | 14 Sep 07:00 | 4h | 2h |
 | 106 | Vacuum blasting debris (BDV) | 14 Sep 04:00 | 14 Sep 07:00 | 4h | 2h |
@@ -143,47 +131,60 @@ Compared with the first Project XML export, the post-MPP-reopen XML changed the 
 | 264 | Vacuum blasting debris (HS Piping) | 16 Sep 23:00 | 17 Sep 07:00 | 12h | 6h |
 | 284 | LPW FD fan impeller | 13 Sep 21:00 | 14 Sep 07:00 | 8h | 4h |
 
-For each of those tasks, the affected assignment is the Resource UID `11` / `WC-OPER` assignment. Microsoft Project moved that assignment's Start/Finish and its Type 1 timephased interval to align with the later assignment window. The task Finish and total Work remained unchanged.
+The same Project build was therefore tested with the untouched source and no Tracker progress transaction.
 
-Project also recalculated derived late/slack fields widely between the first XML export and the post-MPP-reopen export: 536 `LateStart`, 534 `LateFinish`, 510 `TotalSlack`, 515 `StartSlack` and 520 `FinishSlack` values changed. Project/task/calendar/assignment GUIDs were regenerated as save identity.
+### Control result
 
-These changes happened **after** the browser transaction had already been accepted and exported by Project, during the later MPP persistence/reopen cycle. They are therefore not browser-authored fields. However, they affect unrelated schedule data and must be isolated before the PR can merge.
+The untouched source was opened directly in Microsoft Project, saved as MPP, closed, reopened and exported back to XML.
 
-### Required baseline control
+It reproduced **the exact same ten task movements**.
 
-Before merging this PR, perform one control with **no Tracker progress transaction**:
+For each of the ten tasks:
 
-1. open the untouched BOILER source XML directly in the same Microsoft Project build;
-2. save it as MPP;
-3. close Microsoft Project;
-4. reopen the saved MPP;
-5. export XML;
-6. compare the same ten multi-assignment tasks, assignment UID/resource identities, Project Start/Finish/Status Date, calendars and late/slack fields.
+- the affected assignment was the same Resource UID `11` / `WC-OPER` assignment;
+- its assignment Start/Finish moved to the same later interval;
+- the task's final Start, Finish, Duration and Work exactly matched the progressed post-MPP result;
+- Finish and total Work remained unchanged from the original source.
 
-Decision rule:
+Across the whole schedule, the untouched control and the progressed post-MPP result have:
 
-- if the untouched control produces the same ten task/assignment shifts, classify them as baseline Microsoft Project XML → MPP normalization and keep them out of the Tracker-authored semantic delta;
-- if the untouched control does **not** produce the same shifts, treat the bulk candidate as having triggered an unintended recalculation consequence and do not merge until explained.
+- identical task Start, Finish, Duration and Work for all 555 tasks;
+- identical assignment Start, Finish and Work for all 472 assignments;
+- identical `LateStart`, `LateFinish`, `TotalSlack`, `StartSlack` and `FinishSlack` values for all tasks;
+- the same 555 tasks, 472 assignments, 32 resources and 45 calendars;
+- the same Project Start, Project Finish, Status Date and Project Calendar UID;
+- identical 600 predecessor-link semantics;
+- semantically identical calendar definitions after excluding regenerated GUID identity.
 
-## Sunday pass conditions
+The only task/assignment differences between the untouched-control result and the progressed result are therefore the intended progress/actual/remaining fields, plus a small set of expected progress-dependent Free Slack consequences.
 
-- every supported touched task remains coherently 100% complete after Project recalculation/save;
-- no touched task retains contradictory Remaining Duration or Remaining Work;
-- touched assignment progress remains coherent;
-- unsupported tasks are not authored by the browser;
-- source task identity remains traceable;
-- Project Start remains unchanged;
-- Status Date remains unchanged unless the user deliberately changes it in Project;
-- common calendar semantics remain stable;
-- Project Finish movement, summary roll-up, resource roll-up, slack/criticality changes and Project-generated serialization are treated as Project-calculated/result-side evidence rather than hidden Tracker inputs;
-- the saved MPP reopens with all intended completions intact;
-- any unrelated MPP-reopen schedule movement is shown to occur in an untouched baseline control before it is classified as normal Project behavior.
+### Timephased normalization control
+
+The untouched source contained 2,202 timephased rows:
+
+- 889 task Type 9 rows;
+- 851 resource Type 7 rows;
+- 462 assignment Type 1 rows.
+
+After XML → MPP persistence and reopen, the untouched control contained 462 rows, all assignment Type 1, while all tasks remained at zero progress.
+
+The progressed post-MPP result contained 510 rows:
+
+- 449 assignment Type 1 rows;
+- 13 assignment Type 2 actual-work rows;
+- 48 Project-generated task Type 11 rows.
+
+This isolates the broad removal of source task Type 9/resource Type 7 serialization as normal Project persistence behaviour and isolates the additional Type 2/Type 11 rows as the intended progress-related result.
+
+### Classification
+
+The ten unrelated task movements and broad derived late/slack recalculation are **baseline Microsoft Project XML → MPP persistence/recalculation normalization**, not Tracker-authored changes and not consequences unique to the bulk completion transaction.
+
+The control therefore clears the final native blocker for the Sunday bulk-completion experiment.
 
 ## Monday 50% reporting preview
 
-After choosing the Monday reporting cutoff, select **Preview half reported at 50%**.
-
-The page deterministically selects half of the planned-active, zero-progress work tasks and creates a downloadable JSON intent plan:
+The Monday section deterministically selects half of planned-active, zero-progress work tasks and creates a downloadable JSON intent plan containing:
 
 ```text
 Task UID
@@ -195,23 +196,25 @@ planned Finish
 reportedPercent = 50
 ```
 
-This is deliberately **not exportable XML**.
+It remains deliberately non-exportable XML.
 
 ## Partial-progress evidence gate
 
-Before the Monday 50% intent plan can become an XML transaction, create one native Microsoft Project reference on a simple assigned task:
+Before Monday 50% intent can become an XML transaction, collect and verify one native Microsoft Project 50% reference on a simple assigned task. The evidence must establish:
 
-1. start from an untouched assigned task with non-zero Work;
-2. enter 50% progress natively in Microsoft Project;
-3. save as XML;
-4. compare task Actual/Remaining Duration and Work;
-5. compare assignment Percent Work Complete / Actual Work / Remaining Work;
-6. inspect how assignment timephased work is split between Type 2 actual work and Type 1 remaining work;
-7. inspect Stop / Resume and task timephasing;
-8. reopen the saved result to verify stability.
+- task Actual/Remaining Duration;
+- task Actual/Remaining Work;
+- assignment Percent Work Complete;
+- assignment Actual/Remaining Work;
+- Type 2 actual-work and Type 1 remaining-work timephasing;
+- Stop / Resume semantics;
+- task timephasing;
+- MPP reopen stability.
 
-Only after that evidence exists should a bounded partial-progress writer be implemented and the combined Sunday-complete + Monday-half-reported candidate be generated.
+Do not generalize the proven 100% transaction into partial progress before that evidence exists.
 
-## Merge gate
+## Merge decision
 
-Do not merge the bulk-composition experiment merely because automated tests pass. The 13-task completion transaction has passed Project import/recalculation/export and MPP save/close/reopen persistence, but PR #77 must remain draft until the untouched-source MPP baseline control resolves the ten unrelated multi-assignment task shifts described above.
+**Native gate passed for the Sunday bulk-completion experiment.**
+
+The tested 13-task composition may merge with its current fail-closed restrictions. This evidence does not authorize partial-progress XML, Mark on Track, Pause/Resume, off-plan actuals, multiple assignments or other task shapes outside the existing v0 boundary.
