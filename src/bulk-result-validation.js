@@ -40,6 +40,9 @@ function normalizedText(value) {
 
 function valuesEqual(left, right, kind = "text") {
   if (kind === "duration") {
+    const leftText = normalizedText(left);
+    const rightText = normalizedText(right);
+    if (leftText === "" && rightText === "") return true;
     const leftSeconds = durationSeconds(left);
     const rightSeconds = durationSeconds(right);
     return leftSeconds != null && rightSeconds != null && leftSeconds === rightSeconds;
