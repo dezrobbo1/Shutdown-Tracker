@@ -23,8 +23,8 @@ const ASSIGNMENT_PROGRESS_FIELDS = Object.freeze([
   ["Actual Finish", "actualFinish", "text"],
   ["Actual Work", "actualWork", "duration"],
   ["Remaining Work", "remainingWork", "duration"],
-  ["Actual Overtime Work", "actualOvertimeWork", "duration"],
-  ["Remaining Overtime Work", "remainingOvertimeWork", "duration"],
+  ["Actual Overtime Work", "actualOvertimeWork", "optional-zero-duration"],
+  ["Remaining Overtime Work", "remainingOvertimeWork", "optional-zero-duration"],
   ["Stop", "stop", "text"],
   ["Resume", "resume", "text"]
 ]);
@@ -50,6 +50,13 @@ function normalizedText(value) {
 }
 
 function valuesEqual(left, right, kind = "text") {
+  if (kind === "optional-zero-duration") {
+    const leftText = normalizedText(left) || "PT0H0M0S";
+    const rightText = normalizedText(right) || "PT0H0M0S";
+    const leftSeconds = durationSeconds(leftText);
+    const rightSeconds = durationSeconds(rightText);
+    return leftSeconds != null && rightSeconds != null && leftSeconds === rightSeconds;
+  }
   if (kind === "duration") {
     const leftText = normalizedText(left);
     const rightText = normalizedText(right);
@@ -384,7 +391,7 @@ function validateExactAssignment(candidateAssignments, resultAssignments, transa
     "Actual Overtime Work",
     assignment.actualOvertimeWork,
     candidateAssignment.actualOvertimeWork,
-    "duration"
+    "optional-zero-duration"
   );
   requireField(
     failures,
@@ -392,7 +399,7 @@ function validateExactAssignment(candidateAssignments, resultAssignments, transa
     "Remaining Overtime Work",
     assignment.remainingOvertimeWork,
     candidateAssignment.remainingOvertimeWork,
-    "duration"
+    "optional-zero-duration"
   );
   requireField(failures, scope, "Stop", assignment.stop, transaction.actualFinish);
   requireField(failures, scope, "Resume", assignment.resume, transaction.actualFinish);
