@@ -23,6 +23,8 @@ const ASSIGNMENT_PROGRESS_FIELDS = Object.freeze([
   ["Actual Finish", "actualFinish", "text"],
   ["Actual Work", "actualWork", "duration"],
   ["Remaining Work", "remainingWork", "duration"],
+  ["Actual Overtime Work", "actualOvertimeWork", "duration"],
+  ["Remaining Overtime Work", "remainingOvertimeWork", "duration"],
   ["Stop", "stop", "text"],
   ["Resume", "resume", "text"]
 ]);
@@ -286,7 +288,12 @@ function validateTypeElevenCoverage(resultTask, transaction) {
     let progressTotal = 0;
     let progressRows = 0;
     for (const row of rows) {
-      const value = Number(row.value);
+      const rawValue = normalizedText(row.value).trim();
+      if (rawValue === "") {
+        failures.push(`${scope} contains a missing or empty Value.`);
+        continue;
+      }
+      const value = Number(rawValue);
       if (!Number.isFinite(value)) {
         failures.push(`${scope} contains non-numeric Value ${row.value ?? "—"}.`);
         continue;
@@ -316,6 +323,10 @@ function validateExactTask(resultTask, transaction) {
     return { pass: false, failures: [`${scope} is missing from the result.`] };
   }
 
+  if (resultTask.active === false) failures.push(`${scope} became inactive in the result.`);
+  if (resultTask.isNull === true) failures.push(`${scope} became a null task in the result.`);
+  if (resultTask.summary === true) failures.push(`${scope} became a summary task in the result.`);
+
   requireField(failures, scope, "Percent Complete", resultTask.percentComplete, 100, "percent");
   requireField(failures, scope, "Percent Work Complete", resultTask.percentWorkComplete, 100, "percent");
   requireField(failures, scope, "Start", resultTask.start, transaction.actualStart);
@@ -340,14 +351,19 @@ function validateExactTask(resultTask, transaction) {
   return { pass: failures.length === 0, typeElevenPass: typeEleven.pass, failures };
 }
 
-function validateExactAssignment(resultAssignments, transaction) {
+function validateExactAssignment(candidateAssignments, resultAssignments, transaction) {
   const failures = [];
   const scope = `Task UID ${transaction.taskUid} assignment`;
+  if (candidateAssignments.length !== 1) {
+    failures.push(`${scope} candidate count mismatch: candidate ${candidateAssignments.length}, expected 1.`);
+    return { pass: false, failures };
+  }
   if (resultAssignments.length !== 1) {
     failures.push(`${scope} count mismatch: result ${resultAssignments.length}, expected 1.`);
     return { pass: false, failures };
   }
 
+  const candidateAssignment = candidateAssignments[0];
   const assignment = resultAssignments[0];
   requireField(failures, scope, "UID", assignment.uid, transaction.assignmentUid);
   requireField(failures, scope, "Task UID", assignment.taskUid, transaction.taskUid);
@@ -362,6 +378,22 @@ function validateExactAssignment(resultAssignments, transaction) {
   if (!isZeroDuration(assignment.remainingWork)) {
     addMismatch(failures, scope, "Remaining Work", assignment.remainingWork, "PT0H0M0S");
   }
+  requireField(
+    failures,
+    scope,
+    "Actual Overtime Work",
+    assignment.actualOvertimeWork,
+    candidateAssignment.actualOvertimeWork,
+    "duration"
+  );
+  requireField(
+    failures,
+    scope,
+    "Remaining Overtime Work",
+    assignment.remainingOvertimeWork,
+    candidateAssignment.remainingOvertimeWork,
+    "duration"
+  );
   requireField(failures, scope, "Stop", assignment.stop, transaction.actualFinish);
   requireField(failures, scope, "Resume", assignment.resume, transaction.actualFinish);
 
@@ -402,6 +434,107 @@ function sortedAssignments(project, taskUid) {
     .sort((left, right) =>
       String(left.uid ?? "").localeCompare(String(right.uid ?? ""), undefined, { numeric: true })
     );
+}
+
+function allAssignments(project) {
+  if (Array.isArray(project?.assignments)) return project.assignments.slice();
+  const flattened = [];
+  for (const assignments of project?.assignmentsByTaskUid?.values?.() ?? []) {
+    flattened.push(...assignments);
+  }
+  return flattened;
+}
+
+function assignmentIdentityRows(project) {
+  return allAssignments(project)
+    .map((assignment) =>
+      [assignment?.uid, assignment?.taskUid, assignment?.resourceUid]
+        .map((value) => normalizedText(value))
+        .join("|")
+    )
+    .sort();
+}
+
+function validateAssignmentClosure(candidate, result) {
+  const failures = [];
+  compareCanonicalSets(
+    failures,
+    "Project assignment UID/TaskUID/ResourceUID closure",
+    assignmentIdentityRows(candidate),
+    assignmentIdentityRows(result)
+  );
+  return { pass: failures.length === 0, failures };
+}
+
+function resourceIdentityIndex(project) {
+  if (project?.resourceByUid instanceof Map) return project.resourceByUid;
+  if (Array.isArray(project?.resources)) {
+    return new Map(
+      project.resources
+        .filter((resource) => resource?.uid != null && resource.uid !== "")
+        .map((resource) => [String(resource.uid), resource])
+    );
+  }
+
+  const document = project?.document;
+  const root = document?.documentElement;
+  if (!root) return null;
+  const namespace = root.namespaceURI;
+  const resources = Array.from(document.getElementsByTagNameNS(namespace, "Resource"));
+  const index = new Map();
+  for (const element of resources) {
+    const uid = directChildText(element, "UID");
+    if (uid == null || uid === "") continue;
+    index.set(String(uid), {
+      uid,
+      name: directChildText(element, "Name"),
+      type: directChildText(element, "Type"),
+      initials: directChildText(element, "Initials"),
+      group: directChildText(element, "Group")
+    });
+  }
+  return index;
+}
+
+function resourceFingerprint(resource) {
+  return [resource?.uid, resource?.name, resource?.type, resource?.initials, resource?.group]
+    .map((value) => normalizedText(value))
+    .join("|");
+}
+
+function validateReferencedResources(candidate, result) {
+  const failures = [];
+  const candidateResources = resourceIdentityIndex(candidate);
+  const resultResources = resourceIdentityIndex(result);
+  if (!candidateResources && !resultResources) {
+    return { pass: true, checkedResourceCount: 0, failures };
+  }
+  if (!candidateResources || !resultResources) {
+    failures.push("Referenced resource identity data is unavailable in either the candidate or result.");
+    return { pass: false, checkedResourceCount: 0, failures };
+  }
+
+  const referenced = [...new Set(allAssignments(candidate).map((assignment) => String(assignment?.resourceUid ?? "")))]
+    .filter((uid) => candidateResources.has(uid))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true }));
+
+  for (const uid of referenced) {
+    const candidateResource = candidateResources.get(uid);
+    const resultResource = resultResources.get(uid);
+    if (!resultResource) {
+      failures.push(`Referenced Resource UID ${uid} is missing from the result.`);
+      continue;
+    }
+    const candidateFingerprint = resourceFingerprint(candidateResource);
+    const resultFingerprint = resourceFingerprint(resultResource);
+    if (candidateFingerprint !== resultFingerprint) {
+      failures.push(
+        `Referenced Resource UID ${uid} identity mismatch: result ${resultFingerprint || "—"}, expected ${candidateFingerprint || "—"}.`
+      );
+    }
+  }
+
+  return { pass: failures.length === 0, checkedResourceCount: referenced.length, failures };
 }
 
 function taskTypeElevenRows(task) {
@@ -489,6 +622,12 @@ export function validateBulkCompletionResult({
   const projectCheck = validateProjectInvariants(candidate, result);
   failures.push(...projectCheck.failures);
 
+  const assignmentClosure = validateAssignmentClosure(candidate, result);
+  failures.push(...assignmentClosure.failures);
+
+  const referencedResources = validateReferencedResources(candidate, result);
+  failures.push(...referencedResources.failures);
+
   let coherentTaskCount = 0;
   let coherentAssignmentCount = 0;
   let typeElevenTaskCount = 0;
@@ -498,7 +637,11 @@ export function validateBulkCompletionResult({
     if (taskCheck.typeElevenPass) typeElevenTaskCount += 1;
     failures.push(...taskCheck.failures);
 
-    const assignmentCheck = validateExactAssignment(sortedAssignments(result, transaction.taskUid), transaction);
+    const assignmentCheck = validateExactAssignment(
+      sortedAssignments(candidate, transaction.taskUid),
+      sortedAssignments(result, transaction.taskUid),
+      transaction
+    );
     if (assignmentCheck.pass) coherentAssignmentCount += 1;
     failures.push(...assignmentCheck.failures);
   }
@@ -519,6 +662,9 @@ export function validateBulkCompletionResult({
     strictResult,
     projectInvariantsPreserved: projectCheck.pass,
     schedulingStructurePreserved: projectCheck.schedulingStructurePreserved,
+    assignmentClosurePreserved: assignmentClosure.pass,
+    referencedResourcesPreserved: referencedResources.pass,
+    referencedResourceCount: referencedResources.checkedResourceCount,
     projectInvariantCount: projectCheck.invariantCount,
     coherentTaskCount,
     coherentAssignmentCount,
