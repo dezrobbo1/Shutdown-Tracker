@@ -1,56 +1,108 @@
-# Shutdown Tracker XML Round-Trip Lab
+# Shutdown Tracker
 
-This repository is now a deliberately small browser-local laboratory for proving Microsoft Project XML progress behaviour.
+Shutdown Tracker is being rebuilt through small, usable browser-local slices around real Microsoft Project schedules.
 
-The previous application architecture, backend, database, approval lifecycle, Mobile app, simulation framework, and extensive product governance were removed from the active tree. Their history remains available in Git and on `archive/pre-roundtrip-lab-reset-2026-08-27`.
+The repository was deliberately reset on 27 August 2026 after the previous active tree became dominated by backend, database, approval, simulation and governance infrastructure before the core execution-to-Project workflow had been proven. That history remains available in Git and on `archive/pre-roundtrip-lab-reset-2026-08-27`.
+
+The reset lab has now produced useful native evidence. Current `main` includes the Microsoft Project-verified `assigned-completion-native-v0` profile for a deliberately bounded assigned-task completion shape. Partial progress, off-plan actuals, multiple assignments and broader Project transaction shapes are still unproven.
+
+That does **not** mean Shutdown Tracker must wait for every Microsoft Project semantic before product work continues.
+
+## Current milestone — Local Execution Workspace v0
+
+Build the smallest useful local shutdown execution workspace over an imported MSPDI/XML schedule.
+
+The milestone is complete when a user can:
+
+1. import a complete Microsoft Project XML schedule locally in the browser;
+2. browse its hierarchy and executable leaf tasks;
+3. select a task and record Tracker-owned execution intent/observations;
+4. see Tracker state separately from imported Project state;
+5. generate Project XML only for transaction shapes that are already native-evidence-supported;
+6. leave partial or unsupported Project mappings as local/intent-only state rather than inventing XML semantics;
+7. reset the local scenario; and
+8. export the current Tracker workspace/evidence state as JSON.
+
+A Microsoft Project result comparison remains useful for supported exports, but it is not the product itself and must not become the only workstream.
+
+## Authority boundary
+
+Shutdown Tracker and Microsoft Project have different responsibilities:
+
+- **Shutdown Tracker owns execution truth and local operational observations.** It may record Start, Pause, Resume, Finish and partial observations even when no Project write-back mapping exists yet.
+- **Microsoft Project owns schedule calculation and Project-native serialization.**
+- **Project write-back is fail-closed.** Only native-evidence-supported transaction shapes may be written to Project XML.
+- **Unsupported Project mappings are not blockers to Tracker capture.** They remain clearly labelled local/intent-only until separately proven.
+
+This distinction is deliberate. We do not need to prove partial-progress MSPDI write-back before building useful partial-progress tracking.
+
+## Current Project interoperability status
+
+### Intent log only
+
+The candidate XML remains byte-for-byte identical to the imported source. A separate JSON record captures execution intent.
+
+### Task scalar diagnostic
+
+Retained only as a diagnostic known to be insufficient for coherent assigned-task completion.
+
+### Assigned completion native v0
+
+Microsoft Project-verified on the bounded single-assignment BOILER case merged in PR #75. The profile remains deliberately fail-closed outside its proven shape.
+
+### Bulk reporting-cut experiment
+
+PR #77 contains useful 13-task native evidence and a Sunday/Monday reporting-cycle experiment. It is **not a prerequisite for continuing product development**. Review findings on that branch should be classified by whether they invalidate the tested evidence or block a current user capability, rather than automatically expanding the validator until every theoretical edge case is closed.
+
+## Forward-progress rule
+
+Substantial work should do at least one of the following:
+
+- add a user-visible capability to the current milestone;
+- run an experiment whose answer changes what we build next;
+- fix a defect that blocks or corrupts the current milestone; or
+- remove complexity that is preventing delivery.
+
+Tests, documentation, interoperability research and hardening support those goals. They are not progress by themselves.
+
+When an unsupported edge case is discovered, prefer a clear fail-closed/unsupported state unless that case is present in the target workflow or prevents the current milestone from working.
 
 ## Current workflow
 
 ```text
-Microsoft Project XML
+Microsoft Project XML/MSPDI
         ↓
-Import locally in the browser
+Import locally in browser
         ↓
-Review executable leaf tasks
+Browse hierarchy + executable tasks
         ↓
-Record execution intent
-Start / Pause / Resume / Finish / observed progress
+Record Tracker execution state / observations
         ↓
-Use optional trial helpers
-Mark on Track / progress to shift end / skip to planned finish
+Keep unsupported Project mappings local / intent-only
         ↓
-Select an experimental export profile
+For proven shapes only: generate separate candidate XML
         ↓
-Download a separate candidate XML
+Optional Microsoft Project open / recalculate / result comparison
         ↓
-Open, recalculate and Save As XML in Microsoft Project
-        ↓
-Import the Project-saved result
-        ↓
-Compare source → intent → candidate → Project result
+Export Tracker workspace/evidence JSON
 ```
 
-No file is uploaded. State is held in browser memory and is lost on reload.
+The imported source is never overwritten.
 
-## Export profiles
+## Deliberate current exclusions
 
-### Intent log only
+Do not add these merely because they are plausible future product features:
 
-The downloaded XML is byte-for-byte identical to the imported source. A separate JSON file records execution intent. Use this for baseline open/save comparisons.
+- production backend/database/authentication;
+- production Mobile/offline architecture;
+- broad role/approval machinery;
+- native MPP writing;
+- automatic Microsoft Project control;
+- CPM/scheduling engine ownership inside this repository;
+- broad compatibility certification;
+- infrastructure whose only purpose is future-proofing.
 
-### Task scalar diagnostic
-
-Applies only task-level `PercentComplete`, `ActualStart`, and `ActualFinish` values to a complete-source candidate. This profile is deliberately retained as a **diagnostic known to be insufficient for assigned tasks**. It exists so native Project behaviour can be compared against the previously failed mechanism.
-
-No profile is currently claimed to implement a complete native Microsoft Project progress transaction.
-
-## Trial helpers
-
-- **Mark on Track** records the intent to progress according to the planned window at the selected trial time. The displayed percentage is a simple wall-clock estimate, not a Microsoft Project calendar calculation.
-- **Progress to expected shift end** records the estimated planned percentage at the configured shift end.
-- **Skip to planned finish** moves the local trial time to the imported planned finish and records 100% expected progress.
-
-These helpers accelerate user trials. They do not claim to reproduce the native Project commands until native evidence is captured and implemented as a separate profile.
+They can be introduced later when a working product slice demonstrates a concrete need.
 
 ## Run locally
 
@@ -64,6 +116,4 @@ npm run serve
 
 Then open the displayed local address.
 
-## Repository boundary
-
-The current task is feasibility, not product completion. Do not reintroduce the old architecture until assigned-task partial progress and completion have been proven through Microsoft Project-authored XML evidence.
+See `docs/NEXT-MILESTONE.md` for the active acceptance boundary and delivery guardrails.
